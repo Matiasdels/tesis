@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "sis4UzdgEoo=",
+  "success": true,
+  "projectFilePath": "/Users/matiasdelgado/Documents/futbolTesis/backend/FutbolStats.api/FutbolStats.api.csproj",
+  "expectedPackageFiles": [
+    "/Users/matiasdelgado/.nuget/packages/microsoft.aspnetcore.openapi/10.0.5/microsoft.aspnetcore.openapi.10.0.5.nupkg.sha512",
+    "/Users/matiasdelgado/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
