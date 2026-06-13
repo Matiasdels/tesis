@@ -1,5 +1,6 @@
 abstract class AppConstants {
   // Navigation route names
+  static const String routeSplash       = '/splash';
   static const String routeLogin        = '/login';
   static const String routeDashboard    = '/';
   static const String routePlayers      = '/players';

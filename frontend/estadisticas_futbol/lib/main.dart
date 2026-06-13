@@ -10,21 +10,37 @@ void main() {
   runApp(const KanchaApp());
 }
 
-class KanchaApp extends StatelessWidget {
+class KanchaApp extends StatefulWidget {
   const KanchaApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final authState = AuthState()..initialize();
-    final appRouter = createRouter(authState);
+  State<KanchaApp> createState() => _KanchaAppState();
+}
 
+class _KanchaAppState extends State<KanchaApp> {
+  late final AuthState _authState;
+  late final RouterConfig<Object> _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _authState = AuthState();
+    _router = createRouter(_authState);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _authState.initialize();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => authState,
+      create: (_) => _authState,
       child: MaterialApp.router(
         title: 'Kancha',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
-        routerConfig: appRouter,
+        routerConfig: _router,
       ),
     );
   }
