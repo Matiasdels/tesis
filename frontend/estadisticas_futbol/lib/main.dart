@@ -7,11 +7,11 @@ import 'package:estadisticas_futbol/data/remote/auth_state.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const FieldIQApp());
+  runApp(const KanchaApp());
 }
 
-class FieldIQApp extends StatelessWidget {
-  const FieldIQApp({super.key});
+class KanchaApp extends StatelessWidget {
+  const KanchaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
