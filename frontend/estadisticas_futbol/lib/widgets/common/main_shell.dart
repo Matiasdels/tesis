@@ -33,9 +33,9 @@ class MainShell extends StatelessWidget {
         title: const Text('Kancha'),
         actions: [
           IconButton(
-            tooltip: 'Cerrar sesión',
-            onPressed: () => _logout(context),
-            icon: const Icon(Icons.logout),
+            tooltip: 'Perfil',
+            onPressed: () => _showProfileSheet(context),
+            icon: const Icon(Icons.account_circle_outlined),
           ),
         ],
       ),
@@ -49,6 +49,211 @@ Future<void> _logout(BuildContext context) async {
   await context.read<AuthState>().logout();
   if (context.mounted) {
     context.go(AppConstants.routeLogin);
+  }
+}
+
+void _showProfileSheet(BuildContext context) {
+  final auth = context.read<AuthState>();
+  final user = auth.user;
+  final fullName =
+      user == null ? 'Usuario' : '${user.nombre} ${user.apellido}'.trim();
+  final initials = _initials(user?.nombre, user?.apellido);
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.bgCard,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Perfil',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.bgSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderSubtle, width: 0.5),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.purpleDim,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          color: AppColors.purple,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fullName.isEmpty ? 'Usuario' : fullName,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            user?.email ?? 'Sesión activa',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentDim,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                user?.rol ?? 'Usuario',
+                                style: const TextStyle(
+                                  color: AppColors.accent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.bgSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderSubtle, width: 0.5),
+                ),
+                child: Column(
+                  children: [
+                    _ProfileInfoRow(
+                      icon: Icons.person_outline,
+                      label: 'Usuario',
+                      value: user?.nombreUsuario ?? '-',
+                    ),
+                    const Divider(height: 1, color: AppColors.borderSubtle),
+                    _ProfileInfoRow(
+                      icon: Icons.badge_outlined,
+                      label: 'Rol',
+                      value: user?.rol ?? 'Usuario',
+                    ),
+                    const Divider(height: 1, color: AppColors.borderSubtle),
+                    const _ProfileInfoRow(
+                      icon: Icons.verified_user_outlined,
+                      label: 'Estado',
+                      value: 'Sesión activa',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(46),
+                ),
+                onPressed: () async {
+                  Navigator.of(sheetContext).pop();
+                  await _logout(context);
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text('Cerrar sesión'),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+String _initials(String? nombre, String? apellido) {
+  final first = nombre != null && nombre.isNotEmpty ? nombre[0] : '';
+  final last = apellido != null && apellido.isNotEmpty ? apellido[0] : '';
+  final value = '$first$last'.toUpperCase();
+  return value.isEmpty ? 'US' : value;
+}
+
+class _ProfileInfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _ProfileInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.textMuted),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -149,7 +354,8 @@ class _SidebarLogo extends StatelessWidget {
               color: AppColors.accent,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.bolt, color: Colors.black, size: 18),
+            child:
+                const Icon(Icons.sports_soccer, color: Colors.black, size: 18),
           ),
           const SizedBox(width: 10),
           const Text(
@@ -254,72 +460,68 @@ class _SidebarUser extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthState>().user;
-    final initials = user == null
-        ? 'US'
-        : '${user.nombre.isNotEmpty ? user.nombre[0] : ''}'
-                '${user.apellido.isNotEmpty ? user.apellido[0] : ''}'
-            .toUpperCase();
+    final initials = _initials(user?.nombre, user?.apellido);
     final fullName =
         user == null ? 'Usuario' : '${user.nombre} ${user.apellido}'.trim();
     final role = user?.rol ?? 'Usuario';
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        border: Border(
-          top: BorderSide(color: AppColors.borderSubtle, width: 0.5),
-        ),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.purpleDim,
-            child: Text(
-              initials.isEmpty ? 'US' : initials,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.purple,
-                fontWeight: FontWeight.w500,
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showProfileSheet(context),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.borderSubtle, width: 0.5),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fullName,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.purpleDim,
+                child: Text(
+                  initials,
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                    color: AppColors.purple,
                     fontWeight: FontWeight.w500,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  role,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textMuted,
-                  ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fullName.isEmpty ? 'Usuario' : fullName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      role,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.expand_less,
+                size: 16,
+                color: AppColors.textMuted,
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-            padding: EdgeInsets.zero,
-            onPressed: () => _logout(context),
-            icon: const Icon(
-              Icons.logout,
-              size: 16,
-              color: AppColors.textMuted,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
