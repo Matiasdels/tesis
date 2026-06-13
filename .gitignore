@@ -1,6 +1,11 @@
 # Flutter
 frontend/**/build/
 frontend/**/.dart_tool/
+frontend/**/.idea/
+frontend/**/*.iml
+frontend/**/.flutter-plugins-dependencies
+frontend/**/android/.gradle/
+frontend/**/android/.kotlin/
 
 # .NET
 backend/**/bin/
