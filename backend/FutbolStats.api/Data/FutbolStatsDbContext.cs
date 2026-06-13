@@ -5,6 +5,8 @@ namespace FutbolStats.Api.Data;
 
 public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options) : DbContext(options)
 {
+    public DbSet<Rol> Roles => Set<Rol>();
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Jugador> Jugadores => Set<Jugador>();
     public DbSet<Partido> Partidos => Set<Partido>();
@@ -13,6 +15,32 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Rol>(entity =>
+        {
+            entity.ToTable("Roles");
+            entity.HasKey(x => x.RolId);
+            entity.Property(x => x.Nombre).HasMaxLength(50).IsRequired();
+            entity.HasIndex(x => x.Nombre).IsUnique();
+        });
+
+        modelBuilder.Entity<Usuario>(entity =>
+        {
+            entity.ToTable("Usuarios");
+            entity.HasKey(x => x.UsuarioId);
+            entity.Property(x => x.NombreUsuario).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Email).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.PasswordHash).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.Nombre).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Apellido).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Activo).HasDefaultValue(true);
+            entity.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSDATETIME()");
+            entity.HasIndex(x => x.NombreUsuario).IsUnique();
+            entity.HasIndex(x => x.Email).IsUnique();
+            entity.HasOne(x => x.Rol)
+                .WithMany()
+                .HasForeignKey(x => x.RolId);
+        });
+
         modelBuilder.Entity<Categoria>(entity =>
         {
             entity.ToTable("Categorias");
