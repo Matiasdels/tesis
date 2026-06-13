@@ -38,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
+    final busy = auth.loading || !auth.initialized;
 
     return Scaffold(
       body: SafeArea(
@@ -64,6 +65,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
                         TextFormField(
                           controller: _usuarioController,
+                          enabled: !busy,
+                          textInputAction: TextInputAction.next,
                           decoration: InputDecoration(
                             labelText: _registerMode
                                 ? 'Nombre de usuario'
@@ -76,12 +79,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _emailController,
+                            enabled: !busy,
                             keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
                             decoration: const InputDecoration(
                               labelText: 'Email',
                               prefixIcon: Icon(Icons.mail_outline),
                             ),
-                            validator: _required,
+                            validator: _email,
                           ),
                           const SizedBox(height: 12),
                           Row(
@@ -89,6 +94,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               Expanded(
                                 child: TextFormField(
                                   controller: _nombreController,
+                                  enabled: !busy,
+                                  textInputAction: TextInputAction.next,
                                   decoration: const InputDecoration(
                                     labelText: 'Nombre',
                                   ),
@@ -99,6 +106,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               Expanded(
                                 child: TextFormField(
                                   controller: _apellidoController,
+                                  enabled: !busy,
+                                  textInputAction: TextInputAction.next,
                                   decoration: const InputDecoration(
                                     labelText: 'Apellido',
                                   ),
@@ -111,7 +120,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
+                          enabled: !busy,
                           obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => busy ? null : _submit(),
                           decoration: InputDecoration(
                             labelText: 'Contraseña',
                             prefixIcon: const Icon(Icons.lock_outline),
@@ -119,9 +131,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               tooltip: _obscurePassword
                                   ? 'Mostrar contraseña'
                                   : 'Ocultar contraseña',
-                              onPressed: () => setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              }),
+                              onPressed: busy
+                                  ? null
+                                  : () => setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      }),
                               icon: Icon(
                                 _obscurePassword
                                     ? Icons.visibility_outlined
@@ -140,18 +154,28 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: 12),
-                          Text(
-                            _error!,
-                            style: const TextStyle(
-                              color: AppColors.danger,
-                              fontSize: 12,
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.danger.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.danger.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(
+                                color: AppColors.danger,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
                         const SizedBox(height: 18),
                         ElevatedButton.icon(
-                          onPressed: auth.loading ? null : _submit,
-                          icon: auth.loading
+                          onPressed: busy ? null : _submit,
+                          icon: busy
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
@@ -163,21 +187,23 @@ class _LoginScreenState extends State<LoginScreen> {
                               : Icon(_registerMode
                                   ? Icons.person_add_alt
                                   : Icons.login),
-                          label: Text(_registerMode
-                              ? 'Crear cuenta'
-                              : 'Iniciar sesión'),
+                          label: Text(!auth.initialized
+                              ? 'Comprobando sesión'
+                              : _registerMode
+                                  ? 'Crear cuenta'
+                                  : 'Iniciar sesión'),
                         ),
                         const SizedBox(height: 10),
                         TextButton(
-                          onPressed: auth.loading
+                          onPressed: busy
                               ? null
                               : () => setState(() {
                                     _registerMode = !_registerMode;
                                     _error = null;
                                   }),
-                          child: Text(_registerMode
-                              ? 'Ya tengo cuenta'
-                              : 'Crear usuario de prueba'),
+                          child: Text(
+                            _registerMode ? 'Ya tengo cuenta' : 'Crear cuenta',
+                          ),
                         ),
                       ],
                     ),
@@ -195,6 +221,19 @@ class _LoginScreenState extends State<LoginScreen> {
     if (value == null || value.trim().isEmpty) {
       return 'Campo obligatorio';
     }
+    return null;
+  }
+
+  String? _email(String? value) {
+    final message = _required(value);
+    if (message != null) return message;
+
+    final email = value!.trim();
+    final valid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+    if (!valid) {
+      return 'Ingresá un email válido';
+    }
+
     return null;
   }
 
@@ -228,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = error.toString());
     } catch (_) {
       setState(() {
-        _error = 'No se pudo conectar con la API. Verificá que esté corriendo.';
+        _error = 'No pudimos completar la acción. Intentá nuevamente.';
       });
     }
   }
@@ -278,8 +317,8 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           registerMode
-              ? 'Registrá un usuario para probar la API.'
-              : 'Ingresá con un usuario registrado en la API.',
+              ? 'Registrá un usuario para acceder al sistema.'
+              : 'Ingresá con tu usuario o email registrado.',
           style: const TextStyle(
             color: AppColors.textSecondary,
             fontSize: 13,

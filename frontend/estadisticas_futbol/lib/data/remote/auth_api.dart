@@ -38,6 +38,27 @@ class AuthApi {
     return AuthSession.fromJson(response);
   }
 
+  Future<AuthUser> me(String accessToken) async {
+    final response = await _get('/api/Auth/me', accessToken);
+
+    return AuthUser.fromJson(response);
+  }
+
+  Future<Map<String, dynamic>> _get(String path, String accessToken) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final request = await _client.getUrl(uri);
+    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
+
+    final response = await request.close();
+    final responseBody = await response.transform(utf8.decoder).join();
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthApiException(_friendlyError(response.statusCode, responseBody));
+    }
+
+    return jsonDecode(responseBody) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> body,
@@ -51,12 +72,32 @@ class AuthApi {
     final responseBody = await response.transform(utf8.decoder).join();
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw AuthApiException(
-        responseBody.isEmpty ? 'No se pudo completar la solicitud.' : responseBody,
-      );
+      throw AuthApiException(_friendlyError(response.statusCode, responseBody));
     }
 
     return jsonDecode(responseBody) as Map<String, dynamic>;
+  }
+
+  String _friendlyError(int statusCode, String responseBody) {
+    final cleanBody = responseBody.replaceAll('"', '').trim();
+
+    if (statusCode == HttpStatus.unauthorized ||
+        statusCode == HttpStatus.badRequest) {
+      if (cleanBody.toLowerCase().contains('credenciales')) {
+        return 'Usuario o contraseña incorrectos.';
+      }
+      return cleanBody.isEmpty
+          ? 'Revisá los datos ingresados e intentá nuevamente.'
+          : cleanBody;
+    }
+
+    if (statusCode == HttpStatus.conflict) {
+      return cleanBody.isEmpty
+          ? 'Ya existe un usuario con esos datos.'
+          : cleanBody;
+    }
+
+    return 'No pudimos completar la acción. Intentá nuevamente.';
   }
 }
 
@@ -85,6 +126,22 @@ class AuthSession {
       user: AuthUser.fromJson(json['usuario'] as Map<String, dynamic>),
       accessToken: json['accessToken'] as String,
       expiresAt: DateTime.parse(json['expiresAt'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'usuario': user.toJson(),
+      'accessToken': accessToken,
+      'expiresAt': expiresAt.toIso8601String(),
+    };
+  }
+
+  AuthSession copyWith({AuthUser? user}) {
+    return AuthSession(
+      user: user ?? this.user,
+      accessToken: accessToken,
+      expiresAt: expiresAt,
     );
   }
 }
@@ -118,5 +175,17 @@ class AuthUser {
       rolId: json['rolId'] as int,
       rol: json['rol'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'usuarioId': usuarioId,
+      'nombreUsuario': nombreUsuario,
+      'email': email,
+      'nombre': nombre,
+      'apellido': apellido,
+      'rolId': rolId,
+      'rol': rol,
+    };
   }
 }

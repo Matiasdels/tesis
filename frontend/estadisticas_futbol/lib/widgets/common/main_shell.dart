@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_colors.dart';
+import 'package:provider/provider.dart';
+
 import '../../core/constants/app_constants.dart';
+import '../../core/theme/app_colors.dart';
+import '../../data/remote/auth_state.dart';
 
 class MainShell extends StatelessWidget {
   final Widget child;
+
   const MainShell({super.key, required this.child});
 
   @override
@@ -25,13 +29,28 @@ class MainShell extends StatelessWidget {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Kancha'),
+        actions: [
+          IconButton(
+            tooltip: 'Cerrar sesión',
+            onPressed: () => _logout(context),
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
       body: child,
       bottomNavigationBar: const _AppBottomNav(),
     );
   }
 }
 
-// ── Sidebar (tablet/desktop) ───────────────────────────────────────────────
+Future<void> _logout(BuildContext context) async {
+  await context.read<AuthState>().logout();
+  if (context.mounted) {
+    context.go(AppConstants.routeLogin);
+  }
+}
 
 class _AppSidebar extends StatelessWidget {
   const _AppSidebar();
@@ -53,44 +72,51 @@ class _AppSidebar extends StatelessWidget {
               children: [
                 _SidebarSection(label: 'Principal', items: [
                   _SidebarItem(
-                      icon: Icons.dashboard_outlined,
-                      label: 'Dashboard',
-                      route: AppConstants.routeDashboard,
-                      current: location),
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    route: AppConstants.routeDashboard,
+                    current: location,
+                  ),
                   _SidebarItem(
-                      icon: Icons.sports_soccer,
-                      label: 'Partidos',
-                      route: AppConstants.routeMatches,
-                      current: location),
+                    icon: Icons.sports_soccer,
+                    label: 'Partidos',
+                    route: AppConstants.routeMatches,
+                    current: location,
+                  ),
                   _SidebarItem(
-                      icon: Icons.fitness_center,
-                      label: 'Entrenamientos',
-                      route: AppConstants.routeTraining,
-                      current: location),
+                    icon: Icons.fitness_center,
+                    label: 'Entrenamientos',
+                    route: AppConstants.routeTraining,
+                    current: location,
+                  ),
                 ]),
                 _SidebarSection(label: 'Análisis', items: [
                   _SidebarItem(
-                      icon: Icons.bar_chart_outlined,
-                      label: 'Estadísticas',
-                      route: AppConstants.routeStatistics,
-                      current: location),
+                    icon: Icons.bar_chart_outlined,
+                    label: 'Estadísticas',
+                    route: AppConstants.routeStatistics,
+                    current: location,
+                  ),
                   _SidebarItem(
-                      icon: Icons.description_outlined,
-                      label: 'Reportes',
-                      route: AppConstants.routeReports,
-                      current: location),
+                    icon: Icons.description_outlined,
+                    label: 'Reportes',
+                    route: AppConstants.routeReports,
+                    current: location,
+                  ),
                   _SidebarItem(
-                      icon: Icons.chat_bubble_outline,
-                      label: 'Observaciones',
-                      route: AppConstants.routeObservations,
-                      current: location),
+                    icon: Icons.chat_bubble_outline,
+                    label: 'Observaciones',
+                    route: AppConstants.routeObservations,
+                    current: location,
+                  ),
                 ]),
                 _SidebarSection(label: 'Plantilla', items: [
                   _SidebarItem(
-                      icon: Icons.people_outline,
-                      label: 'Jugadores',
-                      route: AppConstants.routePlayers,
-                      current: location),
+                    icon: Icons.people_outline,
+                    label: 'Jugadores',
+                    route: AppConstants.routePlayers,
+                    current: location,
+                  ),
                 ]),
               ],
             ),
@@ -111,7 +137,8 @@ class _SidebarLogo extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
       decoration: const BoxDecoration(
         border: Border(
-            bottom: BorderSide(color: AppColors.borderSubtle, width: 0.5)),
+          bottom: BorderSide(color: AppColors.borderSubtle, width: 0.5),
+        ),
       ),
       child: Row(
         children: [
@@ -119,16 +146,20 @@ class _SidebarLogo extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(8)),
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: const Icon(Icons.bolt, color: Colors.black, size: 18),
           ),
           const SizedBox(width: 10),
-          const Text('FieldIQ',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary)),
+          const Text(
+            'Kancha',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );
@@ -138,6 +169,7 @@ class _SidebarLogo extends StatelessWidget {
 class _SidebarSection extends StatelessWidget {
   final String label;
   final List<_SidebarItem> items;
+
   const _SidebarSection({required this.label, required this.items});
 
   @override
@@ -147,12 +179,15 @@ class _SidebarSection extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
-          child: Text(label.toUpperCase(),
-              style: const TextStyle(
-                  fontSize: 9,
-                  letterSpacing: 0.8,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w500)),
+          child: Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 9,
+              letterSpacing: 0.8,
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         ...items,
       ],
@@ -166,11 +201,12 @@ class _SidebarItem extends StatelessWidget {
   final String route;
   final String current;
 
-  const _SidebarItem(
-      {required this.icon,
-      required this.label,
-      required this.route,
-      required this.current});
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    required this.route,
+    required this.current,
+  });
 
   bool get _active =>
       current == route || (route != '/' && current.startsWith(route));
@@ -189,17 +225,20 @@ class _SidebarItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
               children: [
-                Icon(icon,
-                    size: 18,
-                    color: _active ? AppColors.accent : AppColors.textMuted),
+                Icon(
+                  icon,
+                  size: 18,
+                  color: _active ? AppColors.accent : AppColors.textMuted,
+                ),
                 const SizedBox(width: 10),
-                Text(label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color:
-                          _active ? AppColors.accent : AppColors.textSecondary,
-                      fontWeight: _active ? FontWeight.w500 : FontWeight.w400,
-                    )),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _active ? AppColors.accent : AppColors.textSecondary,
+                    fontWeight: _active ? FontWeight.w500 : FontWeight.w400,
+                  ),
+                ),
               ],
             ),
           ),
@@ -214,47 +253,77 @@ class _SidebarUser extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthState>().user;
+    final initials = user == null
+        ? 'US'
+        : '${user.nombre.isNotEmpty ? user.nombre[0] : ''}'
+                '${user.apellido.isNotEmpty ? user.apellido[0] : ''}'
+            .toUpperCase();
+    final fullName =
+        user == null ? 'Usuario' : '${user.nombre} ${user.apellido}'.trim();
+    final role = user?.rol ?? 'Usuario';
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: const BoxDecoration(
-        border:
-            Border(top: BorderSide(color: AppColors.borderSubtle, width: 0.5)),
+        border: Border(
+          top: BorderSide(color: AppColors.borderSubtle, width: 0.5),
+        ),
       ),
-      child: const Row(
+      child: Row(
         children: [
           CircleAvatar(
             radius: 16,
             backgroundColor: AppColors.purpleDim,
-            child: Text('CG',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.purple,
-                    fontWeight: FontWeight.w500)),
+            child: Text(
+              initials.isEmpty ? 'US' : initials,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.purple,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Carlos García',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis),
-                Text('Coordinador',
-                    style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                Text(
+                  fullName,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  role,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textMuted,
+                  ),
+                ),
               ],
             ),
           ),
-          Icon(Icons.settings_outlined, size: 16, color: AppColors.textMuted),
+          IconButton(
+            tooltip: 'Cerrar sesión',
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            padding: EdgeInsets.zero,
+            onPressed: () => _logout(context),
+            icon: const Icon(
+              Icons.logout,
+              size: 16,
+              color: AppColors.textMuted,
+            ),
+          ),
         ],
       ),
     );
   }
 }
-
-// ── Bottom navigation (mobile) ─────────────────────────────────────────────
 
 class _AppBottomNav extends StatelessWidget {
   const _AppBottomNav();
@@ -273,8 +342,8 @@ class _AppBottomNav extends StatelessWidget {
 
     int current = 0;
     for (var i = 0; i < _items.length; i++) {
-      final r = _items[i].route;
-      if (r == '/' ? location == r : location.startsWith(r)) {
+      final route = _items[i].route;
+      if (route == '/' ? location == route : location.startsWith(route)) {
         current = i;
         break;
       }
@@ -283,8 +352,9 @@ class _AppBottomNav extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.bgSurface,
-        border:
-            Border(top: BorderSide(color: AppColors.borderSubtle, width: 0.5)),
+        border: Border(
+          top: BorderSide(color: AppColors.borderSubtle, width: 0.5),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -294,25 +364,29 @@ class _AppBottomNav extends StatelessWidget {
             children: List.generate(_items.length, (i) {
               final item = _items[i];
               final active = i == current;
+
               return Expanded(
                 child: InkWell(
                   onTap: () => context.go(item.route),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(item.icon,
-                          size: 22,
-                          color:
-                              active ? AppColors.accent : AppColors.textMuted),
+                      Icon(
+                        item.icon,
+                        size: 22,
+                        color: active ? AppColors.accent : AppColors.textMuted,
+                      ),
                       const SizedBox(height: 3),
-                      Text(item.label,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                active ? AppColors.accent : AppColors.textMuted,
-                            fontWeight:
-                                active ? FontWeight.w500 : FontWeight.w400,
-                          )),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color:
+                              active ? AppColors.accent : AppColors.textMuted,
+                          fontWeight:
+                              active ? FontWeight.w500 : FontWeight.w400,
+                        ),
+                      ),
                     ],
                   ),
                 ),

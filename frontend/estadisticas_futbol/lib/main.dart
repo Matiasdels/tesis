@@ -15,13 +15,16 @@ class FieldIQApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authState = AuthState()..initialize();
+    final appRouter = createRouter(authState);
+
     return ChangeNotifierProvider(
-      create: (_) => AuthState(),
+      create: (_) => authState,
       child: MaterialApp.router(
         title: 'Kancha',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
-        routerConfig: router,
+        routerConfig: appRouter,
       ),
     );
   }

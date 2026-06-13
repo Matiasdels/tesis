@@ -1,5 +1,9 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
+
+import '../local/database_helper.dart';
 import 'auth_api.dart';
 
 class AuthState extends ChangeNotifier {
@@ -7,6 +11,7 @@ class AuthState extends ChangeNotifier {
 
   AuthSession? _session;
   bool _loading = false;
+  bool _initialized = false;
 
   AuthState({AuthApi? authApi}) : _authApi = authApi ?? AuthApi();
 
@@ -14,6 +19,31 @@ class AuthState extends ChangeNotifier {
   AuthUser? get user => _session?.user;
   bool get isAuthenticated => _session != null;
   bool get loading => _loading;
+  bool get initialized => _initialized;
+
+  Future<void> initialize() async {
+    final storedSession = await _readStoredSession();
+
+    if (storedSession == null ||
+        storedSession.expiresAt.isBefore(DateTime.now())) {
+      await _clearStoredSession();
+      _initialized = true;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final user = await _authApi.me(storedSession.accessToken);
+      _session = storedSession.copyWith(user: user);
+      await _saveSession(_session!);
+    } catch (_) {
+      await _clearStoredSession();
+      _session = null;
+    } finally {
+      _initialized = true;
+      notifyListeners();
+    }
+  }
 
   Future<void> login({
     required String usuarioOEmail,
@@ -24,6 +54,7 @@ class AuthState extends ChangeNotifier {
         usuarioOEmail: usuarioOEmail,
         password: password,
       );
+      await _saveSession(_session!);
     });
   }
 
@@ -44,11 +75,13 @@ class AuthState extends ChangeNotifier {
         apellido: apellido,
         rolId: rolId,
       );
+      await _saveSession(_session!);
     });
   }
 
-  void logout() {
+  Future<void> logout() async {
     _session = null;
+    await _clearStoredSession();
     notifyListeners();
   }
 
@@ -62,5 +95,45 @@ class AuthState extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  Future<Database> _database() async {
+    final db = await DatabaseHelper.instance.database;
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_session (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        data TEXT NOT NULL
+      )
+    ''');
+    return db;
+  }
+
+  Future<void> _saveSession(AuthSession session) async {
+    final db = await _database();
+    await db.insert(
+      'auth_session',
+      {'id': 1, 'data': jsonEncode(session.toJson())},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<AuthSession?> _readStoredSession() async {
+    final db = await _database();
+    final rows = await db.query(
+      'auth_session',
+      where: 'id = ?',
+      whereArgs: [1],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return null;
+
+    final data = rows.first['data'] as String;
+    return AuthSession.fromJson(jsonDecode(data) as Map<String, dynamic>);
+  }
+
+  Future<void> _clearStoredSession() async {
+    final db = await _database();
+    await db.delete('auth_session', where: 'id = ?', whereArgs: [1]);
   }
 }
