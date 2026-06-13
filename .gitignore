@@ -1,0 +1,14 @@
+# Flutter
+frontend/**/build/
+frontend/**/.dart_tool/
+
+# .NET
+backend/**/bin/
+backend/**/obj/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
