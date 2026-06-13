@@ -163,12 +163,26 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: AppColors.danger.withValues(alpha: 0.4),
                               ),
                             ),
-                            child: Text(
-                              _error!,
-                              style: const TextStyle(
-                                color: AppColors.danger,
-                                fontSize: 12,
-                              ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.info_outline,
+                                  color: AppColors.danger,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      color: AppColors.danger,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

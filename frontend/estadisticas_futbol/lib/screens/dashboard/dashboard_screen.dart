@@ -1,15 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../data/remote/auth_state.dart';
 import '../../mock/mock_data.dart';
 import '../../widgets/common/app_widgets.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  bool _showWelcome = true;
+  Timer? _welcomeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _welcomeTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() => _showWelcome = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _welcomeTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthState>().user;
+    final fullName = '${user?.nombre ?? ''} ${user?.apellido ?? ''}'.trim();
+    final displayName =
+        fullName.isEmpty ? user?.nombreUsuario ?? 'Usuario' : fullName;
+
     return PageScaffold(
       title: 'Panel',
       subtitle: 'Temporada 2024–25 · Jornada 22',
@@ -28,12 +61,19 @@ class DashboardScreen extends StatelessWidget {
       ],
       body: ListView(
         padding: const EdgeInsets.all(AppConstants.pagePadding),
-        children: const [
-          _KpiRow(),
-          SizedBox(height: AppConstants.sectionSpacing),
-          _MidSection(),
-          SizedBox(height: AppConstants.sectionSpacing),
-          _BottomSection(),
+        children: [
+          AnimatedSwitcher(
+            duration: AppConstants.animNormal,
+            child: _showWelcome
+                ? _WelcomeCard(displayName: displayName)
+                : const SizedBox.shrink(),
+          ),
+          if (_showWelcome) const SizedBox(height: AppConstants.sectionSpacing),
+          const _KpiRow(),
+          const SizedBox(height: AppConstants.sectionSpacing),
+          const _MidSection(),
+          const SizedBox(height: AppConstants.sectionSpacing),
+          const _BottomSection(),
         ],
       ),
     );
@@ -41,6 +81,63 @@ class DashboardScreen extends StatelessWidget {
 }
 
 // ── KPI row ────────────────────────────────────────────────────────────────
+
+class _WelcomeCard extends StatelessWidget {
+  final String displayName;
+
+  const _WelcomeCard({required this.displayName});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.35),
+              ),
+            ),
+            child: const Icon(
+              Icons.waving_hand_outlined,
+              color: AppColors.accent,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hola, $displayName',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Tu sesion esta lista para trabajar con partidos, jugadores y estadisticas.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _KpiRow extends StatelessWidget {
   const _KpiRow();
