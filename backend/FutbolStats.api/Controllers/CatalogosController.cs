@@ -40,4 +40,20 @@ public class CatalogosController(FutbolStatsDbContext context) : ControllerBase
 
         return Ok(tiposEvento);
     }
+
+    [HttpGet("roles")]
+    public async Task<IActionResult> GetRoles()
+    {
+        var roles = await context.Roles
+            .AsNoTracking()
+            .OrderBy(rol => rol.Nombre)
+            .Select(rol => new
+            {
+                rol.RolId,
+                rol.Nombre
+            })
+            .ToListAsync();
+
+        return Ok(roles);
+    }
 }
