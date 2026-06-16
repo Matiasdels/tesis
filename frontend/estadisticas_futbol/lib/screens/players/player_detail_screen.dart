@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../data/remote/auth_state.dart';
+import '../../data/remote/player_api.dart';
 import '../../mock/mock_data.dart';
 import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
@@ -16,11 +20,18 @@ class PlayerDetailScreen extends StatefulWidget {
 class _PlayerDetailScreenState extends State<PlayerDetailScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
+  final _api = PlayerApi();
+
+  PlayerModel? _player;
+  bool _loading = true;
+  bool _changed = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 4, vsync: this);
+    _load();
   }
 
   @override
@@ -29,50 +40,128 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
     super.dispose();
   }
 
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      final player = await _api.getPlayer(widget.playerId, token);
+      setState(() {
+        _player = player;
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _error = 'No pudimos cargar el jugador. Intentá nuevamente.';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleActive() async {
+    final player = _player;
+    if (player == null) return;
+
+    final token = context.read<AuthState>().session!.accessToken;
+
+    try {
+      if (player.active) {
+        await _api.deactivatePlayer(player.id, token);
+      } else {
+        await _api.updatePlayer(player.id, player.copyWith(active: true), token);
+      }
+      _changed = true;
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No pudimos actualizar el estado del jugador.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final player = MockData.players.firstWhere(
-      (p) => p.id == widget.playerId,
-      orElse: () => MockData.players.first,
-    );
-
     return Scaffold(
       backgroundColor: AppColors.bgDeep,
-      body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [
-          SliverAppBar(
-            expandedHeight: 200,
-            pinned: true,
-            backgroundColor: AppColors.bgSurface,
-            flexibleSpace: FlexibleSpaceBar(
-              background: _PlayerHeader(player: player),
-            ),
-            bottom: TabBar(
-              controller: _tabs,
-              indicatorColor: AppColors.accent,
-              indicatorSize: TabBarIndicatorSize.label,
-              labelColor: AppColors.accent,
-              unselectedLabelColor: AppColors.textMuted,
-              labelStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-              tabs: const [
-                Tab(text: 'Rendimiento'),
-                Tab(text: 'Carga física'),
-                Tab(text: 'Partidos'),
-                Tab(text: 'Observaciones'),
-              ],
-            ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null || _player == null
+              ? EmptyState(
+                  icon: Icons.error_outline,
+                  title: 'Algo salió mal',
+                  subtitle: _error ?? 'Jugador no encontrado',
+                  actionLabel: 'Reintentar',
+                  onAction: _load,
+                )
+              : _buildContent(_player!),
+    );
+  }
+
+  Widget _buildContent(PlayerModel player) {
+    return NestedScrollView(
+      headerSliverBuilder: (_, __) => [
+        SliverAppBar(
+          expandedHeight: 200,
+          pinned: true,
+          backgroundColor: AppColors.bgSurface,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(_changed),
           ),
-        ],
-        body: TabBarView(
-          controller: _tabs,
-          children: [
-            _PerformanceTab(player: player),
-            _LoadTab(player: player),
-            _MatchesTab(player: player),
-            _ObservationsTab(player: player),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Editar jugador',
+              onPressed: () async {
+                final updated = await context
+                    .push<bool>('/players/${player.id}/edit');
+                if (updated == true) {
+                  _changed = true;
+                  _load();
+                }
+              },
+            ),
+            IconButton(
+              icon: Icon(player.active
+                  ? Icons.person_remove_outlined
+                  : Icons.person_add_alt_1_outlined),
+              tooltip: player.active ? 'Dar de baja' : 'Reactivar',
+              onPressed: _toggleActive,
+            ),
           ],
+          flexibleSpace: FlexibleSpaceBar(
+            background: _PlayerHeader(player: player),
+          ),
+          bottom: TabBar(
+            controller: _tabs,
+            indicatorColor: AppColors.accent,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelColor: AppColors.accent,
+            unselectedLabelColor: AppColors.textMuted,
+            labelStyle:
+                const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            tabs: const [
+              Tab(text: 'Rendimiento'),
+              Tab(text: 'Carga física'),
+              Tab(text: 'Partidos'),
+              Tab(text: 'Observaciones'),
+            ],
+          ),
         ),
+      ],
+      body: TabBarView(
+        controller: _tabs,
+        children: [
+          _PerformanceTab(player: player),
+          _LoadTab(player: player),
+          _MatchesTab(player: player),
+          _ObservationsTab(player: player),
+        ],
       ),
     );
   }
@@ -125,7 +214,9 @@ class _PlayerHeader extends StatelessWidget {
                       border: Border.all(
                           color: AppColors.info.withValues(alpha: 0.4), width: 0.5),
                     ),
-                    child: Text('${player.position} · #${player.number}',
+                    child: Text(
+                        '${player.position.isEmpty ? '—' : player.position} · '
+                        '#${player.number == 0 ? '—' : player.number}',
                         style: const TextStyle(
                             fontSize: 10,
                             color: AppColors.info,
@@ -136,13 +227,14 @@ class _PlayerHeader extends StatelessWidget {
                 Wrap(
                   spacing: 14,
                   children: [
-                    _MetaItem(
-                        Icons.calendar_today_outlined, '${player.age} años'),
-                    _MetaItem(
-                        Icons.height_outlined, '${player.heightCm.toInt()} cm'),
+                    _MetaItem(Icons.calendar_today_outlined,
+                        player.age == 0 ? '— años' : '${player.age} años'),
+                    _MetaItem(Icons.height_outlined,
+                        player.heightCm == 0 ? '— cm' : '${player.heightCm.toInt()} cm'),
                     _MetaItem(Icons.fitness_center_outlined,
-                        '${player.weightKg.toInt()} kg'),
-                    _MetaItem(Icons.flag_outlined, player.nationality),
+                        player.weightKg == 0 ? '— kg' : '${player.weightKg.toInt()} kg'),
+                    _MetaItem(Icons.flag_outlined,
+                        player.nationality.isEmpty ? '—' : player.nationality),
                   ],
                 ),
               ],
@@ -158,7 +250,8 @@ class _PlayerHeader extends StatelessWidget {
               color: AppColors.accentDim,
             ),
             alignment: Alignment.center,
-            child: Text('${player.rating.toInt()}',
+            child: Text(
+                player.hasPerformanceData ? '${player.rating.toInt()}' : '—',
                 style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w500,
@@ -199,6 +292,14 @@ class _PerformanceTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = player.stats;
+
+    if (!player.hasPerformanceData) {
+      return const EmptyState(
+        icon: Icons.bar_chart_outlined,
+        title: 'Sin datos de rendimiento',
+        subtitle: 'Aún no se registraron métricas de rendimiento para este jugador',
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.all(AppConstants.pagePadding),

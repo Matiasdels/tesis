@@ -114,6 +114,8 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> _saveSession(AuthSession session) async {
+    if (kIsWeb) return;
+
     final db = await _database();
     await db.insert(
       'auth_session',
@@ -123,6 +125,8 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<AuthSession?> _readStoredSession() async {
+    if (kIsWeb) return null;
+
     final db = await _database();
     final rows = await db.query(
       'auth_session',
@@ -138,6 +142,8 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> _clearStoredSession() async {
+    if (kIsWeb) return;
+
     final db = await _database();
     await db.delete('auth_session', where: 'id = ?', whereArgs: [1]);
   }

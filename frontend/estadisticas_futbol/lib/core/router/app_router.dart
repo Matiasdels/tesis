@@ -4,6 +4,7 @@ import 'package:estadisticas_futbol/core/constants/app_constants.dart';
 import 'package:estadisticas_futbol/screens/dashboard/dashboard_screen.dart';
 import 'package:estadisticas_futbol/screens/players/players_screen.dart';
 import 'package:estadisticas_futbol/screens/players/player_detail_screen.dart';
+import 'package:estadisticas_futbol/screens/players/player_form_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/matches_screen.dart';
 import 'package:estadisticas_futbol/screens/live_match/live_match_screen.dart';
 import 'package:estadisticas_futbol/screens/training/training_screen.dart';
@@ -82,10 +83,21 @@ GoRouter createRouter(AuthState authState) => GoRouter(
         ),
         // Full-screen routes (outside shell)
         GoRoute(
+          path: AppConstants.routePlayerCreate,
+          pageBuilder: (c, s) => _slide(const PlayerFormScreen()),
+        ),
+        GoRoute(
           path: AppConstants.routePlayerDetail,
           pageBuilder: (c, s) {
             final id = s.pathParameters['id'] ?? '0';
             return _slide(PlayerDetailScreen(playerId: id));
+          },
+        ),
+        GoRoute(
+          path: AppConstants.routePlayerEdit,
+          pageBuilder: (c, s) {
+            final id = s.pathParameters['id'] ?? '0';
+            return _slide(PlayerFormScreen(playerId: id));
           },
         ),
         GoRoute(

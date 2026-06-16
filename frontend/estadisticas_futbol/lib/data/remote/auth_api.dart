@@ -1,10 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 import 'api_config.dart';
 
 class AuthApi {
-  final HttpClient _client = HttpClient();
+  final http.Client _client = http.Client();
 
   Future<AuthSession> login({
     required String usuarioOEmail,
@@ -46,17 +47,16 @@ class AuthApi {
 
   Future<Map<String, dynamic>> _get(String path, String accessToken) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
-    final request = await _client.getUrl(uri);
-    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
-
-    final response = await request.close();
-    final responseBody = await response.transform(utf8.decoder).join();
+    final response = await _client.get(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw AuthApiException(_friendlyError(response.statusCode, responseBody));
+      throw AuthApiException(_friendlyError(response.statusCode, response.body));
     }
 
-    return jsonDecode(responseBody) as Map<String, dynamic>;
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> _post(
@@ -64,25 +64,23 @@ class AuthApi {
     Map<String, dynamic> body,
   ) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
-    final request = await _client.postUrl(uri);
-    request.headers.contentType = ContentType.json;
-    request.write(jsonEncode(body));
-
-    final response = await request.close();
-    final responseBody = await response.transform(utf8.decoder).join();
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw AuthApiException(_friendlyError(response.statusCode, responseBody));
+      throw AuthApiException(_friendlyError(response.statusCode, response.body));
     }
 
-    return jsonDecode(responseBody) as Map<String, dynamic>;
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   String _friendlyError(int statusCode, String responseBody) {
     final cleanBody = responseBody.replaceAll('"', '').trim();
 
-    if (statusCode == HttpStatus.unauthorized ||
-        statusCode == HttpStatus.badRequest) {
+    if (statusCode == 401 || statusCode == 400) {
       if (cleanBody.toLowerCase().contains('credenciales')) {
         return 'Usuario o contraseña incorrectos.';
       }
@@ -91,7 +89,7 @@ class AuthApi {
           : cleanBody;
     }
 
-    if (statusCode == HttpStatus.conflict) {
+    if (statusCode == 409) {
       return cleanBody.isEmpty
           ? 'Ya existe un usuario con esos datos.'
           : cleanBody;

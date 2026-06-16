@@ -64,6 +64,9 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.PiernaHabil).HasMaxLength(10);
             entity.Property(x => x.Estado).HasMaxLength(20).HasDefaultValue("Disponible");
             entity.Property(x => x.Activo).HasDefaultValue(true);
+            entity.HasOne(x => x.Categoria)
+                .WithMany()
+                .HasForeignKey(x => x.CategoriaId);
         });
 
         modelBuilder.Entity<Partido>(entity =>

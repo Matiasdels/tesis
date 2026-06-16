@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
-import '../../mock/mock_data.dart';
+import '../../data/remote/auth_state.dart';
+import '../../data/remote/player_api.dart';
 import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
 
@@ -14,11 +16,44 @@ class PlayersScreen extends StatefulWidget {
 }
 
 class _PlayersScreenState extends State<PlayersScreen> {
+  final _api = PlayerApi();
+
   String _query = '';
   String _filterStatus = 'all';
   String _filterPosition = 'all';
 
-  List<PlayerModel> get _filtered => MockData.players.where((p) {
+  List<PlayerModel> _players = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      final players = await _api.getPlayers(accessToken: token);
+      setState(() {
+        _players = players;
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _error = 'No pudimos cargar la plantilla. Intentá nuevamente.';
+        _loading = false;
+      });
+    }
+  }
+
+  List<PlayerModel> get _filtered => _players.where((p) {
     final matchQuery = p.name.toLowerCase().contains(_query.toLowerCase());
     final matchStatus = _filterStatus == 'all' || p.status == _filterStatus;
     final matchPos = _filterPosition == 'all' || p.position == _filterPosition;
@@ -29,10 +64,13 @@ class _PlayersScreenState extends State<PlayersScreen> {
   Widget build(BuildContext context) {
     return PageScaffold(
       title: 'Jugadores',
-      subtitle: '${MockData.players.length} en plantilla',
+      subtitle: '${_players.length} en plantilla',
       actions: [
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () async {
+            final created = await context.push<bool>(AppConstants.routePlayerCreate);
+            if (created == true) _load();
+          },
           icon: const Icon(Icons.person_add_outlined, size: 16),
           label: const Text('Añadir'),
         ),
@@ -48,18 +86,28 @@ class _PlayersScreenState extends State<PlayersScreen> {
             onPosition: (v) => setState(() => _filterPosition = v),
           ),
           Expanded(
-            child: _filtered.isEmpty
-                ? const EmptyState(
-              icon: Icons.person_search,
-              title: 'Sin resultados',
-              subtitle: 'Prueba con otro filtro o búsqueda',
-            )
-                : ListView.separated(
-              padding: const EdgeInsets.all(AppConstants.pagePadding),
-              itemCount: _filtered.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, i) => _PlayerCard(player: _filtered[i]),
-            ),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? EmptyState(
+                        icon: Icons.error_outline,
+                        title: 'Algo salió mal',
+                        subtitle: _error!,
+                        actionLabel: 'Reintentar',
+                        onAction: _load,
+                      )
+                    : _filtered.isEmpty
+                        ? const EmptyState(
+                            icon: Icons.person_search,
+                            title: 'Sin resultados',
+                            subtitle: 'Prueba con otro filtro o búsqueda',
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(AppConstants.pagePadding),
+                            itemCount: _filtered.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            itemBuilder: (_, i) => _PlayerCard(player: _filtered[i]),
+                          ),
           ),
         ],
       ),
@@ -164,7 +212,12 @@ class _PlayerCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push('/players/${player.id}'),
+        onTap: () async {
+          final changed = await context.push<bool>('/players/${player.id}');
+          if (changed == true && context.mounted) {
+            (context.findAncestorStateOfType<_PlayersScreenState>())?._load();
+          }
+        },
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -196,7 +249,9 @@ class _PlayerCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 3),
-                    Text('${player.position} · ${player.matchesPlayed} partidos',
+                    Text(
+                        '${player.position} · '
+                        '${player.hasPerformanceData ? '${player.matchesPlayed} partidos' : '— partidos'}',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
@@ -204,11 +259,16 @@ class _PlayerCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${player.rating.toInt()}',
+                  Text(
+                      player.hasPerformanceData
+                          ? '${player.rating.toInt()}'
+                          : '—',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w500,
-                        color: _ratingColor(player.rating),
+                        color: player.hasPerformanceData
+                            ? _ratingColor(player.rating)
+                            : AppColors.textMuted,
                       )),
                   const SizedBox(height: 4),
                   StatusBadge(status: player.status),

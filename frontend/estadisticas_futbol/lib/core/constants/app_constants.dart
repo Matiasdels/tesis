@@ -4,7 +4,9 @@ abstract class AppConstants {
   static const String routeLogin        = '/login';
   static const String routeDashboard    = '/';
   static const String routePlayers      = '/players';
+  static const String routePlayerCreate = '/players/new';
   static const String routePlayerDetail = '/players/:id';
+  static const String routePlayerEdit   = '/players/:id/edit';
   static const String routeMatches      = '/matches';
   static const String routeLiveMatch    = '/matches/live/:id';
   static const String routeTraining     = '/training';
@@ -81,4 +83,9 @@ abstract class PlayerPositions {
   static const String leftWing    = 'EXI';
   static const String striker     = 'DC9';
   static const String forward     = 'DEL';
+
+  static const List<String> all = [
+    goalkeeper, rightBack, centerBack, leftBack, defensiveMid,
+    centralMid, attackingMid, rightWing, leftWing, striker, forward,
+  ];
 }

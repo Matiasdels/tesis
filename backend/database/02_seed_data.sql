@@ -2,6 +2,10 @@
 -- Kancha - Datos semilla (catalogos)
 -- =============================================================================
 
+-- Categorias
+INSERT INTO Categorias (Nombre, Descripcion) VALUES
+    (N'Primera', N'Plantel principal');
+
 -- Roles
 INSERT INTO Roles (Nombre) VALUES
     (N'Admin'),
