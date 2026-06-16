@@ -123,6 +123,23 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
       return;
     }
 
+    if (_birthDate != null) {
+      final now = DateTime.now();
+      var age = now.year - _birthDate!.year;
+      if (now.month < _birthDate!.month ||
+          (now.month == _birthDate!.month && now.day < _birthDate!.day)) {
+        age--;
+      }
+      if (age < 10) {
+        setState(() => _error = 'Edad mínima: 10 años');
+        return;
+      }
+      if (age > 60) {
+        setState(() => _error = 'Edad máxima: 60 años');
+        return;
+      }
+    }
+
     setState(() {
       _saving = true;
       _error = null;
@@ -178,8 +195,52 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
     }
   }
 
-  String? _required(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Campo obligatorio';
+  String? _validateNombre(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Nombre requerido';
+    final v = value.trim();
+    if (v.length > 100) return 'Máximo 100 caracteres';
+    if (!RegExp(r"^[\p{L}\s'\-]+$", unicode: true).hasMatch(v)) {
+      return 'Solo letras y espacios';
+    }
+    return null;
+  }
+
+  String? _validateNumero(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final n = int.tryParse(value.trim());
+    if (n == null || n < 1 || n > 99) return 'Debe ser entre 1 y 99';
+    return null;
+  }
+
+  String? _validateAltura(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final n = double.tryParse(value.trim());
+    if (n == null || n < 140 || n > 220) return 'Entre 140 y 220 cm';
+    return null;
+  }
+
+  String? _validatePeso(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final n = double.tryParse(value.trim());
+    if (n == null || n < 45 || n > 160) return 'Entre 45 y 160 kg';
+    return null;
+  }
+
+  String? _validateNacionalidad(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final v = value.trim();
+    if (v.length > 50) return 'Máximo 50 caracteres';
+    if (!RegExp(r'^[\p{L}\s]+$', unicode: true).hasMatch(v)) {
+      return 'Solo letras y espacios';
+    }
+    return null;
+  }
+
+  String? _validateDni(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final v = value.trim();
+    if (v.length > 20) return 'Máximo 20 caracteres';
+    if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(v)) return 'Solo letras y números';
     return null;
   }
 
@@ -211,7 +272,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                             enabled: !_saving,
                             decoration:
                                 const InputDecoration(labelText: 'Nombre'),
-                            validator: _required,
+                            validator: _validateNombre,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -221,7 +282,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                             enabled: !_saving,
                             decoration:
                                 const InputDecoration(labelText: 'Apellido'),
-                            validator: _required,
+                            validator: _validateNombre,
                           ),
                         ),
                       ],
@@ -253,40 +314,30 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                           : (v) => setState(() => _position = v!),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _numberController,
-                            enabled: !_saving,
-                            keyboardType: TextInputType.number,
-                            decoration:
-                                const InputDecoration(labelText: 'Número'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _heightController,
-                            enabled: !_saving,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            decoration:
-                                const InputDecoration(labelText: 'Altura (cm)'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _weightController,
-                            enabled: !_saving,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            decoration:
-                                const InputDecoration(labelText: 'Peso (kg)'),
-                          ),
-                        ),
-                      ],
+                    TextFormField(
+                      controller: _numberController,
+                      enabled: !_saving,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Número de camiseta'),
+                      validator: _validateNumero,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _heightController,
+                      enabled: !_saving,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Altura (cm)'),
+                      validator: _validateAltura,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _weightController,
+                      enabled: !_saving,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Peso (kg)'),
+                      validator: _validatePeso,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -294,6 +345,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                       enabled: !_saving,
                       decoration:
                           const InputDecoration(labelText: 'Nacionalidad'),
+                      validator: _validateNacionalidad,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -304,6 +356,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                         labelText: 'DNI',
                         hintText: 'Opcional',
                       ),
+                      validator: _validateDni,
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(

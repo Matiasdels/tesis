@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using FutbolStats.Api.Services;
@@ -77,7 +78,15 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         };
 
         context.Jugadores.Add(jugador);
-        await context.SaveChangesAsync();
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsDniDuplicate(ex))
+        {
+            return BadRequest("Ya existe un jugador registrado con ese DNI.");
+        }
 
         await context.Entry(jugador).Reference(j => j.Categoria).LoadAsync();
         return CreatedAtAction(nameof(GetJugador), new { id = jugador.JugadorId }, ToResponse(jugador));
@@ -115,7 +124,14 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
             jugador.Activo = request.Activo.Value;
         }
 
-        await context.SaveChangesAsync();
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsDniDuplicate(ex))
+        {
+            return BadRequest("Ya existe un jugador registrado con ese DNI.");
+        }
 
         await context.Entry(jugador).Reference(j => j.Categoria).LoadAsync();
         return Ok(ToResponse(jugador));
@@ -137,19 +153,73 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
 
     private async Task<IActionResult?> ValidateRequest(JugadorRequest request)
     {
-        if (!EstadosValidos.Contains(request.Estado))
-        {
-            return BadRequest($"Estado inválido. Valores permitidos: {string.Join(", ", EstadosValidos)}.");
-        }
+        // Obligatorios: formato texto
+        if (!EsTextoNombre(request.Nombre))
+            return BadRequest("El nombre solo puede contener letras, espacios y guiones.");
 
+        if (request.Nombre.Trim().Length > 100)
+            return BadRequest("El nombre no puede superar los 100 caracteres.");
+
+        if (!EsTextoNombre(request.Apellido))
+            return BadRequest("El apellido solo puede contener letras, espacios y guiones.");
+
+        if (request.Apellido.Trim().Length > 100)
+            return BadRequest("El apellido no puede superar los 100 caracteres.");
+
+        // Estado
+        if (!EstadosValidos.Contains(request.Estado))
+            return BadRequest($"Estado inválido. Valores permitidos: {string.Join(", ", EstadosValidos)}.");
+
+        // Categoría
         var categoriaExiste = await context.Categorias.AnyAsync(c => c.CategoriaId == request.CategoriaId);
         if (!categoriaExiste)
-        {
             return BadRequest("La categoría indicada no existe.");
+
+        // Opcionales con restricciones
+        if (request.NumeroCamiseta is not null && (request.NumeroCamiseta < 1 || request.NumeroCamiseta > 99))
+            return BadRequest("El número de camiseta debe estar entre 1 y 99.");
+
+        if (request.AlturaCm is not null && (request.AlturaCm < 140 || request.AlturaCm > 220))
+            return BadRequest("La altura debe estar entre 140 y 220 cm.");
+
+        if (request.PesoKg is not null && (request.PesoKg < 45 || request.PesoKg > 160))
+            return BadRequest("El peso debe estar entre 45 y 160 kg.");
+
+        if (request.FechaNacimiento is not null)
+        {
+            var edad = EdadEnAnios(request.FechaNacimiento.Value);
+            if (edad < 10 || edad > 60)
+                return BadRequest("La fecha de nacimiento debe corresponder a una edad entre 10 y 60 años.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Nacionalidad) && request.Nacionalidad.Trim().Length > 50)
+            return BadRequest("La nacionalidad no puede superar los 50 caracteres.");
+
+        if (!string.IsNullOrWhiteSpace(request.Dni))
+        {
+            var dni = request.Dni.Trim();
+            if (dni.Length > 20)
+                return BadRequest("El DNI no puede superar los 20 caracteres.");
+            if (!Regex.IsMatch(dni, @"^[a-zA-Z0-9]+$"))
+                return BadRequest("El DNI solo puede contener letras y números.");
         }
 
         return null;
     }
+
+    private static bool EsTextoNombre(string valor) =>
+        !string.IsNullOrWhiteSpace(valor) && Regex.IsMatch(valor.Trim(), @"^[\p{L}\s'\-]+$");
+
+    private static int EdadEnAnios(DateOnly fechaNacimiento)
+    {
+        var hoy = DateOnly.FromDateTime(DateTime.Today);
+        var edad = hoy.Year - fechaNacimiento.Year;
+        if (fechaNacimiento > hoy.AddYears(-edad)) edad--;
+        return edad;
+    }
+
+    private static bool IsDniDuplicate(DbUpdateException ex) =>
+        ex.InnerException?.Message.Contains("IX_Jugadores_DNI") == true;
 
     private static JugadorResponse ToResponse(Jugador jugador)
     {
