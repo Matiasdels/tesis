@@ -66,9 +66,13 @@ CREATE TABLE Jugadores (
     CategoriaId         INT                 NOT NULL,
     Activo              BIT                 NOT NULL DEFAULT 1,
     CONSTRAINT PK_Jugadores PRIMARY KEY (JugadorId),
-    CONSTRAINT UQ_Jugadores_DNI UNIQUE (DNI),
     CONSTRAINT FK_Jugadores_Categorias FOREIGN KEY (CategoriaId) REFERENCES Categorias (CategoriaId)
 );
+GO
+
+CREATE UNIQUE INDEX IX_Jugadores_DNI
+    ON Jugadores (DNI)
+    WHERE DNI IS NOT NULL;
 GO
 
 -- =============================================================================

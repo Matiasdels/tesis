@@ -56,7 +56,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.Nombre).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Apellido).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Dni).HasColumnName("DNI").HasMaxLength(20);
-            entity.HasIndex(x => x.Dni).IsUnique();
+            entity.HasIndex(x => x.Dni).IsUnique().HasFilter("[DNI] IS NOT NULL");
             entity.Property(x => x.Nacionalidad).HasMaxLength(50);
             entity.Property(x => x.PosicionPrincipal).HasMaxLength(10);
             entity.Property(x => x.AlturaCm).HasPrecision(5, 2);
