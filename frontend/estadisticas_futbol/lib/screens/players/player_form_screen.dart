@@ -30,6 +30,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
   final _nationalityController = TextEditingController();
+  final _dniController = TextEditingController();
 
   DateTime? _birthDate;
   String _position = PlayerPositions.all.first;
@@ -56,6 +57,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
     _heightController.dispose();
     _weightController.dispose();
     _nationalityController.dispose();
+    _dniController.dispose();
     super.dispose();
   }
 
@@ -80,13 +82,14 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
           _weightController.text =
               player.weightKg == 0 ? '' : player.weightKg.toString();
           _nationalityController.text = player.nationality;
+          _dniController.text = player.dni ?? '';
           _birthDate = player.birthDate;
           _position = player.position.isNotEmpty
               ? player.position
               : PlayerPositions.all.first;
           _status = player.status;
-          _categoryId =
-              player.categoryId ?? (categories.isEmpty ? null : categories.first.id);
+          _categoryId = player.categoryId ??
+              (categories.isEmpty ? null : categories.first.id);
           _active = player.active;
         } else {
           _categoryId = categories.isEmpty ? null : categories.first.id;
@@ -145,6 +148,9 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
       firstName: firstName,
       lastName: lastName,
       birthDate: _birthDate,
+      dni: _dniController.text.trim().isEmpty
+          ? null
+          : _dniController.text.trim(),
       categoryId: _categoryId,
       active: _active,
     );
@@ -203,7 +209,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                           child: TextFormField(
                             controller: _firstNameController,
                             enabled: !_saving,
-                            decoration: const InputDecoration(labelText: 'Nombre'),
+                            decoration:
+                                const InputDecoration(labelText: 'Nombre'),
                             validator: _required,
                           ),
                         ),
@@ -212,7 +219,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                           child: TextFormField(
                             controller: _lastNameController,
                             enabled: !_saving,
-                            decoration: const InputDecoration(labelText: 'Apellido'),
+                            decoration:
+                                const InputDecoration(labelText: 'Apellido'),
                             validator: _required,
                           ),
                         ),
@@ -222,8 +230,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                     InkWell(
                       onTap: _saving ? null : _pickBirthDate,
                       child: InputDecorator(
-                        decoration:
-                            const InputDecoration(labelText: 'Fecha de nacimiento'),
+                        decoration: const InputDecoration(
+                            labelText: 'Fecha de nacimiento'),
                         child: Text(
                           _birthDate == null
                               ? 'Sin definir'
@@ -237,9 +245,12 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                       initialValue: _position,
                       decoration: const InputDecoration(labelText: 'Posición'),
                       items: PlayerPositions.all
-                          .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                          .map(
+                              (p) => DropdownMenuItem(value: p, child: Text(p)))
                           .toList(),
-                      onChanged: _saving ? null : (v) => setState(() => _position = v!),
+                      onChanged: _saving
+                          ? null
+                          : (v) => setState(() => _position = v!),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -258,8 +269,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                           child: TextFormField(
                             controller: _heightController,
                             enabled: !_saving,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             decoration:
                                 const InputDecoration(labelText: 'Altura (cm)'),
                           ),
@@ -269,8 +280,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                           child: TextFormField(
                             controller: _weightController,
                             enabled: !_saving,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             decoration:
                                 const InputDecoration(labelText: 'Peso (kg)'),
                           ),
@@ -281,30 +292,47 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                     TextFormField(
                       controller: _nationalityController,
                       enabled: !_saving,
-                      decoration: const InputDecoration(labelText: 'Nacionalidad'),
+                      decoration:
+                          const InputDecoration(labelText: 'Nacionalidad'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _dniController,
+                      enabled: !_saving,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'DNI',
+                        hintText: 'Opcional',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: _status,
                       decoration: const InputDecoration(labelText: 'Estado'),
                       items: const [
-                        DropdownMenuItem(value: 'available', child: Text('Disponible')),
-                        DropdownMenuItem(value: 'injured', child: Text('Lesionado')),
-                        DropdownMenuItem(value: 'suspended', child: Text('Suspendido')),
+                        DropdownMenuItem(
+                            value: 'available', child: Text('Disponible')),
+                        DropdownMenuItem(
+                            value: 'injured', child: Text('Lesionado')),
+                        DropdownMenuItem(
+                            value: 'suspended', child: Text('Suspendido')),
                       ],
-                      onChanged: _saving ? null : (v) => setState(() => _status = v!),
+                      onChanged:
+                          _saving ? null : (v) => setState(() => _status = v!),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       initialValue: _categoryId,
                       decoration: const InputDecoration(labelText: 'Categoría'),
                       items: _categories
-                          .map((c) =>
-                              DropdownMenuItem(value: c.id, child: Text(c.name)))
+                          .map((c) => DropdownMenuItem(
+                              value: c.id, child: Text(c.name)))
                           .toList(),
-                      onChanged:
-                          _saving ? null : (v) => setState(() => _categoryId = v),
-                      validator: (v) => v == null ? 'Seleccioná una categoría' : null,
+                      onChanged: _saving
+                          ? null
+                          : (v) => setState(() => _categoryId = v),
+                      validator: (v) =>
+                          v == null ? 'Seleccioná una categoría' : null,
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
@@ -350,7 +378,9 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                               ),
                             )
                           : const Icon(Icons.save_outlined),
-                      label: Text(widget.isEditing ? 'Guardar cambios' : 'Crear jugador'),
+                      label: Text(widget.isEditing
+                          ? 'Guardar cambios'
+                          : 'Crear jugador'),
                     ),
                   ],
                 ),
