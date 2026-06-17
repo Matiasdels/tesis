@@ -8,6 +8,9 @@ abstract class AppConstants {
   static const String routePlayerDetail = '/players/:id';
   static const String routePlayerEdit   = '/players/:id/edit';
   static const String routeMatches      = '/matches';
+  static const String routeMatchCreate  = '/matches/new';
+  static const String routeMatchDetail  = '/matches/:id';
+  static const String routeLineup       = '/matches/:id/lineup';
   static const String routeLiveMatch    = '/matches/live/:id';
   static const String routeTraining     = '/training';
   static const String routeStatistics   = '/statistics';
@@ -69,6 +72,14 @@ abstract class EventTypes {
   static const List<String> radialPrimary = [
     passOk, passBad, shot, goal, foul, recovery, cross, interception,
   ];
+}
+
+abstract class TiposCompeticion {
+  static const List<String> all = ['Liga', 'Copa', 'Amistoso', 'Torneo'];
+}
+
+abstract class EstadosPartido {
+  static const List<String> all = ['Programado', 'EnJuego', 'Finalizado', 'Cancelado'];
 }
 
 abstract class PlayerPositions {

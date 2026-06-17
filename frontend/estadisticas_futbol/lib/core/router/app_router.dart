@@ -6,6 +6,9 @@ import 'package:estadisticas_futbol/screens/players/players_screen.dart';
 import 'package:estadisticas_futbol/screens/players/player_detail_screen.dart';
 import 'package:estadisticas_futbol/screens/players/player_form_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/matches_screen.dart';
+import 'package:estadisticas_futbol/screens/matches/match_form_screen.dart';
+import 'package:estadisticas_futbol/screens/matches/match_detail_screen.dart';
+import 'package:estadisticas_futbol/screens/matches/lineup_screen.dart';
 import 'package:estadisticas_futbol/screens/live_match/live_match_screen.dart';
 import 'package:estadisticas_futbol/screens/training/training_screen.dart';
 import 'package:estadisticas_futbol/screens/statistics/statistics_screen.dart';
@@ -82,6 +85,31 @@ GoRouter createRouter(AuthState authState) => GoRouter(
           ],
         ),
         // Full-screen routes (outside shell)
+        GoRoute(
+          path: AppConstants.routeMatchCreate,
+          pageBuilder: (c, s) => _slide(const MatchFormScreen()),
+        ),
+        GoRoute(
+          path: '/matches/:id/edit',
+          pageBuilder: (c, s) {
+            final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
+            return _slide(MatchFormScreen(matchId: id));
+          },
+        ),
+        GoRoute(
+          path: '/matches/:id/lineup',
+          pageBuilder: (c, s) {
+            final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
+            return _slide(LineupScreen(matchId: id));
+          },
+        ),
+        GoRoute(
+          path: AppConstants.routeMatchDetail,
+          pageBuilder: (c, s) {
+            final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
+            return _slide(MatchDetailScreen(matchId: id));
+          },
+        ),
         GoRoute(
           path: AppConstants.routePlayerCreate,
           pageBuilder: (c, s) => _slide(const PlayerFormScreen()),

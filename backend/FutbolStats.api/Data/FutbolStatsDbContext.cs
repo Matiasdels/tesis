@@ -10,6 +10,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Jugador> Jugadores => Set<Jugador>();
     public DbSet<Partido> Partidos => Set<Partido>();
+    public DbSet<Alineacion> Alineaciones => Set<Alineacion>();
     public DbSet<TipoEvento> TiposEvento => Set<TipoEvento>();
     public DbSet<EventoPartido> EventosPartido => Set<EventoPartido>();
 
@@ -74,8 +75,26 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.ToTable("Partidos");
             entity.HasKey(x => x.PartidoId);
             entity.Property(x => x.Rival).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.TipoCompeticion).HasMaxLength(20).IsRequired().HasDefaultValue("Amistoso");
             entity.Property(x => x.Lugar).HasMaxLength(150);
             entity.Property(x => x.Estado).HasMaxLength(20).HasDefaultValue("Programado");
+            entity.HasOne(x => x.Categoria).WithMany().HasForeignKey(x => x.CategoriaId);
+        });
+
+        modelBuilder.Entity<Alineacion>(entity =>
+        {
+            entity.ToTable("Alineaciones");
+            entity.HasKey(x => x.AlineacionId);
+            entity.Property(x => x.PosicionAsignada).HasMaxLength(10);
+            entity.Property(x => x.EsTitular).HasDefaultValue(false);
+            entity.HasIndex(x => new { x.PartidoId, x.JugadorId }).IsUnique();
+            entity.HasOne(x => x.Partido)
+                .WithMany()
+                .HasForeignKey(x => x.PartidoId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Jugador)
+                .WithMany()
+                .HasForeignKey(x => x.JugadorId);
         });
 
         modelBuilder.Entity<TipoEvento>(entity =>

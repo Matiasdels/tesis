@@ -176,55 +176,88 @@ class PlayerModel {
   }
 }
 
-class MatchModel {
-  final String id;
-  final String homeTeam;
-  final String awayTeam;
-  final String homeAbbr;
-  final String awayAbbr;
-  final int homeScore;
-  final int awayScore;
-  final DateTime date;
-  final String venue;
-  final String status; // 'upcoming' | 'live' | 'finished'
-  final int? minute;
+class PartidoModel {
+  final int id;
+  final int categoriaId;
+  final String? categoriaNombre;
+  final String rival;
+  final bool esLocal;
+  final DateTime fecha;
+  final String tipoCompeticion;
+  final String? lugar;
+  final String estado;
+  final int? golesEquipo;
+  final int? golesRival;
+  final int? minutoActual;
 
-  const MatchModel({
+  const PartidoModel({
     required this.id,
-    required this.homeTeam,
-    required this.awayTeam,
-    required this.homeAbbr,
-    required this.awayAbbr,
-    required this.homeScore,
-    required this.awayScore,
-    required this.date,
-    required this.venue,
-    required this.status,
-    this.minute,
+    required this.categoriaId,
+    this.categoriaNombre,
+    required this.rival,
+    required this.esLocal,
+    required this.fecha,
+    required this.tipoCompeticion,
+    this.lugar,
+    required this.estado,
+    this.golesEquipo,
+    this.golesRival,
+    this.minutoActual,
   });
 
-  bool get isLive => status == 'live';
-  bool get isFinished => status == 'finished';
+  bool get isProgramado => estado == 'Programado';
+  bool get isEnJuego => estado == 'EnJuego';
+  bool get isFinished => estado == 'Finalizado';
+
+  factory PartidoModel.fromApi(Map<String, dynamic> json) => PartidoModel(
+        id: json['partidoId'] as int,
+        categoriaId: json['categoriaId'] as int,
+        categoriaNombre: json['categoriaNombre'] as String?,
+        rival: json['rival'] as String,
+        esLocal: json['esLocal'] as bool,
+        fecha: DateTime.parse(json['fecha'] as String),
+        tipoCompeticion: json['tipoCompeticion'] as String,
+        lugar: json['lugar'] as String?,
+        estado: json['estado'] as String,
+        golesEquipo: json['golesEquipo'] as int?,
+        golesRival: json['golesRival'] as int?,
+        minutoActual: json['minutoActual'] as int?,
+      );
+
+  Map<String, dynamic> toApiJson() => {
+        'categoriaId': categoriaId,
+        'rival': rival,
+        'esLocal': esLocal,
+        'fecha': fecha.toUtc().toIso8601String(),
+        'tipoCompeticion': tipoCompeticion,
+        'lugar': lugar,
+        'estado': estado,
+      };
 }
 
-class MatchEventModel {
-  final String id;
-  final String type; // EventTypes constant
-  final String playerId;
-  final String playerName;
-  final int minute;
-  final double pitchX; // 0.0–1.0 normalised
-  final double pitchY; // 0.0–1.0 normalised
+class AlineacionEntradaModel {
+  final int alineacionId;
+  final int jugadorId;
+  final String nombreJugador;
+  final bool esTitular;
+  final String? posicionAsignada;
 
-  const MatchEventModel({
-    required this.id,
-    required this.type,
-    required this.playerId,
-    required this.playerName,
-    required this.minute,
-    required this.pitchX,
-    required this.pitchY,
+  const AlineacionEntradaModel({
+    required this.alineacionId,
+    required this.jugadorId,
+    required this.nombreJugador,
+    required this.esTitular,
+    this.posicionAsignada,
   });
+
+  factory AlineacionEntradaModel.fromApi(Map<String, dynamic> json) =>
+      AlineacionEntradaModel(
+        alineacionId: json['alineacionId'] as int,
+        jugadorId: json['jugadorId'] as int,
+        nombreJugador: json['nombreJugador'] as String,
+        esTitular: json['esTitular'] as bool,
+        posicionAsignada: json['posicionAsignada'] as String?,
+      );
 }
 
 class TrainingSessionModel {
