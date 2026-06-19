@@ -241,6 +241,7 @@ class AlineacionEntradaModel {
   final String nombreJugador;
   final bool esTitular;
   final String? posicionAsignada;
+  final int? numeroCamiseta;
 
   const AlineacionEntradaModel({
     required this.alineacionId,
@@ -248,6 +249,7 @@ class AlineacionEntradaModel {
     required this.nombreJugador,
     required this.esTitular,
     this.posicionAsignada,
+    this.numeroCamiseta,
   });
 
   factory AlineacionEntradaModel.fromApi(Map<String, dynamic> json) =>
@@ -257,6 +259,59 @@ class AlineacionEntradaModel {
         nombreJugador: json['nombreJugador'] as String,
         esTitular: json['esTitular'] as bool,
         posicionAsignada: json['posicionAsignada'] as String?,
+        numeroCamiseta: json['numeroCamiseta'] as int?,
+      );
+}
+
+class EventoPartidoModel {
+  final int eventoId;
+  final int partidoId;
+  final int? jugadorId;
+  final String? nombreJugador;
+  final int tipoEventoId;
+  final String tipoEventoNombre;
+  final int minuto;
+  final double pitchX;
+  final double pitchY;
+  final String? observacion;
+
+  const EventoPartidoModel({
+    required this.eventoId,
+    required this.partidoId,
+    this.jugadorId,
+    this.nombreJugador,
+    required this.tipoEventoId,
+    required this.tipoEventoNombre,
+    required this.minuto,
+    required this.pitchX,
+    required this.pitchY,
+    this.observacion,
+  });
+
+  factory EventoPartidoModel.fromApi(Map<String, dynamic> json) =>
+      EventoPartidoModel(
+        eventoId: json['eventoId'] as int,
+        partidoId: json['partidoId'] as int,
+        jugadorId: json['jugadorId'] as int?,
+        nombreJugador: json['nombreJugador'] as String?,
+        tipoEventoId: json['tipoEventoId'] as int,
+        tipoEventoNombre: json['tipoEventoNombre'] as String,
+        minuto: json['minuto'] as int,
+        pitchX: (json['pitchX'] as num?)?.toDouble() ?? 0.5,
+        pitchY: (json['pitchY'] as num?)?.toDouble() ?? 0.5,
+        observacion: json['observacion'] as String?,
+      );
+}
+
+class TipoEventoModel {
+  final int tipoEventoId;
+  final String nombre;
+
+  const TipoEventoModel({required this.tipoEventoId, required this.nombre});
+
+  factory TipoEventoModel.fromApi(Map<String, dynamic> json) => TipoEventoModel(
+        tipoEventoId: json['tipoEventoId'] as int,
+        nombre: json['nombre'] as String,
       );
 }
 

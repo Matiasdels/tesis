@@ -92,6 +92,27 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
         return Ok(ToResponse(partido));
     }
 
+    [HttpPatch("{id:int}/estado")]
+    public async Task<IActionResult> PatchEstado(int id, EstadoRequest request)
+    {
+        var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id);
+        if (partido is null) return NotFound();
+
+        if (!EstadosValidos.Contains(request.Estado))
+            return BadRequest($"Estado inválido. Valores permitidos: {string.Join(", ", EstadosValidos)}.");
+
+        partido.Estado = request.Estado;
+
+        if (request.GolesEquipo.HasValue) partido.GolesEquipo = request.GolesEquipo;
+        if (request.GolesRival.HasValue) partido.GolesRival = request.GolesRival;
+        if (request.MinutoActual.HasValue) partido.MinutoActual = request.MinutoActual;
+
+        await context.SaveChangesAsync();
+        await context.Entry(partido).Reference(p => p.Categoria).LoadAsync();
+
+        return Ok(ToResponse(partido));
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeletePartido(int id)
     {
@@ -232,7 +253,8 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
         a.JugadorId,
         $"{a.Jugador!.Nombre} {a.Jugador.Apellido}",
         a.EsTitular,
-        a.PosicionAsignada);
+        a.PosicionAsignada,
+        a.Jugador.NumeroCamiseta);
 }
 
 public record PartidoRequest(
@@ -258,6 +280,8 @@ public record PartidoResponse(
     int? GolesRival,
     int? MinutoActual);
 
+public record EstadoRequest(string Estado, int? GolesEquipo, int? GolesRival, int? MinutoActual);
+
 public record AlineacionEntrada(int JugadorId, bool EsTitular, string? PosicionAsignada);
 
 public record AlineacionRequest(List<AlineacionEntrada> Jugadores);
@@ -267,4 +291,5 @@ public record AlineacionEntradaResponse(
     int JugadorId,
     string NombreJugador,
     bool EsTitular,
-    string? PosicionAsignada);
+    string? PosicionAsignada,
+    int? NumeroCamiseta);

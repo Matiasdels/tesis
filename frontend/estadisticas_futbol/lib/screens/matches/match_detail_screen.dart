@@ -24,6 +24,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
   List<AlineacionEntradaModel> _lineup = [];
   bool _loading = true;
   bool _changed = false;
+  bool _starting = false;
   String? _error;
 
   @override
@@ -53,6 +54,32 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
         _error = 'No pudimos cargar el partido. Intente nuevamente.';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _startMatch() async {
+    final match = _match!;
+    setState(() => _starting = true);
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      if (match.isProgramado) {
+        await _api.patchEstado(match.id, 'EnJuego', token);
+        _changed = true;
+      }
+      if (!mounted) return;
+      await context.push('/matches/live/${match.id}');
+      if (mounted) _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _starting = false);
     }
   }
 
@@ -167,6 +194,12 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                     _load();
                   }
                 },
+              ),
+              const SizedBox(height: AppConstants.sectionSpacing),
+              _MatchActionButton(
+                match: match,
+                loading: _starting,
+                onStart: _startMatch,
               ),
             ]),
           ),
@@ -311,6 +344,56 @@ class _SectionLabel extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _MatchActionButton extends StatelessWidget {
+  final PartidoModel match;
+  final bool loading;
+  final VoidCallback onStart;
+
+  const _MatchActionButton({
+    required this.match,
+    required this.loading,
+    required this.onStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (match.isFinished) return const SizedBox.shrink();
+
+    final isEnJuego = match.isEnJuego;
+    final label = isEnJuego ? 'Continuar partido en vivo' : 'Iniciar partido';
+    final icon = isEnJuego ? Icons.sports_soccer : Icons.play_arrow_rounded;
+    final color = isEnJuego ? AppColors.accent : AppColors.accent;
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: loading ? null : onStart,
+        icon: loading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.black),
+              )
+            : Icon(icon, size: 20),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+          ),
         ),
       ),
     );

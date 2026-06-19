@@ -38,6 +38,36 @@ class MatchApi {
     return PartidoModel.fromApi(response);
   }
 
+  Future<PartidoModel> patchEstado(
+    int id,
+    String estado,
+    String accessToken, {
+    int? golesEquipo,
+    int? golesRival,
+    int? minutoActual,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/Partidos/$id/estado');
+    final body = jsonEncode({
+      'estado': estado,
+      if (golesEquipo != null) 'golesEquipo': golesEquipo,
+      if (golesRival != null) 'golesRival': golesRival,
+      if (minutoActual != null) 'minutoActual': minutoActual,
+    });
+    final response = await _client.patch(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: body,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw MatchApiException(_friendlyError(response.statusCode, response.body));
+    }
+    return PartidoModel.fromApi(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<void> deleteMatch(int id, String accessToken) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/Partidos/$id');
     final response = await _client.delete(
