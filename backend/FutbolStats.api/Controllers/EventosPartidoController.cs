@@ -36,10 +36,13 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
             .FirstOrDefaultAsync(p => p.PartidoId == partidoId);
         if (partido is null) return NotFound("Partido no encontrado.");
 
-        if (request.JugadorId.HasValue)
+        var jugadorId = request.JugadorId is > 0 ? request.JugadorId : null;
+        Console.WriteLine($"[DEBUG] JugadorId recibido: {request.JugadorId?.ToString() ?? "NULL"}, normalizado: {jugadorId?.ToString() ?? "NULL"}");
+
+        if (jugadorId.HasValue)
         {
-            var jugadorExiste = await context.Jugadores.AnyAsync(j => j.JugadorId == request.JugadorId && j.Activo);
-            if (!jugadorExiste) return BadRequest("El jugador no existe o está inactivo.");
+            var jugadorExiste = await context.Jugadores.AnyAsync(j => j.JugadorId == jugadorId && j.Activo);
+            if (!jugadorExiste) return BadRequest($"El jugador indicado ({jugadorId}) no existe o está inactivo.");
         }
 
         var tipoExiste = await context.TiposEvento.AnyAsync(t => t.TipoEventoId == request.TipoEventoId);
@@ -51,7 +54,7 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
         var evento = new EventoPartido
         {
             PartidoId = partidoId,
-            JugadorId = request.JugadorId,
+            JugadorId = jugadorId,
             TipoEventoId = request.TipoEventoId,
             Minuto = request.Minuto,
             PitchX = request.PitchX,
@@ -96,13 +99,15 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
         e.FechaRegistro);
 }
 
-public record EventoRequest(
-    int? JugadorId,
-    int TipoEventoId,
-    int Minuto,
-    decimal? PitchX,
-    decimal? PitchY,
-    string? Observacion);
+public class EventoRequest
+{
+    public int? JugadorId { get; set; }
+    public int TipoEventoId { get; set; }
+    public int Minuto { get; set; }
+    public decimal? PitchX { get; set; }
+    public decimal? PitchY { get; set; }
+    public string? Observacion { get; set; }
+}
 
 public record EventoResponse(
     int EventoId,

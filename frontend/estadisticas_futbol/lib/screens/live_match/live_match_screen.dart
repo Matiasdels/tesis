@@ -1104,11 +1104,13 @@ class _PitchPainter extends CustomPainter {
 
   void _drawPitch(Canvas canvas, double w, double h) {
     const nStripes = 8;
+    // Horizontal stripes for portrait orientation
     for (var i = 0; i < nStripes; i++) {
-      final x = i * w / nStripes;
-      final paint = Paint()
-        ..color = i.isEven ? AppColors.pitchGreen : AppColors.pitchGreenAlt;
-      canvas.drawRect(Rect.fromLTWH(x, 0, w / nStripes, h), paint);
+      final y = i * h / nStripes;
+      canvas.drawRect(
+        Rect.fromLTWH(0, y, w, h / nStripes),
+        Paint()..color = i.isEven ? AppColors.pitchGreen : AppColors.pitchGreenAlt,
+      );
     }
 
     final lp = Paint()
@@ -1117,70 +1119,97 @@ class _PitchPainter extends CustomPainter {
       ..strokeWidth = 1.2
       ..strokeCap = StrokeCap.round;
 
-    final pad = w * 0.05;
+    const padV = 8.0;
+    final padH = w * 0.05;
+    final innerW = w - 2 * padH;
+    final innerH = h - 2 * padV;
+    final halfH = innerH / 2;
 
+    // Outer boundary
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-          Rect.fromLTRB(pad, 6, w - pad, h - 6), const Radius.circular(3)),
+        Rect.fromLTRB(padH, padV, w - padH, h - padV),
+        const Radius.circular(3),
+      ),
       lp,
     );
 
+    // Center line (horizontal) + circle
     lp.strokeWidth = 0.8;
-    canvas.drawLine(Offset(w / 2, 6), Offset(w / 2, h - 6), lp);
-    canvas.drawCircle(Offset(w / 2, h / 2), w * 0.10, lp);
-    canvas.drawCircle(
-        Offset(w / 2, h / 2), 3, Paint()..color = AppColors.pitchLine);
+    canvas.drawLine(Offset(padH, h / 2), Offset(w - padH, h / 2), lp);
+    canvas.drawCircle(Offset(w / 2, h / 2), innerW * 0.15, lp);
+    canvas.drawCircle(Offset(w / 2, h / 2), 3, Paint()..color = AppColors.pitchLine);
 
-    final bW = w * 0.18;
-    final bH = h * 0.44;
-    final bY = (h - bH) / 2;
-    final sW = bW * 0.50;
-    final sH = bH * 0.50;
-    final sY = (h - sH) / 2;
+    // Real proportions (FIFA):
+    // Penalty area: 40.32m wide / 68m pitch = 0.593; 16.5m deep / 52.5m half = 0.314
+    // Goal area:    18.32m wide / 68m = 0.269;  5.5m deep / 52.5m = 0.105
+    // Goal:         7.32m wide  / 68m = 0.108 (enlarged for visibility → 0.18)
+    // Penalty spot: 11m / 52.5m = 0.21 of half-length from goal line
+    // Arc radius:   9.15m / 52.5m = 0.174 of half-length
 
-    canvas.drawRect(Rect.fromLTWH(pad, bY, bW, bH), lp..strokeWidth = 1.0);
-    canvas.drawRect(Rect.fromLTWH(pad, sY, sW, sH), lp..strokeWidth = 0.7);
+    final paW    = innerW * 0.59;
+    final paD    = halfH  * 0.31;
+    final gaW    = innerW * 0.27;
+    final gaD    = halfH  * 0.105;
+    final goalW  = innerW * 0.18;
+    const goalH  = 10.0;
+    final arcR   = halfH  * 0.22; // slightly larger for visibility
+
+    final paL    = (w - paW) / 2;
+    final paR    = paL + paW;
+    final gaL    = (w - gaW) / 2;
+    final gaR    = gaL + gaW;
+    final goalL  = (w - goalW) / 2;
+    final goalR  = goalL + goalW;
+
+    // ── TOP GOAL ─────────────────────────────────────────────────────────────
+    final paTopBot  = padV + paD;
+    final topSpotY  = padV + halfH * 0.21;
+
+    canvas.drawRect(Rect.fromLTRB(paL, padV, paR, paTopBot), lp..strokeWidth = 1.0);
+    canvas.drawRect(Rect.fromLTRB(gaL, padV, gaR, padV + gaD), lp..strokeWidth = 0.7);
+    canvas.drawRect(Rect.fromLTRB(goalL, padV - goalH, goalR, padV), lp..strokeWidth = 1.2);
+    canvas.drawCircle(Offset(w / 2, topSpotY), 2, Paint()..color = AppColors.pitchLine);
+
+    // Arc: only the portion below paTopBot (outside the penalty area)
+    final topRatio = (paTopBot - topSpotY).clamp(-arcR, arcR) / arcR;
+    final topStart = math.asin(topRatio);
+    final topSweep = math.pi - 2 * topStart;
     canvas.drawArc(
-      Rect.fromCenter(
-          center: Offset(pad + bW * 0.72, h / 2),
-          width: bW * 0.6,
-          height: h * 0.28),
-      -math.pi * 0.5, math.pi, false, lp..strokeWidth = 0.7,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(pad - 7, (h - bH * 0.25) / 2, 7, bH * 0.25),
-      lp..strokeWidth = 1.2..color = AppColors.pitchLine,
+      Rect.fromCenter(center: Offset(w / 2, topSpotY), width: arcR * 2, height: arcR * 2),
+      topStart, topSweep, false, lp..strokeWidth = 0.7,
     );
 
-    canvas.drawRect(
-        Rect.fromLTWH(w - pad - bW, bY, bW, bH), lp..strokeWidth = 1.0);
-    canvas.drawRect(
-        Rect.fromLTWH(w - pad - sW, sY, sW, sH), lp..strokeWidth = 0.7);
+    // ── BOTTOM GOAL ──────────────────────────────────────────────────────────
+    final paBotTop  = h - padV - paD;
+    final botSpotY  = h - padV - halfH * 0.21;
+
+    canvas.drawRect(Rect.fromLTRB(paL, paBotTop, paR, h - padV), lp..strokeWidth = 1.0);
+    canvas.drawRect(Rect.fromLTRB(gaL, h - padV - gaD, gaR, h - padV), lp..strokeWidth = 0.7);
+    canvas.drawRect(Rect.fromLTRB(goalL, h - padV, goalR, h - padV + goalH), lp..strokeWidth = 1.2);
+    canvas.drawCircle(Offset(w / 2, botSpotY), 2, Paint()..color = AppColors.pitchLine);
+
+    // Arc: only the portion above paBotTop (outside the penalty area)
+    final botRatio = (botSpotY - paBotTop).clamp(-arcR, arcR) / arcR;
+    final botArcSin = math.asin(botRatio);
+    final botStart = math.pi + botArcSin;
+    final botSweep = math.pi - 2 * botArcSin;
     canvas.drawArc(
-      Rect.fromCenter(
-          center: Offset(w - pad - bW * 0.72, h / 2),
-          width: bW * 0.6,
-          height: h * 0.28),
-      math.pi * 0.5, math.pi, false, lp..strokeWidth = 0.7,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(w - pad, (h - bH * 0.25) / 2, 7, bH * 0.25),
-      lp..strokeWidth = 1.2,
+      Rect.fromCenter(center: Offset(w / 2, botSpotY), width: arcR * 2, height: arcR * 2),
+      botStart, botSweep, false, lp..strokeWidth = 0.7,
     );
 
-    const cornerR = 6.0;
-    for (final corner in [
-      (pad, 6.0, 0.0, math.pi / 2),
-      (w - pad, 6.0, math.pi / 2, math.pi / 2),
-      (pad, h - 6.0, -math.pi / 2, math.pi / 2),
-      (w - pad, h - 6.0, math.pi, math.pi / 2),
+    // ── CORNER ARCS ──────────────────────────────────────────────────────────
+    const cR = 7.0;
+    for (final (cx, cy, start) in [
+      (padH,     padV,     0.0),
+      (w - padH, padV,     math.pi / 2),
+      (padH,     h - padV, -math.pi / 2),
+      (w - padH, h - padV, math.pi),
     ]) {
       canvas.drawArc(
-        Rect.fromCenter(
-            center: Offset(corner.$1, corner.$2),
-            width: cornerR * 2,
-            height: cornerR * 2),
-        corner.$3, corner.$4, false, lp..strokeWidth = 0.8,
+        Rect.fromCenter(center: Offset(cx, cy), width: cR * 2, height: cR * 2),
+        start, math.pi / 2, false, lp..strokeWidth = 0.8,
       );
     }
   }

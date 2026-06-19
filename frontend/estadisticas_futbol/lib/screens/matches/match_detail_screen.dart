@@ -63,8 +63,12 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     try {
       final token = context.read<AuthState>().session!.accessToken;
       if (match.isProgramado) {
-        await _api.patchEstado(match.id, 'EnJuego', token);
-        _changed = true;
+        try {
+          await _api.patchEstado(match.id, 'EnJuego', token);
+          _changed = true;
+        } catch (_) {
+          // El endpoint puede no estar disponible aún; igual navegamos
+        }
       }
       if (!mounted) return;
       await context.push('/matches/live/${match.id}');

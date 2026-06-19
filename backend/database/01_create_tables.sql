@@ -129,7 +129,7 @@ GO
 CREATE TABLE EventosPartido (
     EventoId                INT IDENTITY(1,1)   NOT NULL,
     PartidoId               INT                 NOT NULL,
-    JugadorId               INT                 NOT NULL,
+    JugadorId               INT                 NULL,
     TipoEventoId            INT                 NOT NULL,
     Minuto                  INT                 NOT NULL,
     PitchX                  DECIMAL(4,3)        NULL,

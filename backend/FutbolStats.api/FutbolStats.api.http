@@ -1,4 +1,4 @@
-@FutbolStats.api_HostAddress = http://localhost:5223
+@FutbolStats.api_HostAddress = http://localhost:5224
 
 GET {{FutbolStats.api_HostAddress}}/weatherforecast/
 Accept: application/json
