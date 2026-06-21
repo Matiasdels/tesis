@@ -45,6 +45,7 @@ abstract class AppConstants {
 
 abstract class EventTypes {
   static const String passOk       = 'Pase correcto';
+  static const String passKey      = 'Pase clave';
   static const String passBad      = 'Pase incorrecto';
   static const String shot         = 'Remate';
   static const String goal         = 'Gol';

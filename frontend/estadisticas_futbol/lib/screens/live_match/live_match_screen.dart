@@ -264,7 +264,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
   void _selectSector(int index) {
     HapticFeedback.mediumImpact();
-    final eventName = EventTypes.radialPrimary[index];
+    final eventName = _sectors[index].eventType;
     setState(() {
       _pendingEvent = eventName;
       _showRadial = false;
@@ -1077,6 +1077,7 @@ class _PitchPainter extends CustomPainter {
   static Color colorFor(String type) {
     return switch (type) {
       EventTypes.passOk => AppColors.accent,
+      EventTypes.passKey => AppColors.accent,
       EventTypes.passBad => AppColors.danger,
       EventTypes.shot => AppColors.warning,
       EventTypes.goal => const Color(0xFFFFEB3B),
@@ -1268,7 +1269,7 @@ class _SectorData {
 }
 
 const _sectors = [
-  _SectorData('Pase ✓', EventTypes.passOk, Icons.check_rounded, AppColors.accent),
+  _SectorData('Pase clave', EventTypes.passKey, Icons.key_rounded, AppColors.accent),
   _SectorData('Pase ✗', EventTypes.passBad, Icons.close_rounded, AppColors.danger),
   _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded, AppColors.warning),
   _SectorData('Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
