@@ -367,7 +367,25 @@ class _MatchActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (match.isFinished) return const SizedBox.shrink();
+    if (match.isFinished) {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => context.push('/matches/${match.id}/summary'),
+          icon: const Icon(Icons.bar_chart_rounded, size: 20),
+          label: const Text('Ver resumen del partido'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+            ),
+          ),
+        ),
+      );
+    }
 
     final isEnJuego = match.isEnJuego;
     final label = isEnJuego ? 'Continuar partido en vivo' : 'Iniciar partido';

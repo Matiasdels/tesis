@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -500,7 +501,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         golesRival: _awayScore,
         minutoActual: _minute,
       );
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) context.go('/matches/$_matchId/summary');
     } catch (_) {
       if (mounted) {
         _showError('No se pudo finalizar el partido. Intente nuevamente.');

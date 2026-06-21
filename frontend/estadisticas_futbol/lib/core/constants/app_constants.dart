@@ -12,6 +12,7 @@ abstract class AppConstants {
   static const String routeMatchDetail  = '/matches/:id';
   static const String routeLineup       = '/matches/:id/lineup';
   static const String routeLiveMatch    = '/matches/live/:id';
+  static const String routeMatchSummary = '/matches/:id/summary';
   static const String routeTraining     = '/training';
   static const String routeStatistics   = '/statistics';
   static const String routeReports      = '/reports';
