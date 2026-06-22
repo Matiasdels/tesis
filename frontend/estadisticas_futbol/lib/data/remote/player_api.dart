@@ -2,11 +2,13 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../local/database_helper.dart';
 import '../../models/models.dart';
 import 'api_config.dart';
 
 class PlayerApi {
   final http.Client _client = http.Client();
+  final _databaseHelper = DatabaseHelper.instance;
 
   Future<List<PlayerModel>> getPlayers({
     required String accessToken,
@@ -17,19 +19,66 @@ class PlayerApi {
     if (estado != null && estado.isNotEmpty) query['estado'] = estado;
     if (search != null && search.isNotEmpty) query['search'] = search;
 
-    final response = await _getList('/api/Jugadores', accessToken, query: query);
-    return response
-        .map((item) => PlayerModel.fromApi(item as Map<String, dynamic>))
-        .toList();
+    final cacheKey = _playersCacheKey(estado: estado, search: search);
+
+    try {
+      final response =
+          await _getList('/api/Jugadores', accessToken, query: query);
+      await _databaseHelper.saveJson(cacheKey, response);
+      if (query.isEmpty) {
+        await _databaseHelper.saveJson(_playersCacheKey(), response);
+      }
+      for (final item in response) {
+        final map = item as Map<String, dynamic>;
+        await _databaseHelper.saveJson(
+          'players:item:${map['jugadorId']}',
+          map,
+        );
+      }
+      return response
+          .map((item) => PlayerModel.fromApi(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      final cached = await _databaseHelper.readJsonList(cacheKey) ??
+          await _databaseHelper.readJsonList(_playersCacheKey());
+      if (cached != null) {
+        return cached
+            .map((item) => PlayerModel.fromApi(item as Map<String, dynamic>))
+            .where((player) => _matchesLocalFilters(player, estado, search))
+            .toList();
+      }
+      rethrow;
+    }
   }
 
   Future<PlayerModel> getPlayer(String id, String accessToken) async {
-    final response = await _getMap('/api/Jugadores/$id', accessToken);
-    return PlayerModel.fromApi(response);
+    try {
+      final response = await _getMap('/api/Jugadores/$id', accessToken);
+      await _databaseHelper.saveJson('players:item:$id', response);
+      return PlayerModel.fromApi(response);
+    } catch (_) {
+      final cached = await _databaseHelper.readJsonMap('players:item:$id');
+      if (cached != null) return PlayerModel.fromApi(cached);
+
+      final cachedList = await _databaseHelper.readJsonList(_playersCacheKey());
+      final cachedPlayer = cachedList?.whereType<Map<String, dynamic>>().where(
+            (item) => '${item['jugadorId']}' == id,
+          );
+      if (cachedPlayer != null && cachedPlayer.isNotEmpty) {
+        return PlayerModel.fromApi(cachedPlayer.first);
+      }
+      rethrow;
+    }
   }
 
-  Future<PlayerModel> createPlayer(PlayerModel player, String accessToken) async {
-    final response = await _send('POST', '/api/Jugadores', accessToken, player.toApiJson());
+  Future<PlayerModel> createPlayer(
+      PlayerModel player, String accessToken) async {
+    final response =
+        await _send('POST', '/api/Jugadores', accessToken, player.toApiJson());
+    await _databaseHelper.saveJson(
+      'players:item:${response['jugadorId']}',
+      response,
+    );
     return PlayerModel.fromApi(response);
   }
 
@@ -38,7 +87,9 @@ class PlayerApi {
     PlayerModel player,
     String accessToken,
   ) async {
-    final response = await _send('PUT', '/api/Jugadores/$id', accessToken, player.toApiJson());
+    final response = await _send(
+        'PUT', '/api/Jugadores/$id', accessToken, player.toApiJson());
+    await _databaseHelper.saveJson('players:item:$id', response);
     return PlayerModel.fromApi(response);
   }
 
@@ -50,15 +101,27 @@ class PlayerApi {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw PlayerApiException(_friendlyError(response.statusCode, response.body));
+      throw PlayerApiException(
+          _friendlyError(response.statusCode, response.body));
     }
   }
 
   Future<List<CategoryModel>> getCategories(String accessToken) async {
-    final response = await _getList('/api/Catalogos/categorias', accessToken);
-    return response
-        .map((item) => CategoryModel.fromApi(item as Map<String, dynamic>))
-        .toList();
+    try {
+      final response = await _getList('/api/Catalogos/categorias', accessToken);
+      await _databaseHelper.saveJson('catalogs:categories', response);
+      return response
+          .map((item) => CategoryModel.fromApi(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      final cached = await _databaseHelper.readJsonList('catalogs:categories');
+      if (cached != null) {
+        return cached
+            .map((item) => CategoryModel.fromApi(item as Map<String, dynamic>))
+            .toList();
+      }
+      rethrow;
+    }
   }
 
   Future<List<dynamic>> _getList(
@@ -74,7 +137,8 @@ class PlayerApi {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw PlayerApiException(_friendlyError(response.statusCode, response.body));
+      throw PlayerApiException(
+          _friendlyError(response.statusCode, response.body));
     }
 
     return jsonDecode(response.body) as List<dynamic>;
@@ -88,7 +152,8 @@ class PlayerApi {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw PlayerApiException(_friendlyError(response.statusCode, response.body));
+      throw PlayerApiException(
+          _friendlyError(response.statusCode, response.body));
     }
 
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -112,7 +177,8 @@ class PlayerApi {
         : await _client.put(uri, headers: headers, body: encodedBody);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw PlayerApiException(_friendlyError(response.statusCode, response.body));
+      throw PlayerApiException(
+          _friendlyError(response.statusCode, response.body));
     }
 
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -136,6 +202,25 @@ class PlayerApi {
     }
 
     return 'No pudimos completar la acción. Intentá nuevamente.';
+  }
+
+  String _playersCacheKey({String? estado, String? search}) {
+    final status = estado?.trim() ?? '';
+    final term = search?.trim().toLowerCase() ?? '';
+    if (status.isEmpty && term.isEmpty) return 'players:list';
+    return 'players:list:estado=$status:search=$term';
+  }
+
+  bool _matchesLocalFilters(
+      PlayerModel player, String? estado, String? search) {
+    final statusMatches = estado == null ||
+        estado.isEmpty ||
+        PlayerModel.statusToApi(player.status) == estado;
+    final term = search?.trim().toLowerCase();
+    final searchMatches = term == null ||
+        term.isEmpty ||
+        player.name.toLowerCase().contains(term);
+    return statusMatches && searchMatches;
   }
 }
 

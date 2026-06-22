@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../models/models.dart';
+import '../local/database_helper.dart';
 import 'api_config.dart';
 
 class MatchApi {
   final http.Client _client = http.Client();
+  final _databaseHelper = DatabaseHelper.instance;
 
   Future<List<PartidoModel>> getMatches({
     required String accessToken,
@@ -17,24 +19,79 @@ class MatchApi {
     if (categoriaId != null) query['categoriaId'] = '$categoriaId';
     if (estado != null && estado.isNotEmpty) query['estado'] = estado;
 
-    final response = await _getList('/api/Partidos', accessToken, query: query);
-    return response
-        .map((item) => PartidoModel.fromApi(item as Map<String, dynamic>))
-        .toList();
+    final cacheKey = _matchesCacheKey(categoriaId: categoriaId, estado: estado);
+
+    try {
+      final response =
+          await _getList('/api/Partidos', accessToken, query: query);
+      await _databaseHelper.saveJson(cacheKey, response);
+      if (query.isEmpty) {
+        await _databaseHelper.saveJson(_matchesCacheKey(), response);
+      }
+      for (final item in response) {
+        final map = item as Map<String, dynamic>;
+        await _databaseHelper.saveJson(
+          'matches:item:${map['partidoId']}',
+          map,
+        );
+      }
+      return response
+          .map((item) => PartidoModel.fromApi(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      final cached = await _databaseHelper.readJsonList(cacheKey) ??
+          await _databaseHelper.readJsonList(_matchesCacheKey());
+      if (cached != null) {
+        return cached
+            .map((item) => PartidoModel.fromApi(item as Map<String, dynamic>))
+            .where((match) => _matchesLocalFilters(match, categoriaId, estado))
+            .toList();
+      }
+      rethrow;
+    }
   }
 
   Future<PartidoModel> getMatch(int id, String accessToken) async {
-    final response = await _getMap('/api/Partidos/$id', accessToken);
+    try {
+      final response = await _getMap('/api/Partidos/$id', accessToken);
+      await _databaseHelper.saveJson('matches:item:$id', response);
+      return PartidoModel.fromApi(response);
+    } catch (_) {
+      final cached = await _databaseHelper.readJsonMap('matches:item:$id');
+      if (cached != null) return PartidoModel.fromApi(cached);
+      rethrow;
+    }
+  }
+
+  Future<PartidoModel> createMatch(
+    PartidoModel match,
+    String accessToken,
+  ) async {
+    final response = await _send(
+      'POST',
+      '/api/Partidos',
+      accessToken,
+      match.toApiJson(),
+    );
+    await _databaseHelper.saveJson(
+      'matches:item:${response['partidoId']}',
+      response,
+    );
     return PartidoModel.fromApi(response);
   }
 
-  Future<PartidoModel> createMatch(PartidoModel match, String accessToken) async {
-    final response = await _send('POST', '/api/Partidos', accessToken, match.toApiJson());
-    return PartidoModel.fromApi(response);
-  }
-
-  Future<PartidoModel> updateMatch(int id, PartidoModel match, String accessToken) async {
-    final response = await _send('PUT', '/api/Partidos/$id', accessToken, match.toApiJson());
+  Future<PartidoModel> updateMatch(
+    int id,
+    PartidoModel match,
+    String accessToken,
+  ) async {
+    final response = await _send(
+      'PUT',
+      '/api/Partidos/$id',
+      accessToken,
+      match.toApiJson(),
+    );
+    await _databaseHelper.saveJson('matches:item:$id', response);
     return PartidoModel.fromApi(response);
   }
 
@@ -62,10 +119,12 @@ class MatchApi {
       body: body,
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw MatchApiException(_friendlyError(response.statusCode, response.body));
+      throw MatchApiException(
+          _friendlyError(response.statusCode, response.body));
     }
-    return PartidoModel.fromApi(
-        jsonDecode(response.body) as Map<String, dynamic>);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    await _databaseHelper.saveJson('matches:item:$id', json);
+    return PartidoModel.fromApi(json);
   }
 
   Future<void> deleteMatch(int id, String accessToken) async {
@@ -75,15 +134,34 @@ class MatchApi {
       headers: {'Authorization': 'Bearer $accessToken'},
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw MatchApiException(_friendlyError(response.statusCode, response.body));
+      throw MatchApiException(
+          _friendlyError(response.statusCode, response.body));
     }
   }
 
-  Future<List<AlineacionEntradaModel>> getLineup(int matchId, String accessToken) async {
-    final response = await _getList('/api/Partidos/$matchId/alineacion', accessToken);
-    return response
-        .map((item) => AlineacionEntradaModel.fromApi(item as Map<String, dynamic>))
-        .toList();
+  Future<List<AlineacionEntradaModel>> getLineup(
+    int matchId,
+    String accessToken,
+  ) async {
+    try {
+      final response =
+          await _getList('/api/Partidos/$matchId/alineacion', accessToken);
+      await _databaseHelper.saveJson('matches:$matchId:lineup', response);
+      return response
+          .map((item) =>
+              AlineacionEntradaModel.fromApi(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      final cached =
+          await _databaseHelper.readJsonList('matches:$matchId:lineup');
+      if (cached != null) {
+        return cached
+            .map((item) =>
+                AlineacionEntradaModel.fromApi(item as Map<String, dynamic>))
+            .toList();
+      }
+      rethrow;
+    }
   }
 
   Future<List<AlineacionEntradaModel>> setLineup(
@@ -91,7 +169,8 @@ class MatchApi {
     List<Map<String, dynamic>> entries,
     String accessToken,
   ) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/Partidos/$matchId/alineacion');
+    final uri =
+        Uri.parse('${ApiConfig.baseUrl}/api/Partidos/$matchId/alineacion');
     final headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $accessToken',
@@ -100,12 +179,15 @@ class MatchApi {
     final response = await _client.put(uri, headers: headers, body: body);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw MatchApiException(_friendlyError(response.statusCode, response.body));
+      throw MatchApiException(
+          _friendlyError(response.statusCode, response.body));
     }
 
     final list = jsonDecode(response.body) as List<dynamic>;
+    await _databaseHelper.saveJson('matches:$matchId:lineup', list);
     return list
-        .map((item) => AlineacionEntradaModel.fromApi(item as Map<String, dynamic>))
+        .map((item) =>
+            AlineacionEntradaModel.fromApi(item as Map<String, dynamic>))
         .toList();
   }
 
@@ -121,7 +203,8 @@ class MatchApi {
       headers: {'Authorization': 'Bearer $accessToken'},
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw MatchApiException(_friendlyError(response.statusCode, response.body));
+      throw MatchApiException(
+          _friendlyError(response.statusCode, response.body));
     }
     return jsonDecode(response.body) as List<dynamic>;
   }
@@ -133,7 +216,8 @@ class MatchApi {
       headers: {'Authorization': 'Bearer $accessToken'},
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw MatchApiException(_friendlyError(response.statusCode, response.body));
+      throw MatchApiException(
+          _friendlyError(response.statusCode, response.body));
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -155,17 +239,39 @@ class MatchApi {
         : await _client.put(uri, headers: headers, body: encodedBody);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw MatchApiException(_friendlyError(response.statusCode, response.body));
+      throw MatchApiException(
+          _friendlyError(response.statusCode, response.body));
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   String _friendlyError(int statusCode, String responseBody) {
     final cleanBody = responseBody.replaceAll('"', '').trim();
-    if (statusCode == 401) return 'Tu sesión expiró. Volvé a iniciar sesión.';
+    if (statusCode == 401) return 'Tu sesion expiro. Volve a iniciar sesion.';
     if (cleanBody.isNotEmpty) return cleanBody;
-    if (statusCode == 404) return 'Recurso no encontrado. Verificá que el servidor esté actualizado.';
-    return 'Error $statusCode. No pudimos completar la acción. Intente nuevamente.';
+    if (statusCode == 404) {
+      return 'Recurso no encontrado. Verifica que el servidor este actualizado.';
+    }
+    return 'Error $statusCode. No pudimos completar la accion. Intente nuevamente.';
+  }
+
+  String _matchesCacheKey({int? categoriaId, String? estado}) {
+    if (categoriaId == null && (estado == null || estado.isEmpty)) {
+      return 'matches:list';
+    }
+    return 'matches:list:categoria=${categoriaId ?? ''}:estado=${estado ?? ''}';
+  }
+
+  bool _matchesLocalFilters(
+    PartidoModel match,
+    int? categoriaId,
+    String? estado,
+  ) {
+    final categoryMatches =
+        categoriaId == null || match.categoriaId == categoriaId;
+    final statusMatches =
+        estado == null || estado.isEmpty || match.estado == estado;
+    return categoryMatches && statusMatches;
   }
 }
 

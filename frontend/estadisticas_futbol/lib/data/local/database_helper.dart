@@ -1,5 +1,7 @@
-import 'package:sqflite/sqflite.dart';
+import 'dart:convert';
+
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -17,14 +19,27 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    // Versión 1 de tu base de datos
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
   }
 
-  Future _createDB(Database db, int version) async {
-    // Tabla de Partidos
+  Future<void> _createDB(Database db, int version) async {
+    await _createLegacyTables(db);
+    await _createCacheAndSyncTables(db);
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    await _createLegacyTables(db);
+    await _createCacheAndSyncTables(db);
+  }
+
+  Future<void> _createLegacyTables(Database db) async {
     await db.execute('''
-      CREATE TABLE matches (
+      CREATE TABLE IF NOT EXISTS matches (
         id TEXT PRIMARY KEY,
         opponent_name TEXT NOT NULL,
         match_date TEXT NOT NULL,
@@ -33,13 +48,12 @@ class DatabaseHelper {
       )
     ''');
 
-    // Tabla de Eventos del partido (Goles, tarjetas, cambios)
     await db.execute('''
-      CREATE TABLE match_events (
+      CREATE TABLE IF NOT EXISTS match_events (
         id TEXT PRIMARY KEY,
         match_id TEXT NOT NULL,
         player_name TEXT NOT NULL,
-        event_type TEXT NOT NULL, -- 'GOL', 'TARJETA_AMARILLA', 'ASISTENCIA'
+        event_type TEXT NOT NULL,
         minute INTEGER NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (match_id) REFERENCES matches (id) ON DELETE CASCADE
@@ -47,36 +61,213 @@ class DatabaseHelper {
     ''');
   }
 
-  // --- MÉTODOS PARA AGREGAR Y CONSULTAR DATOS ---
+  Future<void> _createCacheAndSyncTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS local_cache (
+        cache_key TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
 
-  // 1. Guardar un nuevo partido
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_queue (
+        id TEXT PRIMARY KEY,
+        entity TEXT NOT NULL,
+        action TEXT NOT NULL,
+        method TEXT NOT NULL,
+        endpoint TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+      )
+    ''');
+  }
+
+  Future<void> saveJson(String key, Object? value) async {
+    final db = await database;
+    await db.insert(
+      'local_cache',
+      {
+        'cache_key': key,
+        'payload': jsonEncode(value),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<dynamic>?> readJsonList(String key) async {
+    final data = await _readJson(key);
+    return data is List<dynamic> ? data : null;
+  }
+
+  Future<Map<String, dynamic>?> readJsonMap(String key) async {
+    final data = await _readJson(key);
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  Future<Object?> _readJson(String key) async {
+    final db = await database;
+    final rows = await db.query(
+      'local_cache',
+      columns: ['payload'],
+      where: 'cache_key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return null;
+    return jsonDecode(rows.first['payload'] as String) as Object?;
+  }
+
+  Future<PendingSyncAction> enqueueSyncAction({
+    required String entity,
+    required String action,
+    required String method,
+    required String endpoint,
+    required Map<String, dynamic> payload,
+  }) async {
+    final db = await database;
+    final id = '${DateTime.now().toUtc().microsecondsSinceEpoch}_$entity';
+    final row = {
+      'id': id,
+      'entity': entity,
+      'action': action,
+      'method': method,
+      'endpoint': endpoint,
+      'payload': jsonEncode(payload),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'attempts': 0,
+      'last_error': null,
+    };
+    await db.insert('sync_queue', row);
+    return PendingSyncAction.fromDb(row);
+  }
+
+  Future<List<PendingSyncAction>> getPendingSyncActions() async {
+    final db = await database;
+    final rows = await db.query(
+      'sync_queue',
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(PendingSyncAction.fromDb).toList();
+  }
+
+  Future<void> markSyncActionCompleted(String id) async {
+    final db = await database;
+    await db.delete('sync_queue', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> markSyncActionFailed(String id, Object error) async {
+    final db = await database;
+    await db.rawUpdate(
+      '''
+      UPDATE sync_queue
+      SET attempts = attempts + 1,
+          last_error = ?
+      WHERE id = ?
+      ''',
+      [error.toString(), id],
+    );
+  }
+
+  Future<void> deletePendingEventByLocalId(int localEventoId) async {
+    final db = await database;
+    await db.delete(
+      'sync_queue',
+      where: "entity = ? AND action = ? AND payload LIKE ?",
+      whereArgs: [
+        'evento_partido',
+        'create',
+        '%"localEventoId":$localEventoId%',
+      ],
+    );
+  }
+
+  Future<int> pendingSyncCount() async {
+    final db = await database;
+    final result =
+        await db.rawQuery('SELECT COUNT(*) AS count FROM sync_queue');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   Future<int> insertMatch(Map<String, dynamic> row) async {
-    final db = await instance.database;
-    return await db.insert('matches', row,
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    final db = await database;
+    return db.insert(
+      'matches',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
-  // 2. Guardar un evento (Gol, falta, etc.) del menú radial
   Future<int> insertEvent(Map<String, dynamic> row) async {
-    final db = await instance.database;
-    return await db.insert('match_events', row);
+    final db = await database;
+    return db.insert(
+      'match_events',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
-  // 3. Traer todos los partidos (para tu Dashboard / Matches)
   Future<List<Map<String, dynamic>>> getMatches() async {
-    final db = await instance.database;
-    return await db.query('matches', orderBy: 'match_date DESC');
+    final db = await database;
+    return db.query('matches', orderBy: 'match_date DESC');
   }
 
-  // 4. Traer los eventos de un partido específico
   Future<List<Map<String, dynamic>>> getEventsForMatch(String matchId) async {
-    final db = await instance.database;
-    return await db
-        .query('match_events', where: 'match_id = ?', whereArgs: [matchId]);
+    final db = await database;
+    return db.query(
+      'match_events',
+      where: 'match_id = ?',
+      whereArgs: [matchId],
+    );
   }
 
-  Future close() async {
+  Future<void> close() async {
     final db = _database;
-    if (db != null) await db.close();
+    if (db != null) {
+      await db.close();
+      _database = null;
+    }
+  }
+}
+
+class PendingSyncAction {
+  final String id;
+  final String entity;
+  final String action;
+  final String method;
+  final String endpoint;
+  final Map<String, dynamic> payload;
+  final DateTime createdAt;
+  final int attempts;
+  final String? lastError;
+
+  const PendingSyncAction({
+    required this.id,
+    required this.entity,
+    required this.action,
+    required this.method,
+    required this.endpoint,
+    required this.payload,
+    required this.createdAt,
+    required this.attempts,
+    this.lastError,
+  });
+
+  factory PendingSyncAction.fromDb(Map<String, Object?> row) {
+    return PendingSyncAction(
+      id: row['id'] as String,
+      entity: row['entity'] as String,
+      action: row['action'] as String,
+      method: row['method'] as String,
+      endpoint: row['endpoint'] as String,
+      payload: jsonDecode(row['payload'] as String) as Map<String, dynamic>,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      attempts: row['attempts'] as int,
+      lastError: row['last_error'] as String?,
+    );
   }
 }
