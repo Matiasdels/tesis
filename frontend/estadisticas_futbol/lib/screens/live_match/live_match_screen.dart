@@ -327,7 +327,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       final evento = await _eventApi.createEvento(
         partidoId: _matchId,
         jugadorId: player.jugadorId,
+        nombreJugador: player.nombreJugador,
         tipoEventoId: tipoId,
+        tipoEventoNombre: _pendingEvent,
         minuto: _minute,
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
@@ -372,7 +374,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       final evento = await _eventApi.createEvento(
         partidoId: _matchId,
         jugadorId: null,
+        nombreJugador: null,
         tipoEventoId: tipoId,
+        tipoEventoNombre: _pendingEvent,
         minuto: _minute,
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
