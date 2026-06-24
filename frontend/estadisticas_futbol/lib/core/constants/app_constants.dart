@@ -112,25 +112,58 @@ abstract class EstadosPartido {
 
 abstract class PlayerPositions {
   static const String goalkeeper = 'ARQ';
+
+  // Defensas
   static const String rightBack = 'LD';
   static const String centerBack = 'DFC';
   static const String leftBack = 'LI';
-  static const String defensiveMid = 'MDC';
+
+  // Mediocampistas
+  static const String rightMidfielder = 'MD';
+  static const String defensiveMid = 'MCD';
   static const String centralMid = 'MC';
   static const String attackingMid = 'MCO';
+  static const String leftMidfielder = 'MI';
+
+  // Delanteros
   static const String rightWing = 'ED';
   static const String leftWing = 'EI';
   static const String striker = 'DC';
   static const String forward = 'DEL';
+
+  static const Map<String, List<String>> groups = {
+    'Arquero': ['ARQ'],
+    'Defensas': ['LD', 'DFC', 'LI'],
+    'Mediocampistas': ['MD', 'MCD', 'MC', 'MCO', 'MI'],
+    'Delanteros': ['ED', 'EI', 'DC', 'DEL'],
+  };
+
+  static const Map<String, String> names = {
+    'ARQ': 'Arquero',
+    'LD': 'Lateral Derecho',
+    'DFC': 'Defensa Central',
+    'LI': 'Lateral Izquierdo',
+    'MD': 'Mediocampista Derecho',
+    'MCD': 'Mediocentro Defensivo',
+    'MC': 'Mediocampista Central',
+    'MCO': 'Mediocampista Ofensivo',
+    'MI': 'Mediocampista Izquierdo',
+    'ED': 'Extremo Derecho',
+    'EI': 'Extremo Izquierdo',
+    'DC': 'Delantero Centro',
+    'DEL': 'Delantero',
+  };
 
   static const List<String> all = [
     goalkeeper,
     rightBack,
     centerBack,
     leftBack,
+    rightMidfielder,
     defensiveMid,
     centralMid,
     attackingMid,
+    leftMidfielder,
     rightWing,
     leftWing,
     striker,
