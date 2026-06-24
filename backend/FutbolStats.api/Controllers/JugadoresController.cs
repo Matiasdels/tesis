@@ -219,7 +219,8 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
     }
 
     private static bool IsDniDuplicate(DbUpdateException ex) =>
-        ex.InnerException?.Message.Contains("IX_Jugadores_DNI") == true;
+        ex.InnerException?.Message.Contains("IX_Jugadores_DNI") == true ||
+        ex.InnerException?.Message.Contains("UQ_Jugadores_DNI") == true;
 
     private static JugadorResponse ToResponse(Jugador jugador)
     {
