@@ -297,8 +297,9 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                       initialValue: _position,
                       decoration: const InputDecoration(labelText: 'Posición'),
                       items: PlayerPositions.all
-                          .map(
-                              (p) => DropdownMenuItem(value: p, child: Text(p)))
+                          .map((p) => DropdownMenuItem(
+                              value: p,
+                              child: Text(PlayerPositions.names[p] ?? p)))
                           .toList(),
                       onChanged: _saving
                           ? null

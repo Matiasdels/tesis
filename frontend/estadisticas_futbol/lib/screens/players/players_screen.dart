@@ -56,7 +56,8 @@ class _PlayersScreenState extends State<PlayersScreen> {
   List<PlayerModel> get _filtered => _players.where((p) {
     final matchQuery = p.name.toLowerCase().contains(_query.toLowerCase());
     final matchStatus = _filterStatus == 'all' || p.status == _filterStatus;
-    final matchPos = _filterPosition == 'all' || p.position == _filterPosition;
+    final matchPos = _filterPosition == 'all' ||
+        (PlayerPositions.groups[_filterPosition]?.contains(p.position) ?? false);
     return matchQuery && matchStatus && matchPos;
   }).toList();
 
@@ -155,11 +156,9 @@ class _FilterBar extends StatelessWidget {
                 const SizedBox(width: 10),
                 const VerticalDivider(color: AppColors.borderDefault, width: 1),
                 const SizedBox(width: 10),
-                _Chip('Posición: Todas', filterPosition == 'all', () => onPosition('all')),
-                _Chip('PT', filterPosition == 'PT', () => onPosition('PT')),
-                _Chip('DC', filterPosition == 'DC', () => onPosition('DC')),
-                _Chip('MC', filterPosition == 'MC', () => onPosition('MC')),
-                _Chip('DEL', filterPosition == 'DEL', () => onPosition('DEL')),
+                _Chip('Todas', filterPosition == 'all', () => onPosition('all')),
+                ...PlayerPositions.groups.keys.map((g) =>
+                    _Chip(g, filterPosition == g, () => onPosition(g))),
               ],
             ),
           ),
