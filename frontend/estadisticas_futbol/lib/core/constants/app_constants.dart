@@ -97,6 +97,26 @@ abstract class EventTypes {
   ];
 }
 
+abstract class Nacionalidades {
+  static const String defaultValue = 'Uruguay';
+  static const List<String> all = [
+    'Uruguay',
+    'Argentina',
+    'Brasil',
+    'Chile',
+    'Paraguay',
+    'Bolivia',
+    'Perú',
+    'Ecuador',
+    'Colombia',
+    'Venezuela',
+    'Estados Unidos',
+    'España',
+    'Italia',
+    'Otra',
+  ];
+}
+
 abstract class TiposCompeticion {
   static const List<String> all = ['Liga', 'Copa', 'Amistoso', 'Torneo'];
 }

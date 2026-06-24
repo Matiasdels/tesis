@@ -29,7 +29,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
   final _numberController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
-  final _nationalityController = TextEditingController();
+  String _nationality = Nacionalidades.defaultValue;
   final _dniController = TextEditingController();
 
   DateTime? _birthDate;
@@ -56,7 +56,6 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
     _numberController.dispose();
     _heightController.dispose();
     _weightController.dispose();
-    _nationalityController.dispose();
     _dniController.dispose();
     super.dispose();
   }
@@ -81,7 +80,9 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
               player.heightCm == 0 ? '' : player.heightCm.toString();
           _weightController.text =
               player.weightKg == 0 ? '' : player.weightKg.toString();
-          _nationalityController.text = player.nationality;
+          _nationality = Nacionalidades.all.contains(player.nationality)
+              ? player.nationality
+              : 'Otra';
           _dniController.text = player.dni ?? '';
           _birthDate = player.birthDate;
           _position = player.position.isNotEmpty
@@ -155,7 +156,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
       position: _position,
       number: int.tryParse(_numberController.text.trim()) ?? 0,
       age: 0,
-      nationality: _nationalityController.text.trim(),
+      nationality: _nationality,
       heightCm: double.tryParse(_heightController.text.trim()) ?? 0,
       weightKg: double.tryParse(_weightController.text.trim()) ?? 0,
       status: _status,
@@ -223,16 +224,6 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
     if (value == null || value.trim().isEmpty) return null;
     final n = double.tryParse(value.trim());
     if (n == null || n < 45 || n > 160) return 'Entre 45 y 160 kg';
-    return null;
-  }
-
-  String? _validateNacionalidad(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final v = value.trim();
-    if (v.length > 50) return 'Máximo 50 caracteres';
-    if (!RegExp(r'^[\p{L}\s]+$', unicode: true).hasMatch(v)) {
-      return 'Solo letras y espacios';
-    }
     return null;
   }
 
@@ -340,12 +331,17 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                       validator: _validatePeso,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _nationalityController,
-                      enabled: !_saving,
+                    DropdownButtonFormField<String>(
+                      initialValue: _nationality,
                       decoration:
-                          const InputDecoration(labelText: 'Nacionalidad'),
-                      validator: _validateNacionalidad,
+                          const InputDecoration(labelText: 'País'),
+                      items: Nacionalidades.all
+                          .map((n) =>
+                              DropdownMenuItem(value: n, child: Text(n)))
+                          .toList(),
+                      onChanged: _saving
+                          ? null
+                          : (v) => setState(() => _nationality = v!),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
