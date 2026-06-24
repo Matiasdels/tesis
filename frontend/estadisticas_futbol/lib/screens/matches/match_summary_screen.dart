@@ -102,7 +102,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             color: AppColors.textPrimary,
-            onPressed: () => context.go('/matches/${match.id}'),
+            onPressed: () => context.pop(),
           ),
           title: const Text(
             'Resumen del partido',
@@ -112,6 +112,16 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
+          actions: [
+            TextButton.icon(
+              onPressed: () => context.go(AppConstants.routeMatches),
+              icon: const Icon(Icons.list_alt_rounded, size: 16, color: AppColors.accent),
+              label: const Text(
+                'Partidos',
+                style: TextStyle(color: AppColors.accent, fontSize: 13),
+              ),
+            ),
+          ],
         ),
         SliverPadding(
           padding: const EdgeInsets.all(AppConstants.pagePadding),

@@ -152,7 +152,13 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
           backgroundColor: AppColors.bgSurface,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(_changed),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop(_changed);
+              } else {
+                context.go(AppConstants.routeMatches);
+              }
+            },
           ),
           title: Text(
             match.rival,

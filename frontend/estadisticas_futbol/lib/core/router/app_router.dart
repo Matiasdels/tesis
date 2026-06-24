@@ -20,7 +20,11 @@ import 'package:estadisticas_futbol/widgets/common/main_shell.dart';
 import '../../screens/observations/observations_screen.dart';
 import '../../screens/reports/reports_screen.dart';
 
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+final _shellNavigatorKey = GlobalKey<NavigatorState>();
+
 GoRouter createRouter(AuthState authState) => GoRouter(
+      navigatorKey: _rootNavigatorKey,
       initialLocation: AppConstants.routeSplash,
       debugLogDiagnostics: false,
       refreshListenable: authState,
@@ -45,115 +49,129 @@ GoRouter createRouter(AuthState authState) => GoRouter(
       routes: [
         GoRoute(
           path: AppConstants.routeSplash,
-          pageBuilder: (c, s) => _fade(const SplashScreen()),
+          pageBuilder: (c, s) => _fade(s, const SplashScreen()),
         ),
         GoRoute(
           path: AppConstants.routeLogin,
-          pageBuilder: (c, s) => _fade(const LoginScreen()),
+          pageBuilder: (c, s) => _fade(s, const LoginScreen()),
         ),
         // Shell route wraps all main tabs with bottom nav / sidebar
         ShellRoute(
+          navigatorKey: _shellNavigatorKey,
           builder: (context, state, child) => MainShell(child: child),
           routes: [
             GoRoute(
               path: AppConstants.routeDashboard,
-              pageBuilder: (c, s) => _fade(const DashboardScreen()),
+              pageBuilder: (c, s) => _fade(s, const DashboardScreen()),
             ),
             GoRoute(
               path: AppConstants.routePlayers,
-              pageBuilder: (c, s) => _fade(const PlayersScreen()),
+              pageBuilder: (c, s) => _fade(s, const PlayersScreen()),
             ),
             GoRoute(
               path: AppConstants.routeMatches,
-              pageBuilder: (c, s) => _fade(const MatchesScreen()),
+              pageBuilder: (c, s) => _fade(s, const MatchesScreen()),
+              routes: [
+                GoRoute(
+                  path: 'new',
+                  parentNavigatorKey: _rootNavigatorKey,
+                  pageBuilder: (c, s) =>
+                      _slide<bool>(s, const MatchFormScreen()),
+                ),
+                GoRoute(
+                  path: ':id',
+                  parentNavigatorKey: _rootNavigatorKey,
+                  pageBuilder: (c, s) {
+                    final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
+                    return _slide<bool>(s, MatchDetailScreen(matchId: id));
+                  },
+                  routes: [
+                    GoRoute(
+                      path: 'summary',
+                      parentNavigatorKey: _rootNavigatorKey,
+                      pageBuilder: (c, s) {
+                        final id =
+                            int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
+                        return _slide(s, MatchSummaryScreen(matchId: id));
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ),
             GoRoute(
               path: AppConstants.routeTraining,
-              pageBuilder: (c, s) => _fade(const TrainingScreen()),
+              pageBuilder: (c, s) => _fade(s, const TrainingScreen()),
             ),
             GoRoute(
               path: AppConstants.routeStatistics,
-              pageBuilder: (c, s) => _fade(const StatisticsScreen()),
+              pageBuilder: (c, s) => _fade(s, const StatisticsScreen()),
             ),
             GoRoute(
               path: AppConstants.routeReports,
-              pageBuilder: (c, s) => _fade(const ReportsScreen()),
+              pageBuilder: (c, s) => _fade(s, const ReportsScreen()),
             ),
             GoRoute(
               path: AppConstants.routeObservations,
-              pageBuilder: (c, s) => _fade(const ObservationsScreen()),
+              pageBuilder: (c, s) => _fade(s, const ObservationsScreen()),
             ),
           ],
         ),
         // Full-screen routes (outside shell)
         GoRoute(
-          path: AppConstants.routeMatchCreate,
-          pageBuilder: (c, s) => _slide(const MatchFormScreen()),
-        ),
-        GoRoute(
           path: '/matches/:id/edit',
           pageBuilder: (c, s) {
             final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
-            return _slide(MatchFormScreen(matchId: id));
+            return _slide<bool>(s, MatchFormScreen(matchId: id));
           },
         ),
         GoRoute(
           path: '/matches/:id/lineup',
           pageBuilder: (c, s) {
             final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
-            return _slide(LineupScreen(matchId: id));
-          },
-        ),
-        GoRoute(
-          path: AppConstants.routeMatchDetail,
-          pageBuilder: (c, s) {
-            final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
-            return _slide(MatchDetailScreen(matchId: id));
+            return _slide<bool>(s, LineupScreen(matchId: id));
           },
         ),
         GoRoute(
           path: AppConstants.routePlayerCreate,
-          pageBuilder: (c, s) => _slide(const PlayerFormScreen()),
+          pageBuilder: (c, s) => _slide<bool>(s, const PlayerFormScreen()),
         ),
         GoRoute(
           path: AppConstants.routePlayerDetail,
           pageBuilder: (c, s) {
             final id = s.pathParameters['id'] ?? '0';
-            return _slide(PlayerDetailScreen(playerId: id));
+            return _slide<bool>(s, PlayerDetailScreen(playerId: id));
           },
         ),
         GoRoute(
           path: AppConstants.routePlayerEdit,
           pageBuilder: (c, s) {
             final id = s.pathParameters['id'] ?? '0';
-            return _slide(PlayerFormScreen(playerId: id));
+            return _slide<bool>(s, PlayerFormScreen(playerId: id));
           },
         ),
         GoRoute(
           path: AppConstants.routeLiveMatch,
           pageBuilder: (c, s) {
             final id = s.pathParameters['id'] ?? '0';
-            return _slide(LiveMatchScreen(matchId: id));
-          },
-        ),
-        GoRoute(
-          path: '/matches/:id/summary',
-          pageBuilder: (c, s) {
-            final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
-            return _slide(MatchSummaryScreen(matchId: id));
+            return _slide(s, LiveMatchScreen(matchId: id));
           },
         ),
       ],
     );
 
-CustomTransitionPage<void> _fade(Widget child) => CustomTransitionPage(
+CustomTransitionPage<void> _fade(GoRouterState state, Widget child) =>
+    CustomTransitionPage(
+      key: state.pageKey,
       child: child,
       transitionsBuilder: (_, animation, __, child) =>
           FadeTransition(opacity: animation, child: child),
       transitionDuration: AppConstants.animFast,
     );
 
-CustomTransitionPage<void> _slide(Widget child) => CustomTransitionPage(
+CustomTransitionPage<T> _slide<T>(GoRouterState state, Widget child) =>
+    CustomTransitionPage(
+      key: state.pageKey,
       child: child,
       transitionsBuilder: (_, animation, __, child) => SlideTransition(
         position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
