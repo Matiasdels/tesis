@@ -19,7 +19,7 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
         [FromQuery] int? categoriaId,
         [FromQuery] string? estado)
     {
-        var query = context.Partidos.Include(p => p.Categoria).AsNoTracking();
+        var query = context.Partidos.Include(p => p.Categoria).AsNoTracking().Where(p => p.Activo);
 
         if (categoriaId.HasValue)
             query = query.Where(p => p.CategoriaId == categoriaId.Value);
@@ -40,7 +40,7 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
         var partido = await context.Partidos
             .Include(p => p.Categoria)
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.PartidoId == id);
+            .FirstOrDefaultAsync(p => p.PartidoId == id && p.Activo);
 
         return partido is null ? NotFound() : Ok(ToResponse(partido));
     }
@@ -116,10 +116,10 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeletePartido(int id)
     {
-        var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id);
+        var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id && p.Activo);
         if (partido is null) return NotFound();
 
-        context.Partidos.Remove(partido);
+        partido.Activo = false;
         await context.SaveChangesAsync();
         return NoContent();
     }

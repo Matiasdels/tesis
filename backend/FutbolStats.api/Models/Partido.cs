@@ -14,6 +14,7 @@ public class Partido
     public int? GolesRival { get; set; }
     public int? MinutoActual { get; set; }
     public int? UsuarioCreadorId { get; set; }
+    public bool Activo { get; set; } = true;
 
     public Categoria? Categoria { get; set; }
 }

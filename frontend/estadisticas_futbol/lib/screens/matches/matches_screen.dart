@@ -22,6 +22,17 @@ class _MatchesScreenState extends State<MatchesScreen> {
   List<PartidoModel> _matches = [];
   bool _loading = true;
   String? _error;
+  int? _filterYear;
+
+  List<int> get _availableYears {
+    final years = _matches.map((m) => m.fecha.year).toSet().toList();
+    years.sort((a, b) => b.compareTo(a));
+    return years;
+  }
+
+  List<PartidoModel> get _filteredMatches => _filterYear == null
+      ? _matches
+      : _matches.where((m) => m.fecha.year == _filterYear).toList();
 
   @override
   void initState() {
@@ -38,6 +49,15 @@ class _MatchesScreenState extends State<MatchesScreen> {
       final token = context.read<AuthState>().session!.accessToken;
       final matches = await _api.getMatches(accessToken: token);
       if (!mounted) return;
+      matches.sort((a, b) {
+        int estadoPriority(PartidoModel m) =>
+            m.isEnJuego ? 0 : (m.isProgramado ? 1 : 2);
+        final ep = estadoPriority(a).compareTo(estadoPriority(b));
+        if (ep != 0) return ep;
+        final fd = b.fecha.compareTo(a.fecha);
+        if (fd != 0) return fd;
+        return b.id.compareTo(a.id);
+      });
       setState(() {
         _matches = matches;
         _loading = false;
@@ -67,46 +87,141 @@ class _MatchesScreenState extends State<MatchesScreen> {
           label: const Text('Nuevo'),
         ),
       ],
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? EmptyState(
-                    icon: Icons.error_outline,
-                    title: 'Error al cargar',
-                    subtitle: _error!,
-                    actionLabel: 'Reintentar',
-                    onAction: _load,
-                  )
-                : _matches.isEmpty
-                    ? EmptyState(
-                        icon: Icons.sports_soccer_outlined,
-                        title: 'Sin partidos registrados',
-                        subtitle:
-                            'Todavía no hay partidos. Creá el primero con el botón "Nuevo".',
-                        actionLabel: 'Nuevo partido',
-                        onAction: () async {
-                          final created = await context
-                              .push<bool>(AppConstants.routeMatchCreate);
-                          if (created == true) _load();
-                        },
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(AppConstants.pagePadding),
-                        itemCount: _matches.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (_, i) => _MatchTile(
-                          match: _matches[i],
-                          onTap: () async {
-                            final changed = await context.push<bool>(
-                              '/matches/${_matches[i].id}',
-                            );
-                            if (changed == true) _load();
-                          },
-                        ),
-                      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                if (_availableYears.isNotEmpty)
+                  _YearFilterBar(
+                    years: _availableYears,
+                    selected: _filterYear,
+                    onSelect: (y) => setState(() => _filterYear = y),
+                  ),
+                Expanded(
+                  child: _error != null
+                      ? EmptyState(
+                          icon: Icons.error_outline,
+                          title: 'Error al cargar',
+                          subtitle: _error!,
+                          actionLabel: 'Reintentar',
+                          onAction: _load,
+                        )
+                      : _filteredMatches.isEmpty
+                          ? EmptyState(
+                              icon: Icons.sports_soccer_outlined,
+                              title: _filterYear != null
+                                  ? 'Sin partidos en $_filterYear'
+                                  : 'Sin partidos registrados',
+                              subtitle: _filterYear != null
+                                  ? 'No hay partidos registrados para este año.'
+                                  : 'Todavía no hay partidos. Creá el primero con el botón "Nuevo".',
+                              actionLabel:
+                                  _filterYear != null ? null : 'Nuevo partido',
+                              onAction: _filterYear != null
+                                  ? null
+                                  : () async {
+                                      final created = await context.push<bool>(
+                                          AppConstants.routeMatchCreate);
+                                      if (created == true) _load();
+                                    },
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _load,
+                              child: ListView.separated(
+                                padding: const EdgeInsets.all(
+                                    AppConstants.pagePadding),
+                                itemCount: _filteredMatches.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (_, i) => _MatchTile(
+                                  match: _filteredMatches[i],
+                                  onTap: () async {
+                                    final changed = await context.push<bool>(
+                                      '/matches/${_filteredMatches[i].id}',
+                                    );
+                                    if (changed == true) _load();
+                                  },
+                                ),
+                              ),
+                            ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _YearFilterBar extends StatelessWidget {
+  final List<int> years;
+  final int? selected;
+  final ValueChanged<int?> onSelect;
+
+  const _YearFilterBar({
+    required this.years,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.bgSurface,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _YearChip(
+              label: 'Todos',
+              active: selected == null,
+              onTap: () => onSelect(null),
+            ),
+            ...years.map((y) => _YearChip(
+                  label: '$y',
+                  active: selected == y,
+                  onTap: () => onSelect(y),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _YearChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _YearChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: FilterChip(
+        label: Text(label),
+        selected: active,
+        onSelected: (_) => onTap(),
+        backgroundColor: AppColors.bgMuted,
+        selectedColor: AppColors.accentDim,
+        checkmarkColor: AppColors.accent,
+        side: BorderSide(
+          color: active
+              ? AppColors.accent.withValues(alpha: 0.4)
+              : AppColors.borderDefault,
+          width: 0.5,
+        ),
+        labelStyle: TextStyle(
+          fontSize: 12,
+          color: active ? AppColors.accent : AppColors.textSecondary,
+          fontWeight: active ? FontWeight.w500 : FontWeight.w400,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       ),
     );
   }

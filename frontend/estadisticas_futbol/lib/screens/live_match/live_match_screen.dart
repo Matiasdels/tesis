@@ -65,6 +65,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   bool _showPlayerPicker = false;
   bool _savingEvent = false;
 
+  // ── Assist flow (2-step: assister → goalscorer) ────────────────────────────
+  AlineacionEntradaModel? _assistPlayer;
+  bool _pickingGoalScorer = false;
+
   // ── Undo ───────────────────────────────────────────────────────────────────
   EventoPartidoModel? _lastRegistered;
   int _undoSeconds = 0;
@@ -148,7 +152,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _tiposEvento = tipos;
         _events = List.from(events.reversed);
         _minute = partido.minutoActual ?? 0;
-        _homeScore = partido.golesEquipo ?? 0;
+        _homeScore = events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
         _awayScore = partido.golesRival ?? 0;
         _isRunning = partido.isEnJuego;
         _loading = false;
@@ -312,6 +316,21 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     if (_tapNorm == null || _pendingEvent == null) return;
     if (_savingEvent) return;
 
+    // Assist step 1: save assister, move to goalscorer selection
+    if (_pendingEvent == EventTypes.assist && !_pickingGoalScorer) {
+      setState(() {
+        _assistPlayer = player;
+        _pickingGoalScorer = true;
+      });
+      return;
+    }
+
+    // Assist step 2: player is the goalscorer
+    if (_pickingGoalScorer) {
+      await _registerAssistAndGoal(player);
+      return;
+    }
+
     final tipoId = _tipoEventoIds[_pendingEvent];
     if (tipoId == null) {
       _showError('Tipo de evento "$_pendingEvent" no encontrado en la base de datos.');
@@ -356,9 +375,85 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     }
   }
 
+  Future<void> _registerAssistAndGoal(AlineacionEntradaModel? goalscorer) async {
+    final assistId = _tipoEventoIds[EventTypes.assist];
+    final goalId = _tipoEventoIds[EventTypes.goal];
+    if (assistId == null || goalId == null) {
+      _showError('Tipos de evento no encontrados en la base de datos.');
+      return;
+    }
+
+    HapticFeedback.heavyImpact();
+    setState(() => _savingEvent = true);
+
+    try {
+      final assistEvento = await _eventApi.createEvento(
+        partidoId: _matchId,
+        jugadorId: _assistPlayer?.jugadorId,
+        nombreJugador: _assistPlayer?.nombreJugador,
+        tipoEventoId: assistId,
+        tipoEventoNombre: EventTypes.assist,
+        minuto: _minute,
+        pitchX: _tapNorm!.dx,
+        pitchY: _tapNorm!.dy,
+        accessToken: _token,
+      );
+
+      final goalEvento = await _eventApi.createEvento(
+        partidoId: _matchId,
+        jugadorId: goalscorer?.jugadorId,
+        nombreJugador: goalscorer?.nombreJugador,
+        tipoEventoId: goalId,
+        tipoEventoNombre: EventTypes.goal,
+        minuto: _minute,
+        pitchX: _tapNorm!.dx,
+        pitchY: _tapNorm!.dy,
+        accessToken: _token,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _homeScore++;
+        _events.insert(0, goalEvento);
+        _events.insert(1, assistEvento);
+        _showPlayerPicker = false;
+        _pendingEvent = null;
+        _tapNorm = null;
+        _tapLocal = null;
+        _assistPlayer = null;
+        _pickingGoalScorer = false;
+        _savingEvent = false;
+        _lastRegistered = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _assistPlayer = null;
+        _pickingGoalScorer = false;
+        _savingEvent = false;
+      });
+      _showError(e.toString());
+    }
+  }
+
   Future<void> _onNoPlayerSelected() async {
     if (_tapNorm == null || _pendingEvent == null) return;
     if (_savingEvent) return;
+
+    // Assist step 1 with no player: advance to goalscorer selection
+    if (_pendingEvent == EventTypes.assist && !_pickingGoalScorer) {
+      setState(() {
+        _assistPlayer = null;
+        _pickingGoalScorer = true;
+      });
+      return;
+    }
+
+    // Assist step 2 with no player: register both events with null jugadorId
+    if (_pickingGoalScorer) {
+      await _registerAssistAndGoal(null);
+      return;
+    }
 
     final tipoId = _tipoEventoIds[_pendingEvent];
     if (tipoId == null) {
@@ -409,6 +504,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _pendingEvent = null;
       _tapNorm = null;
       _tapLocal = null;
+      _assistPlayer = null;
+      _pickingGoalScorer = false;
     });
   }
 
@@ -648,6 +745,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                       minute: _minute,
                       lineup: _lineup,
                       saving: _savingEvent,
+                      pickingGoalScorer: _pickingGoalScorer,
+                      assisterName: _assistPlayer?.nombreJugador,
                       onSelect: _onPlayerSelected,
                       onDismiss: _dismissPlayerPicker,
                       onSelectNone: _onNoPlayerSelected,
@@ -1711,6 +1810,8 @@ class _PlayerPicker extends StatelessWidget {
   final int minute;
   final List<AlineacionEntradaModel> lineup;
   final bool saving;
+  final bool pickingGoalScorer;
+  final String? assisterName;
   final ValueChanged<AlineacionEntradaModel> onSelect;
   final VoidCallback onDismiss;
   final VoidCallback onSelectNone;
@@ -1720,6 +1821,8 @@ class _PlayerPicker extends StatelessWidget {
     required this.minute,
     required this.lineup,
     required this.saving,
+    this.pickingGoalScorer = false,
+    this.assisterName,
     required this.onSelect,
     required this.onDismiss,
     required this.onSelectNone,
@@ -1748,9 +1851,11 @@ class _PlayerPicker extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Text('Registrando:',
-                    style: TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  pickingGoalScorer ? '¿Quién hizo el gol?' : 'Registrando:',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
                 const SizedBox(width: 8),
                 Container(
                   padding:
@@ -1761,12 +1866,23 @@ class _PlayerPicker extends StatelessWidget {
                     border: Border.all(
                         color: eventColor.withValues(alpha: 0.4), width: 0.5),
                   ),
-                  child: Text(eventType,
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: eventColor,
-                          fontWeight: FontWeight.w500)),
+                  child: Text(
+                    pickingGoalScorer ? EventTypes.goal : eventType,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: eventColor,
+                        fontWeight: FontWeight.w500),
+                  ),
                 ),
+                if (pickingGoalScorer && assisterName != null) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '(asistencia: $assisterName)',
+                    style: const TextStyle(
+                        fontSize: 10, color: AppColors.textMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 const Spacer(),
                 Text("$minute'",
                     style: const TextStyle(
