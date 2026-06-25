@@ -108,14 +108,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: Icons.sports_soccer_outlined,
               title: 'Partidos',
               subtitle:
-                  'Todavia no hay gestion real de partidos conectada a la API.',
+                  'Crea, consulta y administra los partidos reales desde la seccion Partidos.',
             ),
             const SizedBox(height: AppConstants.sectionSpacing),
             const _PendingDataCard(
               icon: Icons.bar_chart_outlined,
               title: 'Estadisticas y reportes',
               subtitle:
-                  'Las metricas se van a mostrar cuando existan eventos reales registrados.',
+                  'Los reportes y metricas se generan a partir de partidos y eventos registrados.',
             ),
           ],
         ),
@@ -162,14 +162,6 @@ class _WelcomeCard extends StatelessWidget {
                     color: AppColors.textPrimary,
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'La app esta mostrando solo informacion registrada en backend.',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
                   ),
                 ),
               ],
