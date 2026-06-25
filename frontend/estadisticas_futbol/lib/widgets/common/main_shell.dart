@@ -32,7 +32,19 @@ class MainShell extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.bgSurface,
         elevation: 0,
-        title: const Text('Kancha'),
+        titleSpacing: 16,
+        title: InkWell(
+          onTap: () => context.go(AppConstants.routeDashboard),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+            child: Image.asset(
+              'assets/images/kancha_logo.png',
+              height: 40,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'Perfil',
