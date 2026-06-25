@@ -535,7 +535,7 @@ class _AppBottomNav extends StatelessWidget {
     (icon: Icons.sports_soccer, label: 'Partidos', route: '/matches'),
     (icon: Icons.people_outline, label: 'Plantilla', route: '/players'),
     (icon: Icons.bar_chart_outlined, label: 'Stats', route: '/statistics'),
-    (icon: Icons.more_horiz, label: 'Más', route: '/reports'),
+    (icon: Icons.description_outlined, label: 'Reportes', route: '/reports'),
   ];
 
   @override
