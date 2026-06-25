@@ -166,6 +166,7 @@ class _YearFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.bgSurface,
+      width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
