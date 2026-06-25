@@ -5,4 +5,12 @@
             <solid android:color="#070D18" />
         </shape>
     </item>
+    <item
+        android:width="148dp"
+        android:height="148dp"
+        android:gravity="center">
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/kancha_splash_logo" />
+    </item>
 </layer-list>
