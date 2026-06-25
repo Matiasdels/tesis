@@ -22,15 +22,11 @@ class AuthState extends ChangeNotifier {
   bool get initialized => _initialized;
 
   Future<void> initialize() async {
-    final minimumSplashTime = Future<void>.delayed(
-      const Duration(seconds: 3),
-    );
     final storedSession = await _readStoredSession();
 
     if (storedSession == null ||
         storedSession.expiresAt.isBefore(DateTime.now())) {
       await _clearStoredSession();
-      await minimumSplashTime;
       _initialized = true;
       notifyListeners();
       return;
@@ -44,7 +40,6 @@ class AuthState extends ChangeNotifier {
       await _clearStoredSession();
       _session = null;
     } finally {
-      await minimumSplashTime;
       _initialized = true;
       notifyListeners();
     }

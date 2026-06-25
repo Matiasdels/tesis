@@ -23,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _showWelcome = true;
   bool _loadingPlayers = true;
+  bool _playersLoadRequested = false;
   String? _playersError;
   List<PlayerModel> _players = [];
   Timer? _welcomeTimer;
@@ -30,7 +31,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPlayers();
     _welcomeTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) setState(() => _showWelcome = false);
     });
@@ -42,6 +42,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  void _requestPlayersWhenSessionIsReady(AuthState authState) {
+    if (_playersLoadRequested ||
+        !authState.initialized ||
+        authState.session == null) {
+      return;
+    }
+
+    _playersLoadRequested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadPlayers();
+    });
+  }
+
   Future<void> _loadPlayers() async {
     setState(() {
       _loadingPlayers = true;
@@ -49,7 +62,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      final token = context.read<AuthState>().session!.accessToken;
+      final session = context.read<AuthState>().session;
+      if (session == null) {
+        if (!mounted) return;
+        setState(() {
+          _loadingPlayers = true;
+          _playersError = null;
+        });
+        return;
+      }
+
+      final token = session.accessToken;
       final players = await _playerApi.getPlayers(accessToken: token);
       if (!mounted) return;
       setState(() {
@@ -67,7 +90,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthState>().user;
+    final authState = context.watch<AuthState>();
+    _requestPlayersWhenSessionIsReady(authState);
+
+    final user = authState.user;
     final fullName = '${user?.nombre ?? ''} ${user?.apellido ?? ''}'.trim();
     final displayName =
         fullName.isEmpty ? user?.nombreUsuario ?? 'Usuario' : fullName;
