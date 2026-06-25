@@ -30,6 +30,8 @@ class MainShell extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: AppColors.bgSurface,
+        elevation: 0,
         title: const Text('Kancha'),
         actions: [
           IconButton(
@@ -38,6 +40,21 @@ class MainShell extends StatelessWidget {
             icon: const Icon(Icons.account_circle_outlined),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.accent.withValues(alpha: 0.55),
+                  AppColors.borderSubtle,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
       body: child,
       bottomNavigationBar: const _AppBottomNav(),
