@@ -25,19 +25,28 @@ class StatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(data.label,
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           Text(data.value,
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w500, color: color, height: 1)),
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                  height: 1)),
           if (data.delta != null) ...[
             const SizedBox(height: 5),
             Row(
               children: [
                 if (data.deltaPositive != null)
                   Icon(
-                    data.deltaPositive! ? Icons.arrow_upward : Icons.arrow_downward,
+                    data.deltaPositive!
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward,
                     size: 11,
-                    color: data.deltaPositive! ? AppColors.accent : AppColors.danger,
+                    color: data.deltaPositive!
+                        ? AppColors.accent
+                        : AppColors.danger,
                   ),
                 const SizedBox(width: 2),
                 Text(data.delta!,
@@ -45,7 +54,9 @@ class StatCard extends StatelessWidget {
                       fontSize: 10,
                       color: data.deltaPositive == null
                           ? AppColors.textMuted
-                          : (data.deltaPositive! ? AppColors.accent : AppColors.danger),
+                          : (data.deltaPositive!
+                              ? AppColors.accent
+                              : AppColors.danger),
                     )),
               ],
             ),
@@ -150,13 +161,13 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color, bg) = switch (status) {
-      'available'  => ('Disponible', AppColors.accent,   AppColors.accentDim),
-      'injured'    => ('Lesionado',  AppColors.danger,   AppColors.dangerDim),
-      'suspended'  => ('Suspendido', AppColors.warning,  AppColors.warningDim),
-      'live'       => ('En vivo',    AppColors.danger,   AppColors.dangerDim),
-      'upcoming'   => ('Próximo',    AppColors.info,     AppColors.infoDim),
-      'finished'   => ('Finalizado', AppColors.textMuted,AppColors.bgMuted),
-      _            => (status,       AppColors.textMuted,AppColors.bgMuted),
+      'available' => ('Disponible', AppColors.accent, AppColors.accentDim),
+      'injured' => ('Lesionado', AppColors.danger, AppColors.dangerDim),
+      'suspended' => ('Suspendido', AppColors.warning, AppColors.warningDim),
+      'live' => ('En vivo', AppColors.danger, AppColors.dangerDim),
+      'upcoming' => ('Próximo', AppColors.info, AppColors.infoDim),
+      'finished' => ('Finalizado', AppColors.textMuted, AppColors.bgMuted),
+      _ => (status, AppColors.textMuted, AppColors.bgMuted),
     };
 
     return Container(
@@ -166,7 +177,9 @@ class StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.4), width: 0.5),
       ),
-      child: Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 10, color: color, fontWeight: FontWeight.w500)),
     );
   }
 }
@@ -180,17 +193,22 @@ class FormBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, bg) = switch (result) {
-      'V' => (AppColors.accent,   AppColors.accentDim),
-      'E' => (AppColors.warning,  AppColors.warningDim),
-      _   => (AppColors.danger,   AppColors.dangerDim),
+      'V' => (AppColors.accent, AppColors.accentDim),
+      'E' => (AppColors.warning, AppColors.warningDim),
+      _ => (AppColors.danger, AppColors.dangerDim),
     };
 
     return Container(
-      width: 30, height: 30,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(7),
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(7),
           border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5)),
       alignment: Alignment.center,
-      child: Text(result, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: color)),
+      child: Text(result,
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w500, color: color)),
     );
   }
 }
@@ -208,7 +226,8 @@ class LabeledDivider extends StatelessWidget {
         const Expanded(child: Divider(color: AppColors.borderSubtle)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+          child: Text(label,
+              style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
         ),
         const Expanded(child: Divider(color: AppColors.borderSubtle)),
       ],
@@ -241,7 +260,8 @@ class MetricBarRow extends StatelessWidget {
           SizedBox(
             width: 110,
             child: Text(label,
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.textSecondary)),
           ),
           Expanded(
             child: ClipRRect(
@@ -259,7 +279,8 @@ class MetricBarRow extends StatelessWidget {
             width: 40,
             child: Text(displayValue,
                 textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: color)),
+                style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w500, color: color)),
           ),
         ],
       ),
@@ -295,9 +316,14 @@ class EmptyState extends StatelessWidget {
           children: [
             Icon(icon, size: 48, color: AppColors.textMuted),
             const SizedBox(height: 16),
-            Text(title, style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
+            Text(title,
+                style: Theme.of(context).textTheme.titleMedium,
+                textAlign: TextAlign.center),
             const SizedBox(height: 6),
-            Text(subtitle, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary), textAlign: TextAlign.center),
+            Text(subtitle,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary),
+                textAlign: TextAlign.center),
             if (actionLabel != null) ...[
               const SizedBox(height: 20),
               ElevatedButton(onPressed: onAction, child: Text(actionLabel!)),
@@ -332,23 +358,80 @@ class PageScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bgDeep,
       appBar: AppBar(
+        toolbarHeight: subtitle == null ? 64 : 76,
         backgroundColor: AppColors.bgSurface,
+        elevation: 0,
         leading: showBack ? const BackButton() : null,
         automaticallyImplyLeading: showBack,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        titleSpacing: showBack ? 0 : 16,
+        title: Row(
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-            if (subtitle != null)
-              Text(subtitle!, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            Container(
+              width: 4,
+              height: subtitle == null ? 32 : 42,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(99),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      height: 1.05,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
-        actions: actions != null
-            ? [...actions!, const SizedBox(width: 8)]
-            : null,
+        actions:
+            actions != null ? [...actions!, const SizedBox(width: 10)] : null,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Container(height: 0.5, color: AppColors.borderSubtle),
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.borderSubtle,
+                  AppColors.accent.withValues(alpha: 0.35),
+                  AppColors.borderSubtle,
+                ],
+              ),
+            ),
+          ),
         ),
       ),
       body: body,
