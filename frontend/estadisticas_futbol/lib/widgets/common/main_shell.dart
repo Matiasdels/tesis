@@ -202,7 +202,7 @@ void _showProfileSheet(BuildContext context) {
                     ),
                     const Divider(height: 1, color: AppColors.borderSubtle),
                     _ProfileInfoRow(
-                      icon: Icons.badge_outlined,
+                      icon: Icons.admin_panel_settings_outlined,
                       label: 'Rol',
                       value: user?.rol ?? 'Usuario',
                     ),
@@ -257,30 +257,48 @@ class _ProfileInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.textMuted),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-          ),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 40),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: Center(
+                child: Icon(icon, size: 17, color: AppColors.textMuted),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 82,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  height: 1.0,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
