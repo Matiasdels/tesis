@@ -332,23 +332,74 @@ class PageScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bgDeep,
       appBar: AppBar(
+        toolbarHeight: subtitle == null ? 66 : 78,
         backgroundColor: AppColors.bgSurface,
+        elevation: 0,
         leading: showBack ? const BackButton() : null,
         automaticallyImplyLeading: showBack,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        titleSpacing: showBack ? 0 : 16,
+        title: Row(
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-            if (subtitle != null)
-              Text(subtitle!, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            Container(
+              width: 4,
+              height: subtitle == null ? 34 : 44,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      height: 1.05,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
         actions: actions != null
-            ? [...actions!, const SizedBox(width: 8)]
+            ? [...actions!, const SizedBox(width: 10)]
             : null,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Container(height: 0.5, color: AppColors.borderSubtle),
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.borderSubtle,
+                  AppColors.accent.withValues(alpha: 0.35),
+                  AppColors.borderSubtle,
+                ],
+              ),
+            ),
+          ),
         ),
       ),
       body: body,
