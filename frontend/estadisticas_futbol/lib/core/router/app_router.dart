@@ -14,6 +14,7 @@ import 'package:estadisticas_futbol/screens/matches/match_summary_screen.dart';
 import 'package:estadisticas_futbol/screens/training/training_screen.dart';
 import 'package:estadisticas_futbol/screens/statistics/statistics_screen.dart';
 import 'package:estadisticas_futbol/screens/auth/login_screen.dart';
+import 'package:estadisticas_futbol/screens/auth/splash_screen.dart';
 import 'package:estadisticas_futbol/data/remote/auth_state.dart';
 import 'package:estadisticas_futbol/widgets/common/main_shell.dart';
 import '../../screens/observations/observations_screen.dart';
@@ -24,25 +25,32 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 GoRouter createRouter(AuthState authState) => GoRouter(
       navigatorKey: _rootNavigatorKey,
-      initialLocation: AppConstants.routeDashboard,
+      initialLocation: AppConstants.routeSplash,
       debugLogDiagnostics: false,
       refreshListenable: authState,
       redirect: (context, state) {
         final isLogin = state.matchedLocation == AppConstants.routeLogin;
+        final isSplash = state.matchedLocation == AppConstants.routeSplash;
+
         if (!authState.initialized) {
-          return null;
+          return isSplash ? null : AppConstants.routeSplash;
         }
 
         if (!authState.isAuthenticated) {
           return isLogin ? null : AppConstants.routeLogin;
         }
-        if (isLogin) {
+
+        if (isLogin || isSplash) {
           return AppConstants.routeDashboard;
         }
 
         return null;
       },
       routes: [
+        GoRoute(
+          path: AppConstants.routeSplash,
+          pageBuilder: (c, s) => _fade(s, const SplashScreen()),
+        ),
         GoRoute(
           path: AppConstants.routeLogin,
           pageBuilder: (c, s) => _fade(s, const LoginScreen()),
