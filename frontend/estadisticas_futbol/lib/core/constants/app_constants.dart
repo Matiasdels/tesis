@@ -50,6 +50,7 @@ abstract class EventTypes {
   static const String passBad = 'Pase incorrecto';
   static const String shot = 'Remate';
   static const String goal = 'Gol';
+  static const String goalRival = 'Gol rival';
   static const String recovery = 'Recuperación';
   static const String foul = 'Falta';
   static const String interception = 'Intercepción';

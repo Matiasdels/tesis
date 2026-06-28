@@ -153,7 +153,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _events = List.from(events.reversed);
         _minute = partido.minutoActual ?? 0;
         _homeScore = events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
-        _awayScore = partido.golesRival ?? 0;
+        _awayScore = events.where((e) => e.tipoEventoNombre == EventTypes.goalRival).length;
         _isRunning = partido.isEnJuego;
         _loading = false;
       });
@@ -183,10 +183,30 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     setState(() => _isRunning = !_isRunning);
     if (!_isRunning) {
       _matchTimer?.cancel();
+      _saveProgress();
     } else {
       _startMatchTimer();
     }
     HapticFeedback.selectionClick();
+  }
+
+  void _saveProgress() {
+    if (!(_partido?.isEnJuego ?? false)) return;
+    _matchApi
+        .patchEstado(
+          _matchId,
+          'EnJuego',
+          _token,
+          golesEquipo: _homeScore,
+          golesRival: _awayScore,
+          minutoActual: _minute,
+        )
+        .ignore();
+  }
+
+  void _saveProgressAndPop() {
+    _saveProgress();
+    Navigator.of(context).pop();
   }
 
   // ==========================================================================
@@ -273,10 +293,11 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     setState(() {
       _pendingEvent = eventName;
       _showRadial = false;
-      _showPlayerPicker = true;
+      _showPlayerPicker = eventName != EventTypes.goalRival;
       _dragSector = -1;
     });
     _radialAnimCtrl.reverse();
+    if (eventName == EventTypes.goalRival) _onNoPlayerSelected();
   }
 
   void _closeRadial() {
@@ -303,8 +324,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (chosen == null || !mounted) return;
       setState(() {
         _pendingEvent = chosen;
-        _showPlayerPicker = true;
+        _showPlayerPicker = chosen != EventTypes.goalRival;
       });
+      if (chosen == EventTypes.goalRival) _onNoPlayerSelected();
     });
   }
 
@@ -358,6 +380,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (!mounted) return;
       setState(() {
         if (_pendingEvent == EventTypes.goal) _homeScore++;
+        if (_pendingEvent == EventTypes.goalRival) _awayScore++;
         _events.insert(0, evento);
         _lastRegistered = evento;
         _showPlayerPicker = false;
@@ -481,6 +504,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (!mounted) return;
       setState(() {
         if (_pendingEvent == EventTypes.goal) _homeScore++;
+        if (_pendingEvent == EventTypes.goalRival) _awayScore++;
         _events.insert(0, evento);
         _lastRegistered = evento;
         _showPlayerPicker = false;
@@ -537,10 +561,12 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     final evento = _lastRegistered!;
     final wasGoal = evento.tipoEventoNombre == EventTypes.goal;
+    final wasGoalRival = evento.tipoEventoNombre == EventTypes.goalRival;
 
     setState(() {
       _events.removeWhere((e) => e.eventoId == evento.eventoId);
       if (wasGoal) _homeScore--;
+      if (wasGoalRival) _awayScore--;
       _lastRegistered = null;
       _undoSeconds = 0;
     });
@@ -558,6 +584,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         setState(() {
           _events.insert(0, evento);
           if (wasGoal) _homeScore++;
+          if (wasGoalRival) _awayScore++;
         });
         _showError('No se pudo deshacer. Intente nuevamente.');
       }
@@ -678,7 +705,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               isRunning: _isRunning,
               finishing: _finishing,
               onToggle: _toggleTimer,
-              onBack: () => Navigator.of(context).pop(),
+              onBack: _saveProgressAndPop,
               onFinish: _finishMatch,
             ),
 
@@ -2056,6 +2083,7 @@ class _MoreEventsSheet extends StatelessWidget {
     'Remate / Gol': [
       EventTypes.shot,
       EventTypes.goal,
+      EventTypes.goalRival,
     ],
     'Defensivo': [
       EventTypes.recovery,
