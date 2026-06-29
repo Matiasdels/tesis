@@ -15,6 +15,7 @@ public class Partido
     public int? MinutoActual { get; set; }
     public int? UsuarioCreadorId { get; set; }
     public bool Activo { get; set; } = true;
+    public string? Formacion { get; set; }
 
     public Categoria? Categoria { get; set; }
 }
