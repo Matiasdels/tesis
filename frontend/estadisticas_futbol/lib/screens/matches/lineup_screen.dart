@@ -257,6 +257,100 @@ class _LineupScreenState extends State<LineupScreen> {
     );
   }
 
+  void _openSuplentesSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (_, setSheetState) {
+          return DraggableScrollableSheet(
+            initialChildSize: 0.5,
+            minChildSize: 0.3,
+            maxChildSize: 0.85,
+            expand: false,
+            builder: (_, controller) => Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 6),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderDefault,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.swap_horiz,
+                          size: 16, color: AppColors.textMuted),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Suplentes (${_suplentes.length})',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          Future.microtask(_openSuplentePicker);
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Agregar'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: AppColors.borderSubtle, height: 0.5),
+                Expanded(
+                  child: _suplentes.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Sin suplentes seleccionados',
+                            style: TextStyle(color: AppColors.textMuted),
+                          ),
+                        )
+                      : ListView.separated(
+                          controller: controller,
+                          padding:
+                              const EdgeInsets.fromLTRB(12, 10, 12, 20),
+                          itemCount: _suplentes.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 6),
+                          itemBuilder: (_, i) => _SuplenteTile(
+                            player: _suplentes[i],
+                            number: i + 1,
+                            onRemove: () {
+                              setState(
+                                  () => _suplentes.removeAt(i));
+                              setSheetState(() {});
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _openSuplentePicker() {
     final excluded = _allAssignedIds;
 
@@ -413,29 +507,19 @@ class _LineupScreenState extends State<LineupScreen> {
                               'No hay jugadores activos en la categoría del partido.',
                         ),
                       )
-                    else
+                    else ...[
                       Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                height: 400,
-                                child: _PitchView(
-                                  slots: _currentSlots,
-                                  assignments: _slots,
-                                  onSlotTap: _openPlayerPicker,
-                                ),
-                              ),
-                              _SubstitutesSection(
-                                suplentes: _suplentes,
-                                onAdd: _openSuplentePicker,
-                                onRemove: (p) =>
-                                    setState(() => _suplentes.remove(p)),
-                              ),
-                            ],
-                          ),
+                        child: _PitchView(
+                          slots: _currentSlots,
+                          assignments: _slots,
+                          onSlotTap: _openPlayerPicker,
                         ),
                       ),
+                      _SubstitutesBar(
+                        count: _suplentes.length,
+                        onTap: _openSuplentesSheet,
+                      ),
+                    ],
                   ],
                 ),
     );
@@ -699,85 +783,49 @@ class _PositionSlot extends StatelessWidget {
 }
 
 // =============================================================================
-//  SUBSTITUTES SECTION
+//  SUBSTITUTES BAR (fixed bottom strip)
 // =============================================================================
 
-class _SubstitutesSection extends StatelessWidget {
-  final List<PlayerModel> suplentes;
-  final VoidCallback onAdd;
-  final ValueChanged<PlayerModel> onRemove;
+class _SubstitutesBar extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
 
-  const _SubstitutesSection({
-    required this.suplentes,
-    required this.onAdd,
-    required this.onRemove,
-  });
+  const _SubstitutesBar({required this.count, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.bgSurface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Divider(color: AppColors.borderSubtle, height: 0.5),
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                const Icon(Icons.swap_horiz,
-                    size: 16, color: AppColors.textMuted),
-                const SizedBox(width: 6),
-                Text(
-                  'Suplentes (${suplentes.length})',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: onAdd,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Agregar'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.accent,
-                    textStyle: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (suplentes.isEmpty)
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        color: AppColors.bgSurface,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Divider(color: AppColors.borderSubtle, height: 0.5),
             Padding(
               padding:
-                  const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Text(
-                'Sin suplentes seleccionados',
-                style: TextStyle(
-                    color: AppColors.textMuted.withValues(alpha: 0.6),
-                    fontSize: 12),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              itemCount: suplentes.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 6),
-              itemBuilder: (_, i) => _SuplenteTile(
-                player: suplentes[i],
-                number: i + 1,
-                onRemove: () => onRemove(suplentes[i]),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.swap_horiz,
+                      size: 16, color: AppColors.textMuted),
+                  const SizedBox(width: 8),
+                  Text(
+                    count == 0 ? 'Suplentes' : 'Suplentes ($count)',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.keyboard_arrow_up,
+                      size: 18, color: AppColors.textMuted),
+                ],
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
