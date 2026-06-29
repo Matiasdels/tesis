@@ -29,9 +29,9 @@ const _formations = <String, List<_SlotDef>>{
     _SlotDef('DFC1', 'DFC', 0.62, 0.73),
     _SlotDef('DFC2', 'DFC', 0.38, 0.73),
     _SlotDef('LI',   'LI',  0.15, 0.70),
-    _SlotDef('MD',   'MD',  0.77, 0.52),
-    _SlotDef('MC',   'MC',  0.50, 0.52),
-    _SlotDef('MI',   'MI',  0.23, 0.52),
+    _SlotDef('MC1',  'MC',  0.77, 0.52),
+    _SlotDef('MC2',  'MC',  0.50, 0.52),
+    _SlotDef('MC3',  'MC',  0.23, 0.52),
     _SlotDef('ED',   'ED',  0.82, 0.27),
     _SlotDef('DC',   'DC',  0.50, 0.27),
     _SlotDef('EI',   'EI',  0.18, 0.27),
@@ -42,10 +42,10 @@ const _formations = <String, List<_SlotDef>>{
     _SlotDef('DFC1', 'DFC', 0.62, 0.73),
     _SlotDef('DFC2', 'DFC', 0.38, 0.73),
     _SlotDef('LI',   'LI',  0.15, 0.70),
-    _SlotDef('MD',   'MD',  0.83, 0.52),
+    _SlotDef('MD',   'MD',  0.83, 0.44),
     _SlotDef('MC1',  'MC',  0.60, 0.52),
     _SlotDef('MC2',  'MC',  0.40, 0.52),
-    _SlotDef('MI',   'MI',  0.17, 0.52),
+    _SlotDef('MI',   'MI',  0.17, 0.44),
     _SlotDef('DC1',  'DC',  0.65, 0.25),
     _SlotDef('DC2',  'DC',  0.35, 0.25),
   ],
@@ -67,11 +67,11 @@ const _formations = <String, List<_SlotDef>>{
     _SlotDef('DFC1', 'DFC', 0.73, 0.73),
     _SlotDef('DFC2', 'DFC', 0.50, 0.76),
     _SlotDef('DFC3', 'DFC', 0.27, 0.73),
-    _SlotDef('MD',   'MD',  0.88, 0.55),
+    _SlotDef('MD',   'MD',  0.88, 0.44),
     _SlotDef('MC1',  'MC',  0.68, 0.52),
     _SlotDef('MC2',  'MC',  0.50, 0.52),
     _SlotDef('MC3',  'MC',  0.32, 0.52),
-    _SlotDef('MI',   'MI',  0.12, 0.55),
+    _SlotDef('MI',   'MI',  0.12, 0.44),
     _SlotDef('DC1',  'DC',  0.65, 0.25),
     _SlotDef('DC2',  'DC',  0.35, 0.25),
   ],
@@ -80,10 +80,10 @@ const _formations = <String, List<_SlotDef>>{
     _SlotDef('DFC1', 'DFC', 0.73, 0.73),
     _SlotDef('DFC2', 'DFC', 0.50, 0.76),
     _SlotDef('DFC3', 'DFC', 0.27, 0.73),
-    _SlotDef('MD',   'MD',  0.83, 0.55),
+    _SlotDef('MD',   'MD',  0.83, 0.44),
     _SlotDef('MC1',  'MC',  0.60, 0.52),
     _SlotDef('MC2',  'MC',  0.40, 0.52),
-    _SlotDef('MI',   'MI',  0.17, 0.55),
+    _SlotDef('MI',   'MI',  0.17, 0.44),
     _SlotDef('ED',   'ED',  0.82, 0.27),
     _SlotDef('DC',   'DC',  0.50, 0.25),
     _SlotDef('EI',   'EI',  0.18, 0.27),
@@ -138,8 +138,14 @@ class _LineupScreenState extends State<LineupScreen> {
       final allPlayers = await _playerApi.getPlayers(accessToken: token);
       final existing = await _matchApi.getLineup(widget.matchId, token);
 
+      // All active players in category — used for reconstruction
       final categoryPlayers = allPlayers
           .where((p) => p.categoryId == match.categoriaId && p.active)
+          .toList();
+
+      // Only available (not injured/suspended) — shown in picker
+      final eligiblePlayers = categoryPlayers
+          .where((p) => p.isAvailable)
           .toList();
 
       String formation = match.formacion ?? '4-3-3';
@@ -151,6 +157,8 @@ class _LineupScreenState extends State<LineupScreen> {
       }
 
       // Reconstruct from saved lineup using posicionAsignada as slot key
+      // Uses categoryPlayers (not eligiblePlayers) so a player who became
+      // injured after saving still shows in their assigned slot on reload.
       final titulares = existing.where((e) => e.esTitular).toList();
       for (final entry in titulares) {
         final slotKey = entry.posicionAsignada;
@@ -165,7 +173,7 @@ class _LineupScreenState extends State<LineupScreen> {
       if (!mounted) return;
       setState(() {
         _match = match;
-        _players = categoryPlayers;
+        _players = eligiblePlayers;
         _formation = formation;
         _slots.clear();
         _slots.addAll(slotMap);
