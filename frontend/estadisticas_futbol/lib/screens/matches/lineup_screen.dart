@@ -113,13 +113,18 @@ class _LineupScreenState extends State<LineupScreen> {
   String? _error;
 
   String _formation = '4-3-3';
-  // slotId → assigned player
   final Map<String, PlayerModel?> _slots = {};
+  final List<PlayerModel> _suplentes = [];
 
   List<_SlotDef> get _currentSlots => _formations[_formation]!;
 
-  int get _assignedCount =>
-      _slots.values.where((p) => p != null).length;
+  int get _assignedCount => _slots.values.where((p) => p != null).length;
+
+  // All players currently taken (titulares + suplentes)
+  Set<String> get _allAssignedIds => {
+        ..._slots.values.whereType<PlayerModel>().map((p) => p.id),
+        ..._suplentes.map((p) => p.id),
+      };
 
   @override
   void initState() {
@@ -138,7 +143,8 @@ class _LineupScreenState extends State<LineupScreen> {
       final allPlayers = await _playerApi.getPlayers(accessToken: token);
       final existing = await _matchApi.getLineup(widget.matchId, token);
 
-      // All active players in category — used for reconstruction
+      // All active players in category — used for reconstruction (ignores status
+      // so a player who became injured after saving still shows in their slot)
       final categoryPlayers = allPlayers
           .where((p) => p.categoryId == match.categoriaId && p.active)
           .toList();
@@ -151,16 +157,14 @@ class _LineupScreenState extends State<LineupScreen> {
       String formation = match.formacion ?? '4-3-3';
       if (!_formations.containsKey(formation)) formation = '4-3-3';
 
+      // Build empty slot map
       final slotMap = <String, PlayerModel?>{};
       for (final s in _formations[formation]!) {
         slotMap[s.slot] = null;
       }
 
-      // Reconstruct from saved lineup using posicionAsignada as slot key
-      // Uses categoryPlayers (not eligiblePlayers) so a player who became
-      // injured after saving still shows in their assigned slot on reload.
-      final titulares = existing.where((e) => e.esTitular).toList();
-      for (final entry in titulares) {
+      // Reconstruct titulares using posicionAsignada as slot key
+      for (final entry in existing.where((e) => e.esTitular)) {
         final slotKey = entry.posicionAsignada;
         if (slotKey != null && slotMap.containsKey(slotKey)) {
           final player = categoryPlayers
@@ -170,13 +174,26 @@ class _LineupScreenState extends State<LineupScreen> {
         }
       }
 
+      // Reconstruct suplentes
+      final loadedSuplentes = <PlayerModel>[];
+      for (final entry in existing.where((e) => !e.esTitular)) {
+        final player = categoryPlayers
+            .where((p) => int.tryParse(p.id) == entry.jugadorId)
+            .firstOrNull;
+        if (player != null) loadedSuplentes.add(player);
+      }
+
       if (!mounted) return;
       setState(() {
         _match = match;
         _players = eligiblePlayers;
         _formation = formation;
-        _slots.clear();
-        _slots.addAll(slotMap);
+        _slots
+          ..clear()
+          ..addAll(slotMap);
+        _suplentes
+          ..clear()
+          ..addAll(loadedSuplentes);
         _loading = false;
       });
     } catch (_) {
@@ -195,14 +212,18 @@ class _LineupScreenState extends State<LineupScreen> {
       for (final s in _formations[f]!) {
         _slots[s.slot] = null;
       }
+      // Suplentes are independent of formation — keep them
     });
   }
 
   void _openPlayerPicker(_SlotDef slot) {
-    final assignedElsewhere = _slots.entries
-        .where((e) => e.key != slot.slot && e.value != null)
-        .map((e) => e.value!)
-        .toSet();
+    // "Assigned elsewhere" = other slots + suplentes (shown but marked)
+    final assignedElsewhere = <PlayerModel>{
+      ..._slots.entries
+          .where((e) => e.key != slot.slot && e.value != null)
+          .map((e) => e.value!),
+      ..._suplentes,
+    };
 
     showModalBottomSheet<void>(
       context: context,
@@ -219,16 +240,39 @@ class _LineupScreenState extends State<LineupScreen> {
         onSelect: (player) {
           Navigator.pop(context);
           setState(() {
-            // Remove this player from any other slot they were in
+            // Remove from any other titular slot
             for (final key in _slots.keys.toList()) {
               if (_slots[key]?.id == player.id) _slots[key] = null;
             }
+            // Remove from suplentes if was there
+            _suplentes.removeWhere((p) => p.id == player.id);
             _slots[slot.slot] = player;
           });
         },
         onRemove: () {
           Navigator.pop(context);
           setState(() => _slots[slot.slot] = null);
+        },
+      ),
+    );
+  }
+
+  void _openSuplentePicker() {
+    final excluded = _allAssignedIds;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _SubstitutePickerSheet(
+        players: _players,
+        excludedIds: excluded,
+        onSelect: (player) {
+          Navigator.pop(context);
+          setState(() => _suplentes.add(player));
         },
       ),
     );
@@ -246,7 +290,7 @@ class _LineupScreenState extends State<LineupScreen> {
       _error = null;
     });
 
-    final entries = _slots.entries
+    final titularEntries = _slots.entries
         .where((e) => e.value != null)
         .map((e) => {
               'jugadorId': int.tryParse(e.value!.id) ?? 0,
@@ -255,11 +299,19 @@ class _LineupScreenState extends State<LineupScreen> {
             })
         .toList();
 
+    final suplenteEntries = _suplentes
+        .map((p) => {
+              'jugadorId': int.tryParse(p.id) ?? 0,
+              'esTitular': false,
+              'posicionAsignada': null,
+            })
+        .toList();
+
     try {
       final token = context.read<AuthState>().session!.accessToken;
       await _matchApi.setLineup(
         widget.matchId,
-        entries,
+        [...titularEntries, ...suplenteEntries],
         token,
         formacion: _formation,
       );
@@ -316,8 +368,7 @@ class _LineupScreenState extends State<LineupScreen> {
                       child: SizedBox(
                         width: 18,
                         height: 18,
-                        child:
-                            CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ),
                   )
@@ -352,8 +403,7 @@ class _LineupScreenState extends State<LineupScreen> {
                       selected: _formation,
                       onChanged: _changeFormation,
                     ),
-                    if (_error != null)
-                      _ErrorBanner(message: _error!),
+                    if (_error != null) _ErrorBanner(message: _error!),
                     if (_players.isEmpty)
                       const Expanded(
                         child: EmptyState(
@@ -365,10 +415,25 @@ class _LineupScreenState extends State<LineupScreen> {
                       )
                     else
                       Expanded(
-                        child: _PitchView(
-                          slots: _currentSlots,
-                          assignments: _slots,
-                          onSlotTap: _openPlayerPicker,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                height: 400,
+                                child: _PitchView(
+                                  slots: _currentSlots,
+                                  assignments: _slots,
+                                  onSlotTap: _openPlayerPicker,
+                                ),
+                              ),
+                              _SubstitutesSection(
+                                suplentes: _suplentes,
+                                onAdd: _openSuplentePicker,
+                                onRemove: (p) =>
+                                    setState(() => _suplentes.remove(p)),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],
@@ -464,11 +529,9 @@ class _PitchView extends StatelessWidget {
         return ClipRect(
           child: Stack(
             children: [
-              // Pitch background
               Positioned.fill(
                 child: CustomPaint(painter: _PitchPainter()),
               ),
-              // Slots
               ...slots.map((s) {
                 final cx = s.x * w;
                 final cy = s.y * h;
@@ -502,10 +565,9 @@ class _PitchPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    final fieldPaint = Paint()..color = const Color(0xFF1B5E20);
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), fieldPaint);
+    canvas.drawRect(
+        Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFF1B5E20));
 
-    // Stripes
     final stripePaint = Paint()..color = const Color(0xFF1A5C1E);
     final stripeH = h / 8;
     for (int i = 0; i < 8; i += 2) {
@@ -518,46 +580,32 @@ class _PitchPainter extends CustomPainter {
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
-    // Border
-    canvas.drawRect(
-        Rect.fromLTRB(8, 8, w - 8, h - 8), linePaint);
-
-    // Halfway line
+    canvas.drawRect(Rect.fromLTRB(8, 8, w - 8, h - 8), linePaint);
     canvas.drawLine(Offset(8, h / 2), Offset(w - 8, h / 2), linePaint);
+    canvas.drawCircle(Offset(w / 2, h / 2), h * 0.1, linePaint);
 
-    // Center circle
-    canvas.drawCircle(
-        Offset(w / 2, h / 2), h * 0.1, linePaint);
-
-    // Our penalty area (bottom)
     final paW = w * 0.55;
     final paH = h * 0.18;
     canvas.drawRect(
         Rect.fromLTRB(
             (w - paW) / 2, h - 8 - paH, (w + paW) / 2, h - 8),
         linePaint);
-
-    // Opponent penalty area (top)
     canvas.drawRect(
-        Rect.fromLTRB(
-            (w - paW) / 2, 8, (w + paW) / 2, 8 + paH),
+        Rect.fromLTRB((w - paW) / 2, 8, (w + paW) / 2, 8 + paH),
         linePaint);
 
-    // Our goal area (bottom)
     final gaW = w * 0.28;
     final gaH = h * 0.07;
     canvas.drawRect(
         Rect.fromLTRB(
             (w - gaW) / 2, h - 8 - gaH, (w + gaW) / 2, h - 8),
         linePaint);
-
-    // Opponent goal area (top)
     canvas.drawRect(
         Rect.fromLTRB((w - gaW) / 2, 8, (w + gaW) / 2, 8 + gaH),
         linePaint);
 
-    // Center dot
-    canvas.drawCircle(Offset(w / 2, h / 2), 3, linePaint..style = PaintingStyle.fill);
+    canvas.drawCircle(Offset(w / 2, h / 2), 3,
+        linePaint..style = PaintingStyle.fill);
   }
 
   @override
@@ -624,10 +672,7 @@ class _PositionSlot extends StatelessWidget {
                 Text(
                   '${player!.number}',
                   style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 7,
-                    height: 1.0,
-                  ),
+                      color: Colors.black54, fontSize: 7, height: 1.0),
                 ),
             ] else ...[
               Text(
@@ -639,8 +684,7 @@ class _PositionSlot extends StatelessWidget {
                 ),
               ),
               Icon(Icons.add,
-                  size: 10,
-                  color: Colors.white.withValues(alpha: 0.6)),
+                  size: 10, color: Colors.white.withValues(alpha: 0.6)),
             ],
           ],
         ),
@@ -655,7 +699,287 @@ class _PositionSlot extends StatelessWidget {
 }
 
 // =============================================================================
-//  PLAYER PICKER SHEET
+//  SUBSTITUTES SECTION
+// =============================================================================
+
+class _SubstitutesSection extends StatelessWidget {
+  final List<PlayerModel> suplentes;
+  final VoidCallback onAdd;
+  final ValueChanged<PlayerModel> onRemove;
+
+  const _SubstitutesSection({
+    required this.suplentes,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.bgSurface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(color: AppColors.borderSubtle, height: 0.5),
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.swap_horiz,
+                    size: 16, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  'Suplentes (${suplentes.length})',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Agregar'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (suplentes.isEmpty)
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Text(
+                'Sin suplentes seleccionados',
+                style: TextStyle(
+                    color: AppColors.textMuted.withValues(alpha: 0.6),
+                    fontSize: 12),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              itemCount: suplentes.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              itemBuilder: (_, i) => _SuplenteTile(
+                player: suplentes[i],
+                number: i + 1,
+                onRemove: () => onRemove(suplentes[i]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuplenteTile extends StatelessWidget {
+  final PlayerModel player;
+  final int number;
+  final VoidCallback onRemove;
+
+  const _SuplenteTile({
+    required this.player,
+    required this.number,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.bgMuted,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$number',
+              style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 10),
+          PlayerAvatar(player: player, radius: 14),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  player.name,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  player.position.isNotEmpty ? player.position : '—',
+                  style: const TextStyle(
+                      color: AppColors.textMuted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (player.number > 0)
+            Text(
+              '#${player.number}',
+              style: const TextStyle(
+                  color: AppColors.textMuted, fontSize: 11),
+            ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close,
+                color: AppColors.danger, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+//  SUBSTITUTE PICKER SHEET
+// =============================================================================
+
+class _SubstitutePickerSheet extends StatefulWidget {
+  final List<PlayerModel> players;
+  final Set<String> excludedIds;
+  final ValueChanged<PlayerModel> onSelect;
+
+  const _SubstitutePickerSheet({
+    required this.players,
+    required this.excludedIds,
+    required this.onSelect,
+  });
+
+  @override
+  State<_SubstitutePickerSheet> createState() =>
+      _SubstitutePickerSheetState();
+}
+
+class _SubstitutePickerSheetState
+    extends State<_SubstitutePickerSheet> {
+  String _query = '';
+
+  List<PlayerModel> get _available {
+    final q = _query.toLowerCase();
+    return widget.players
+        .where((p) => !widget.excludedIds.contains(p.id))
+        .where((p) => q.isEmpty || p.name.toLowerCase().contains(q))
+        .toList()
+      ..sort((a, b) {
+        final pos = a.position.compareTo(b.position);
+        return pos != 0 ? pos : a.name.compareTo(b.name);
+      });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (_, controller) => Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.borderDefault,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: Row(
+              children: [
+                Icon(Icons.swap_horiz,
+                    size: 18, color: AppColors.accent),
+                SizedBox(width: 8),
+                Text(
+                  'Agregar suplente',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              autofocus: false,
+              onChanged: (v) => setState(() => _query = v),
+              style: const TextStyle(
+                  fontSize: 14, color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                hintText: 'Buscar jugador...',
+                prefixIcon: Icon(Icons.search,
+                    size: 18, color: AppColors.textMuted),
+              ),
+            ),
+          ),
+          const Divider(color: AppColors.borderSubtle, height: 0.5),
+          Expanded(
+            child: _available.isEmpty
+                ? const Center(
+                    child: Text('Sin jugadores disponibles',
+                        style: TextStyle(color: AppColors.textMuted)))
+                : ListView.separated(
+                    controller: controller,
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+                    itemCount: _available.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: 6),
+                    itemBuilder: (_, i) {
+                      final p = _available[i];
+                      return _PlayerPickerTile(
+                        player: p,
+                        isSelected: false,
+                        isAssignedElsewhere: false,
+                        isPreferred: false,
+                        onTap: () => widget.onSelect(p),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+//  PLAYER PICKER SHEET (for titular slots)
 // =============================================================================
 
 class _PlayerPickerSheet extends StatefulWidget {
@@ -688,7 +1012,6 @@ class _PlayerPickerSheetState extends State<_PlayerPickerSheet> {
         .where((p) => q.isEmpty || p.name.toLowerCase().contains(q))
         .toList();
 
-    // Preferred: position matches slot
     final preferred =
         filtered.where((p) => p.position == widget.slotDef.position).toList();
     final others =
@@ -806,6 +1129,10 @@ class _PlayerPickerSheetState extends State<_PlayerPickerSheet> {
   }
 }
 
+// =============================================================================
+//  PLAYER PICKER TILE (shared)
+// =============================================================================
+
 class _PlayerPickerTile extends StatelessWidget {
   final PlayerModel player;
   final bool isSelected;
@@ -824,9 +1151,7 @@ class _PlayerPickerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected
-          ? AppColors.accentDim
-          : AppColors.bgCard,
+      color: isSelected ? AppColors.accentDim : AppColors.bgCard,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -872,9 +1197,7 @@ class _PlayerPickerTile extends StatelessWidget {
                           const Text(
                             'asignado',
                             style: TextStyle(
-                              fontSize: 10,
-                              color: AppColors.warning,
-                            ),
+                                fontSize: 10, color: AppColors.warning),
                           ),
                         ],
                       ],
@@ -920,12 +1243,14 @@ class _ErrorBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.danger.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+        border:
+            Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: AppColors.danger, size: 18),
+          const Icon(Icons.info_outline,
+              color: AppColors.danger, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
