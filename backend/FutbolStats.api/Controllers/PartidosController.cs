@@ -145,10 +145,12 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
     public async Task<IActionResult> SetAlineacion(int id, AlineacionRequest request)
     {
         var partido = await context.Partidos
-            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.PartidoId == id);
 
         if (partido is null) return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(request.Formacion))
+            partido.Formacion = request.Formacion.Trim();
 
         var jugadoresRequest = request.Jugadores ?? [];
 
@@ -246,7 +248,8 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
         p.Estado,
         p.GolesEquipo,
         p.GolesRival,
-        p.MinutoActual);
+        p.MinutoActual,
+        p.Formacion);
 
     private static AlineacionEntradaResponse ToAlineacionResponse(Alineacion a) => new(
         a.AlineacionId,
@@ -278,13 +281,13 @@ public record PartidoResponse(
     string Estado,
     int? GolesEquipo,
     int? GolesRival,
-    int? MinutoActual);
+    int? MinutoActual,
+    string? Formacion);
 
 public record EstadoRequest(string Estado, int? GolesEquipo, int? GolesRival, int? MinutoActual);
 
+public record AlineacionRequest(string? Formacion, List<AlineacionEntrada>? Jugadores);
 public record AlineacionEntrada(int JugadorId, bool EsTitular, string? PosicionAsignada);
-
-public record AlineacionRequest(List<AlineacionEntrada> Jugadores);
 
 public record AlineacionEntradaResponse(
     int AlineacionId,

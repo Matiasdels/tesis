@@ -167,15 +167,19 @@ class MatchApi {
   Future<List<AlineacionEntradaModel>> setLineup(
     int matchId,
     List<Map<String, dynamic>> entries,
-    String accessToken,
-  ) async {
+    String accessToken, {
+    String? formacion,
+  }) async {
     final uri =
         Uri.parse('${ApiConfig.baseUrl}/api/Partidos/$matchId/alineacion');
     final headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $accessToken',
     };
-    final body = jsonEncode({'jugadores': entries});
+    final body = jsonEncode({
+      if (formacion != null) 'formacion': formacion,
+      'jugadores': entries,
+    });
     final response = await _client.put(uri, headers: headers, body: body);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
