@@ -8,6 +8,7 @@ import 'package:estadisticas_futbol/screens/players/player_form_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/matches_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/match_form_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/match_detail_screen.dart';
+import 'package:estadisticas_futbol/models/models.dart';
 import 'package:estadisticas_futbol/screens/matches/lineup_screen.dart';
 import 'package:estadisticas_futbol/screens/live_match/live_match_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/match_summary_screen.dart';
@@ -83,7 +84,11 @@ GoRouter createRouter(AuthState authState) => GoRouter(
                   parentNavigatorKey: _rootNavigatorKey,
                   pageBuilder: (c, s) {
                     final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
-                    return _slide<bool>(s, MatchDetailScreen(matchId: id));
+                    final playerCtx = s.extra is PlayerMatchModel
+                        ? s.extra as PlayerMatchModel
+                        : null;
+                    return _slide<bool>(
+                        s, MatchDetailScreen(matchId: id, playerContext: playerCtx));
                   },
                   routes: [
                     GoRoute(

@@ -389,3 +389,85 @@ class StatCardData {
     this.iconCode,
   });
 }
+
+class PlayerMatchStats {
+  final int goles;
+  final int asistencias;
+  final int remates;
+  final int faltas;
+  final int amarillas;
+  final int rojas;
+
+  const PlayerMatchStats({
+    required this.goles,
+    required this.asistencias,
+    required this.remates,
+    required this.faltas,
+    required this.amarillas,
+    required this.rojas,
+  });
+
+  bool get hasActivity =>
+      goles > 0 || asistencias > 0 || remates > 0 ||
+      faltas > 0 || amarillas > 0 || rojas > 0;
+
+  factory PlayerMatchStats.fromApi(Map<String, dynamic> json) =>
+      PlayerMatchStats(
+        goles: json['goles'] as int? ?? 0,
+        asistencias: json['asistencias'] as int? ?? 0,
+        remates: json['remates'] as int? ?? 0,
+        faltas: json['faltas'] as int? ?? 0,
+        amarillas: json['amarillas'] as int? ?? 0,
+        rojas: json['rojas'] as int? ?? 0,
+      );
+}
+
+class PlayerMatchModel {
+  final int partidoId;
+  final String rival;
+  final DateTime fecha;
+  final int categoriaId;
+  final String? categoriaNombre;
+  final String tipoCompeticion;
+  final bool esLocal;
+  final String estado;
+  final int? golesEquipo;
+  final int? golesRival;
+  final bool esTitular;
+  final String? posicionAsignada;
+  final PlayerMatchStats estadisticas;
+
+  const PlayerMatchModel({
+    required this.partidoId,
+    required this.rival,
+    required this.fecha,
+    required this.categoriaId,
+    this.categoriaNombre,
+    required this.tipoCompeticion,
+    required this.esLocal,
+    required this.estado,
+    this.golesEquipo,
+    this.golesRival,
+    required this.esTitular,
+    this.posicionAsignada,
+    required this.estadisticas,
+  });
+
+  factory PlayerMatchModel.fromApi(Map<String, dynamic> json) =>
+      PlayerMatchModel(
+        partidoId: json['partidoId'] as int,
+        rival: json['rival'] as String,
+        fecha: DateTime.parse(json['fecha'] as String),
+        categoriaId: json['categoriaId'] as int,
+        categoriaNombre: json['categoriaNombre'] as String?,
+        tipoCompeticion: json['tipoCompeticion'] as String,
+        esLocal: json['esLocal'] as bool,
+        estado: json['estado'] as String,
+        golesEquipo: json['golesEquipo'] as int?,
+        golesRival: json['golesRival'] as int?,
+        esTitular: json['esTitular'] as bool,
+        posicionAsignada: json['posicionAsignada'] as String?,
+        estadisticas: PlayerMatchStats.fromApi(
+            json['estadisticas'] as Map<String, dynamic>),
+      );
+}

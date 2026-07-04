@@ -172,12 +172,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
             subtitle:
                 'Todavia no hay registros reales de entrenamientos o carga conectados a este jugador.',
           ),
-          const _PendingTab(
-            icon: Icons.sports_soccer_outlined,
-            title: 'Sin partidos reales',
-            subtitle:
-                'Los partidos del jugador se van a mostrar cuando exista gestion real de partidos en la API.',
-          ),
+          _MatchesTab(playerId: player.id),
           const _PendingTab(
             icon: Icons.chat_bubble_outline,
             title: 'Sin observaciones',
@@ -438,5 +433,219 @@ class _PendingTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyState(icon: icon, title: title, subtitle: subtitle);
+  }
+}
+
+class _MatchesTab extends StatefulWidget {
+  final String playerId;
+
+  const _MatchesTab({required this.playerId});
+
+  @override
+  State<_MatchesTab> createState() => _MatchesTabState();
+}
+
+class _MatchesTabState extends State<_MatchesTab>
+    with AutomaticKeepAliveClientMixin {
+  final _api = PlayerApi();
+  List<PlayerMatchModel>? _matches;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      final matches = await _api.getPlayerMatches(widget.playerId, token);
+      if (!mounted) return;
+      setState(() {
+        _matches = matches;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'No pudimos cargar los partidos.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return EmptyState(
+        icon: Icons.error_outline,
+        title: 'Algo salio mal',
+        subtitle: _error!,
+        actionLabel: 'Reintentar',
+        onAction: _load,
+      );
+    }
+    final matches = _matches!;
+    if (matches.isEmpty) {
+      return const EmptyState(
+        icon: Icons.sports_soccer_outlined,
+        title: 'Sin partidos',
+        subtitle: 'Este jugador todavia no tiene partidos registrados.',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppConstants.pagePadding),
+      itemCount: matches.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (_, i) => _MatchCard(
+        match: matches[i],
+        onTap: () => context.push(
+          '/matches/${matches[i].partidoId}',
+          extra: matches[i],
+        ),
+      ),
+    );
+  }
+}
+
+class _MatchCard extends StatelessWidget {
+  final PlayerMatchModel match;
+  final VoidCallback onTap;
+
+  const _MatchCard({required this.match, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final resultado = _resultado();
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'vs ${match.rival}',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (resultado != null)
+                  Text(
+                    resultado,
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatDate(match.fecha)}  ·  ${match.tipoCompeticion}  ·  ${match.esLocal ? 'Local' : 'Visitante'}',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _RolBadge(
+                  esTitular: match.esTitular,
+                  posicion: match.posicionAsignada,
+                ),
+                if (match.estadisticas.hasActivity) ...[
+                  const Spacer(),
+                  Text(
+                    _statsText(match.estadisticas),
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _resultado() {
+    if (match.golesEquipo == null || match.golesRival == null) return null;
+    return '${match.golesEquipo} - ${match.golesRival}';
+  }
+
+  String _formatDate(DateTime d) {
+    final day = d.day.toString().padLeft(2, '0');
+    final month = d.month.toString().padLeft(2, '0');
+    return '$day/$month/${d.year}';
+  }
+
+  String _statsText(PlayerMatchStats s) {
+    final parts = <String>[];
+    if (s.goles > 0) parts.add('${s.goles} gol${s.goles > 1 ? 'es' : ''}');
+    if (s.asistencias > 0) parts.add('${s.asistencias} ast.');
+    if (s.remates > 0) parts.add('${s.remates} rem.');
+    if (s.amarillas > 0) parts.add('${s.amarillas} AM');
+    if (s.rojas > 0) parts.add('${s.rojas} RJ');
+    return parts.join(' · ');
+  }
+}
+
+class _RolBadge extends StatelessWidget {
+  final bool esTitular;
+  final String? posicion;
+
+  const _RolBadge({required this.esTitular, this.posicion});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = esTitular
+        ? (posicion != null && posicion!.isNotEmpty
+            ? 'Titular · $posicion'
+            : 'Titular')
+        : 'Suplente';
+    final color = esTitular ? AppColors.accent : AppColors.textSecondary;
+    final bg = esTitular ? AppColors.accentDim : AppColors.bgMuted;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 }

@@ -11,7 +11,13 @@ import '../../widgets/common/app_widgets.dart';
 
 class MatchDetailScreen extends StatefulWidget {
   final int matchId;
-  const MatchDetailScreen({super.key, required this.matchId});
+  final PlayerMatchModel? playerContext;
+
+  const MatchDetailScreen({
+    super.key,
+    required this.matchId,
+    this.playerContext,
+  });
 
   @override
   State<MatchDetailScreen> createState() => _MatchDetailScreenState();
@@ -192,6 +198,10 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
           padding: const EdgeInsets.all(AppConstants.pagePadding),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
+              if (widget.playerContext != null) ...[
+                _PlayerParticipationCard(playerMatch: widget.playerContext!),
+                const SizedBox(height: AppConstants.sectionSpacing),
+              ],
               _MatchInfoCard(match: match),
               const SizedBox(height: AppConstants.sectionSpacing),
               _LineupCard(
@@ -423,6 +433,134 @@ class _MatchActionButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppConstants.cardRadius),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PlayerParticipationCard extends StatelessWidget {
+  final PlayerMatchModel playerMatch;
+
+  const _PlayerParticipationCard({required this.playerMatch});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = playerMatch.estadisticas;
+    final rol = playerMatch.esTitular
+        ? (playerMatch.posicionAsignada != null &&
+                playerMatch.posicionAsignada!.isNotEmpty
+            ? 'Titular · ${playerMatch.posicionAsignada}'
+            : 'Titular')
+        : 'Suplente';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: SectionHeader(title: 'Participacion del jugador'),
+              ),
+              _RolBadgeSmall(esTitular: playerMatch.esTitular, label: rol),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (!s.hasActivity)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No se registraron eventos para este jugador en este partido.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            )
+          else ...[
+            if (s.goles > 0)
+              _StatRow(
+                  'Goles', s.goles, Icons.sports_soccer_outlined),
+            if (s.asistencias > 0)
+              _StatRow(
+                  'Asistencias', s.asistencias, Icons.assistant_outlined),
+            if (s.remates > 0)
+              _StatRow('Remates', s.remates, Icons.gps_fixed_outlined),
+            if (s.faltas > 0)
+              _StatRow('Faltas', s.faltas, Icons.warning_amber_outlined),
+            if (s.amarillas > 0)
+              _StatRow('Tarjetas amarillas', s.amarillas,
+                  Icons.crop_square_outlined),
+            if (s.rojas > 0)
+              _StatRow(
+                  'Tarjetas rojas', s.rojas, Icons.square_outlined),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RolBadgeSmall extends StatelessWidget {
+  final bool esTitular;
+  final String label;
+
+  const _RolBadgeSmall({required this.esTitular, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = esTitular ? AppColors.accent : AppColors.textSecondary;
+    final bg = esTitular ? AppColors.accentDim : AppColors.bgMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+
+  const _StatRow(this.label, this.value, this.icon);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: AppColors.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12),
+            ),
+          ),
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
