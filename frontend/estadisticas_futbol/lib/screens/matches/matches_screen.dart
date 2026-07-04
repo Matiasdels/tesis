@@ -40,6 +40,51 @@ class _MatchesScreenState extends State<MatchesScreen> {
     _load();
   }
 
+  Future<bool> _confirmDelete(PartidoModel match) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppColors.bgSurface,
+        title: const Text(
+          'Eliminar partido',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          '¿Estás seguro de que querés eliminar este partido? '
+          'Esta acción ocultará el partido del listado.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return false;
+
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      await _api.deleteMatch(match.id, token);
+      return true;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No pudimos eliminar el partido.')),
+        );
+      }
+      return false;
+    }
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -133,15 +178,37 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                 itemCount: _filteredMatches.length,
                                 separatorBuilder: (_, __) =>
                                     const SizedBox(height: 10),
-                                itemBuilder: (_, i) => _MatchTile(
-                                  match: _filteredMatches[i],
-                                  onTap: () async {
-                                    final changed = await context.push<bool>(
-                                      '/matches/${_filteredMatches[i].id}',
-                                    );
-                                    if (changed == true) _load();
-                                  },
-                                ),
+                                itemBuilder: (_, i) {
+                                  final match = _filteredMatches[i];
+                                  return Dismissible(
+                                    key: ValueKey(match.id),
+                                    direction: DismissDirection.endToStart,
+                                    background: const _SwipeDeleteBackground(),
+                                    confirmDismiss: (_) =>
+                                        _confirmDelete(match),
+                                    onDismissed: (_) {
+                                      setState(() => _matches.removeWhere(
+                                          (m) => m.id == match.id));
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content:
+                                              Text('Partido eliminado.'),
+                                        ),
+                                      );
+                                    },
+                                    child: _MatchTile(
+                                      match: match,
+                                      onTap: () async {
+                                        final changed =
+                                            await context.push<bool>(
+                                          '/matches/${match.id}',
+                                        );
+                                        if (changed == true) _load();
+                                      },
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                 ),
@@ -318,6 +385,46 @@ class _EstadoIndicator extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+}
+
+class _SwipeDeleteBackground extends StatelessWidget {
+  const _SwipeDeleteBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 22),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+        border: Border.all(
+          color: AppColors.danger.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.delete_outline,
+            color: AppColors.danger.withValues(alpha: 0.85),
+            size: 20,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Borrar',
+            style: TextStyle(
+              color: AppColors.danger.withValues(alpha: 0.75),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }
