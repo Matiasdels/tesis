@@ -106,6 +106,16 @@ class PlayerApi {
     }
   }
 
+  Future<List<PlayerMatchModel>> getPlayerMatches(
+      String playerId, String accessToken) async {
+    final response = await _getList(
+        '/api/Jugadores/$playerId/partidos', accessToken);
+    return response
+        .map((item) =>
+            PlayerMatchModel.fromApi(item as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<CategoryModel>> getCategories(String accessToken) async {
     try {
       final response = await _getList('/api/Catalogos/categorias', accessToken);

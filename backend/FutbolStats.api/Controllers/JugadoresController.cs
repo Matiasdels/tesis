@@ -137,6 +137,63 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         return Ok(ToResponse(jugador));
     }
 
+    [HttpGet("{id:int}/partidos")]
+    public async Task<IActionResult> GetPartidosDelJugador(int id)
+    {
+        var jugadorExiste = await context.Jugadores.AnyAsync(j => j.JugadorId == id);
+        if (!jugadorExiste) return NotFound();
+
+        var alineaciones = await context.Alineaciones
+            .Include(a => a.Partido)
+                .ThenInclude(p => p!.Categoria)
+            .AsNoTracking()
+            .Where(a => a.JugadorId == id && a.Partido!.Activo)
+            .OrderByDescending(a => a.Partido!.Fecha)
+            .ToListAsync();
+
+        if (!alineaciones.Any()) return Ok(Array.Empty<object>());
+
+        var partidoIds = alineaciones.Select(a => a.PartidoId).ToList();
+        var eventos = await context.EventosPartido
+            .Include(e => e.TipoEvento)
+            .AsNoTracking()
+            .Where(e => e.JugadorId == id && partidoIds.Contains(e.PartidoId))
+            .ToListAsync();
+
+        var eventosPorPartido = eventos
+            .GroupBy(e => e.PartidoId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var resultado = alineaciones.Select(a =>
+        {
+            var evs = eventosPorPartido.GetValueOrDefault(a.PartidoId, []);
+            return new JugadorPartidoResponse(
+                a.Partido!.PartidoId,
+                a.Partido.Rival,
+                a.Partido.Fecha,
+                a.Partido.CategoriaId,
+                a.Partido.Categoria?.Nombre,
+                a.Partido.TipoCompeticion,
+                a.Partido.EsLocal,
+                a.Partido.Estado,
+                a.Partido.GolesEquipo,
+                a.Partido.GolesRival,
+                a.EsTitular,
+                a.PosicionAsignada,
+                new JugadorEstadisticasResponse(
+                    evs.Count(e => e.TipoEvento?.Nombre == "Gol"),
+                    evs.Count(e => e.TipoEvento?.Nombre == "Asistencia"),
+                    evs.Count(e => e.TipoEvento?.Nombre == "Remate"),
+                    evs.Count(e => e.TipoEvento?.Nombre == "Falta"),
+                    evs.Count(e => e.TipoEvento?.Nombre == "Tarjeta amarilla"),
+                    evs.Count(e => e.TipoEvento?.Nombre == "Tarjeta roja")
+                )
+            );
+        });
+
+        return Ok(resultado);
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeactivateJugador(int id)
     {
@@ -274,3 +331,26 @@ public record JugadorResponse(
     int CategoriaId,
     string? CategoriaNombre,
     bool Activo);
+
+public record JugadorEstadisticasResponse(
+    int Goles,
+    int Asistencias,
+    int Remates,
+    int Faltas,
+    int Amarillas,
+    int Rojas);
+
+public record JugadorPartidoResponse(
+    int PartidoId,
+    string Rival,
+    DateTime Fecha,
+    int CategoriaId,
+    string? CategoriaNombre,
+    string TipoCompeticion,
+    bool EsLocal,
+    string Estado,
+    int? GolesEquipo,
+    int? GolesRival,
+    bool EsTitular,
+    string? PosicionAsignada,
+    JugadorEstadisticasResponse Estadisticas);
