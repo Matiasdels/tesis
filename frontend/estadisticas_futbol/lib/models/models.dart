@@ -25,6 +25,8 @@ class PlayerModel {
   final int? categoryId;
   final String? categoryName;
   final bool active;
+  final int? partidosSuspendido;
+  final DateTime? fechaEstimadaRegreso;
 
   const PlayerModel({
     required this.id,
@@ -48,6 +50,8 @@ class PlayerModel {
     this.categoryId,
     this.categoryName,
     this.active = true,
+    this.partidosSuspendido,
+    this.fechaEstimadaRegreso,
   });
 
   String get initials {
@@ -57,6 +61,18 @@ class PlayerModel {
   }
 
   bool get isAvailable => status == 'available';
+
+  bool get statusNeedsReview {
+    if (status == 'suspended' && partidosSuspendido == 0) {
+      return true;
+    }
+    if (status == 'injured' &&
+        fechaEstimadaRegreso != null &&
+        fechaEstimadaRegreso!.isBefore(DateTime.now())) {
+      return true;
+    }
+    return false;
+  }
 
   /// Indica si el jugador cuenta con datos de rendimiento registrados.
   bool get hasPerformanceData => stats.isNotEmpty;
@@ -124,6 +140,10 @@ class PlayerModel {
       categoryId: json['categoriaId'] as int?,
       categoryName: json['categoriaNombre'] as String?,
       active: json['activo'] as bool? ?? true,
+      partidosSuspendido: json['partidosSuspendido'] as int?,
+      fechaEstimadaRegreso: json['fechaEstimadaRegreso'] != null
+          ? DateTime.tryParse(json['fechaEstimadaRegreso'] as String)
+          : null,
     );
   }
 
@@ -150,6 +170,8 @@ class PlayerModel {
       categoryId: categoryId,
       categoryName: categoryName,
       active: active ?? this.active,
+      partidosSuspendido: partidosSuspendido,
+      fechaEstimadaRegreso: fechaEstimadaRegreso,
     );
   }
 
@@ -172,6 +194,12 @@ class PlayerModel {
       'estado': statusToApi(status),
       'categoriaId': categoryId,
       'activo': active,
+      'partidosSuspendido': status == 'suspended' ? partidosSuspendido : null,
+      'fechaEstimadaRegreso': status == 'injured' && fechaEstimadaRegreso != null
+          ? '${fechaEstimadaRegreso!.year.toString().padLeft(4, '0')}-'
+              '${fechaEstimadaRegreso!.month.toString().padLeft(2, '0')}-'
+              '${fechaEstimadaRegreso!.day.toString().padLeft(2, '0')}'
+          : null,
     };
   }
 }

@@ -65,6 +65,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.PesoKg).HasPrecision(5, 2);
             entity.Property(x => x.PiernaHabil).HasMaxLength(10);
             entity.Property(x => x.Estado).HasMaxLength(20).HasDefaultValue("Disponible");
+            entity.Property(x => x.FechaEstimadaRegreso).HasColumnType("date");
             entity.Property(x => x.Activo).HasDefaultValue(true);
             entity.HasOne(x => x.Categoria)
                 .WithMany()

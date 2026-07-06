@@ -86,6 +86,8 @@ class _PlayersScreenState extends State<PlayersScreen> {
             onStatus: (v) => setState(() => _filterStatus = v),
             onPosition: (v) => setState(() => _filterPosition = v),
           ),
+          if (!_loading && _error == null)
+            _StatusReviewBanner(players: _players),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -109,6 +111,47 @@ class _PlayersScreenState extends State<PlayersScreen> {
                             separatorBuilder: (_, __) => const SizedBox(height: 8),
                             itemBuilder: (_, i) => _PlayerCard(player: _filtered[i]),
                           ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusReviewBanner extends StatelessWidget {
+  final List<PlayerModel> players;
+  const _StatusReviewBanner({required this.players});
+
+  @override
+  Widget build(BuildContext context) {
+    final needsReview = players.where((p) => p.statusNeedsReview).toList();
+    if (needsReview.isEmpty) return const SizedBox.shrink();
+
+    final names = needsReview.map((p) => p.name).join(', ');
+    final plural = needsReview.length == 1;
+    final msg = plural
+        ? '${needsReview.first.name} podría haber cumplido su sanción o recuperado su lesión. Revisá su estado.'
+        : '$names podrían haber cumplido su sanción o recuperado su lesión. Revisá sus estados.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: AppColors.warning.withValues(alpha: 0.12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: AppColors.warning, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              msg,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.warning,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),
@@ -270,7 +313,18 @@ class _PlayerCard extends StatelessWidget {
                             : AppColors.textMuted,
                       )),
                   const SizedBox(height: 4),
-                  StatusBadge(status: player.status),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (player.statusNeedsReview)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 4),
+                          child: Icon(Icons.warning_amber_rounded,
+                              color: AppColors.warning, size: 14),
+                        ),
+                      StatusBadge(status: player.status),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(width: 4),

@@ -63,6 +63,8 @@ CREATE TABLE Jugadores (
     PesoKg              DECIMAL(5,2)        NULL,
     PiernaHabil         NVARCHAR(10)        NULL,
     Estado              NVARCHAR(20)        NOT NULL DEFAULT 'Disponible',
+    PartidosSuspendido  INT                 NULL,
+    FechaEstimadaRegreso DATE               NULL,
     CategoriaId         INT                 NOT NULL,
     Activo              BIT                 NOT NULL DEFAULT 1,
     CONSTRAINT PK_Jugadores PRIMARY KEY (JugadorId),

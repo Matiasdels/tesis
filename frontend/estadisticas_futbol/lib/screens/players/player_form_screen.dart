@@ -37,6 +37,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
   String _status = 'available';
   int? _categoryId;
   bool _active = true;
+  final _suspendedMatchesController = TextEditingController();
+  DateTime? _fechaEstimadaRegreso;
 
   List<CategoryModel> _categories = [];
   bool _loading = true;
@@ -57,6 +59,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
     _heightController.dispose();
     _weightController.dispose();
     _dniController.dispose();
+    _suspendedMatchesController.dispose();
     super.dispose();
   }
 
@@ -92,6 +95,11 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
           _categoryId = player.categoryId ??
               (categories.isEmpty ? null : categories.first.id);
           _active = player.active;
+          if (player.partidosSuspendido != null) {
+            _suspendedMatchesController.text =
+                player.partidosSuspendido.toString();
+          }
+          _fechaEstimadaRegreso = player.fechaEstimadaRegreso;
         } else {
           _categoryId = categories.isEmpty ? null : categories.first.id;
         }
@@ -103,6 +111,18 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _pickReturnDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fechaEstimadaRegreso ?? now.add(const Duration(days: 7)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 2),
+      helpText: 'Fecha estimada de regreso',
+    );
+    if (picked != null) setState(() => _fechaEstimadaRegreso = picked);
   }
 
   Future<void> _pickBirthDate() async {
@@ -171,6 +191,11 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
           : _dniController.text.trim(),
       categoryId: _categoryId,
       active: _active,
+      partidosSuspendido: _status == 'suspended'
+          ? int.tryParse(_suspendedMatchesController.text.trim())
+          : null,
+      fechaEstimadaRegreso:
+          _status == 'injured' ? _fechaEstimadaRegreso : null,
     );
 
     final token = context.read<AuthState>().session!.accessToken;
@@ -367,9 +392,57 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                         DropdownMenuItem(
                             value: 'suspended', child: Text('Suspendido')),
                       ],
-                      onChanged:
-                          _saving ? null : (v) => setState(() => _status = v!),
+                      onChanged: _saving
+                          ? null
+                          : (v) {
+                              setState(() {
+                                _status = v!;
+                                if (v != 'suspended') {
+                                  _suspendedMatchesController.clear();
+                                }
+                                if (v != 'injured') {
+                                  _fechaEstimadaRegreso = null;
+                                }
+                              });
+                            },
                     ),
+                    if (_status == 'suspended') ...[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _suspendedMatchesController,
+                        enabled: !_saving,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Partidos de suspensión',
+                          hintText: 'Ej: 3',
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return null;
+                          final n = int.tryParse(v.trim());
+                          if (n == null || n < 0) {
+                            return 'Ingresá un número válido (0 o más)';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                    if (_status == 'injured') ...[
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: _saving ? null : _pickReturnDate,
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                              labelText: 'Fecha estimada de regreso'),
+                          child: Text(
+                            _fechaEstimadaRegreso == null
+                                ? 'Sin definir'
+                                : _formatDate(_fechaEstimadaRegreso!),
+                            style:
+                                const TextStyle(color: AppColors.textPrimary),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       initialValue: _categoryId,
