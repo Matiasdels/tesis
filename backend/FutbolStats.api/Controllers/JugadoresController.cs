@@ -73,6 +73,8 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
             PesoKg = request.PesoKg,
             PiernaHabil = BusinessRules.NormalizeOptionalText(request.PiernaHabil),
             Estado = request.Estado,
+            PartidosSuspendido = request.Estado == "Suspendido" ? request.PartidosSuspendido : null,
+            FechaEstimadaRegreso = request.Estado == "Lesionado" ? request.FechaEstimadaRegreso : null,
             CategoriaId = request.CategoriaId,
             Activo = request.Activo ?? true,
         };
@@ -118,6 +120,8 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         jugador.PesoKg = request.PesoKg;
         jugador.PiernaHabil = BusinessRules.NormalizeOptionalText(request.PiernaHabil);
         jugador.Estado = request.Estado;
+        jugador.PartidosSuspendido = request.Estado == "Suspendido" ? request.PartidosSuspendido : null;
+        jugador.FechaEstimadaRegreso = request.Estado == "Lesionado" ? request.FechaEstimadaRegreso : null;
         jugador.CategoriaId = request.CategoriaId;
         if (request.Activo is not null)
         {
@@ -261,6 +265,9 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
                 return BadRequest("El DNI solo puede contener letras y números.");
         }
 
+        if (request.Estado == "Suspendido" && request.PartidosSuspendido.HasValue && request.PartidosSuspendido < 0)
+            return BadRequest("Los partidos de suspensión no pueden ser negativos.");
+
         return null;
     }
 
@@ -296,7 +303,9 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
             jugador.Estado,
             jugador.CategoriaId,
             jugador.Categoria?.Nombre,
-            jugador.Activo);
+            jugador.Activo,
+            jugador.PartidosSuspendido,
+            jugador.FechaEstimadaRegreso);
     }
 }
 
@@ -313,7 +322,9 @@ public record JugadorRequest(
     string? PiernaHabil,
     string Estado,
     int CategoriaId,
-    bool? Activo);
+    bool? Activo,
+    int? PartidosSuspendido,
+    DateOnly? FechaEstimadaRegreso);
 
 public record JugadorResponse(
     int JugadorId,
@@ -330,7 +341,9 @@ public record JugadorResponse(
     string Estado,
     int CategoriaId,
     string? CategoriaNombre,
-    bool Activo);
+    bool Activo,
+    int? PartidosSuspendido,
+    DateOnly? FechaEstimadaRegreso);
 
 public record JugadorEstadisticasResponse(
     int Goles,

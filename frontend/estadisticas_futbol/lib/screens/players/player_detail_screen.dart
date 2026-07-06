@@ -358,6 +358,22 @@ class _RealDataTab extends StatelessWidget {
               ),
               _DataRow('Pierna habil', player.dominantFoot ?? '-'),
               _DataRow('Estado', PlayerModel.statusToApi(player.status)),
+              if (player.status == 'suspended') ...[
+                _DataRow(
+                  'Partidos de suspension',
+                  player.partidosSuspendido != null
+                      ? '${player.partidosSuspendido}'
+                      : '-',
+                ),
+              ],
+              if (player.status == 'injured') ...[
+                _DataRow(
+                  'Fecha est. de regreso',
+                  player.fechaEstimadaRegreso != null
+                      ? _formatDate(player.fechaEstimadaRegreso!)
+                      : '-',
+                ),
+              ],
               _DataRow('Activo', player.active ? 'Si' : 'No'),
             ],
           ),

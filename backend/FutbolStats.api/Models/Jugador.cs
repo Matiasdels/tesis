@@ -14,6 +14,8 @@ public class Jugador
     public decimal? PesoKg { get; set; }
     public string? PiernaHabil { get; set; }
     public string Estado { get; set; } = "Disponible";
+    public int? PartidosSuspendido { get; set; }
+    public DateOnly? FechaEstimadaRegreso { get; set; }
     public int CategoriaId { get; set; }
     public Categoria? Categoria { get; set; }
     public bool Activo { get; set; } = true;
