@@ -471,3 +471,25 @@ class PlayerMatchModel {
             json['estadisticas'] as Map<String, dynamic>),
       );
 }
+
+class PlayerObservacionModel {
+  final int observacionId;
+  final String contenido;
+  final DateTime fecha;
+  final String autorNombre;
+
+  const PlayerObservacionModel({
+    required this.observacionId,
+    required this.contenido,
+    required this.fecha,
+    required this.autorNombre,
+  });
+
+  factory PlayerObservacionModel.fromApi(Map<String, dynamic> json) =>
+      PlayerObservacionModel(
+        observacionId: json['observacionId'] as int,
+        contenido: json['contenido'] as String,
+        fecha: DateTime.parse(json['fecha'] as String),
+        autorNombre: json['autorNombre'] as String? ?? '',
+      );
+}

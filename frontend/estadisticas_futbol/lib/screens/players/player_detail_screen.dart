@@ -173,12 +173,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
                 'Todavia no hay registros reales de entrenamientos o carga conectados a este jugador.',
           ),
           _MatchesTab(playerId: player.id),
-          const _PendingTab(
-            icon: Icons.chat_bubble_outline,
-            title: 'Sin observaciones',
-            subtitle:
-                'Todavia no se registraron observaciones reales para este jugador.',
-          ),
+          _ObservationsTab(playerId: player.id),
         ],
       ),
     );
@@ -647,5 +642,302 @@ class _RolBadge extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ─── Observaciones ───────────────────────────────────────────────────────────
+
+class _ObservationsTab extends StatefulWidget {
+  final String playerId;
+
+  const _ObservationsTab({required this.playerId});
+
+  @override
+  State<_ObservationsTab> createState() => _ObservationsTabState();
+}
+
+class _ObservationsTabState extends State<_ObservationsTab>
+    with AutomaticKeepAliveClientMixin {
+  final _api = PlayerApi();
+  List<PlayerObservacionModel> _observations = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      final obs = await _api.getPlayerObservations(widget.playerId, token);
+      if (!mounted) return;
+      setState(() {
+        _observations = obs;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'No pudimos cargar las observaciones.';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openAddSheet() async {
+    final token = context.read<AuthState>().session!.accessToken;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => _AddObservationSheet(
+        onSave: (texto) async {
+          final nueva = await _api.createPlayerObservation(
+              widget.playerId, texto, token);
+          if (!mounted) return;
+          setState(() => _observations.insert(0, nueva));
+          if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Observacion guardada.')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    if (_loading) return const Center(child: CircularProgressIndicator());
+
+    if (_error != null) {
+      return EmptyState(
+        icon: Icons.error_outline,
+        title: 'Algo salio mal',
+        subtitle: _error!,
+        actionLabel: 'Reintentar',
+        onAction: _load,
+      );
+    }
+
+    if (_observations.isEmpty) {
+      return EmptyState(
+        icon: Icons.chat_bubble_outline,
+        title: 'Sin observaciones',
+        subtitle: 'Todavia no hay observaciones para este jugador.',
+        actionLabel: 'Nueva observacion',
+        onAction: _openAddSheet,
+      );
+    }
+
+    return Stack(
+      children: [
+        ListView.separated(
+          padding: const EdgeInsets.fromLTRB(
+            AppConstants.pagePadding,
+            AppConstants.pagePadding,
+            AppConstants.pagePadding,
+            80,
+          ),
+          itemCount: _observations.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          itemBuilder: (_, i) =>
+              _ObservationCard(observation: _observations[i]),
+        ),
+        Positioned(
+          right: AppConstants.pagePadding,
+          bottom: AppConstants.pagePadding,
+          child: FloatingActionButton.small(
+            onPressed: _openAddSheet,
+            backgroundColor: AppColors.accent,
+            foregroundColor: Colors.black,
+            tooltip: 'Nueva observacion',
+            child: const Icon(Icons.add),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddObservationSheet extends StatefulWidget {
+  final Future<void> Function(String texto) onSave;
+
+  const _AddObservationSheet({required this.onSave});
+
+  @override
+  State<_AddObservationSheet> createState() => _AddObservationSheetState();
+}
+
+class _AddObservationSheetState extends State<_AddObservationSheet> {
+  final _controller = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final texto = _controller.text.trim();
+    if (texto.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(texto);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No pudimos guardar la observacion.')),
+        );
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Nueva observacion',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ValueListenableBuilder(
+            valueListenable: _controller,
+            builder: (_, value, __) => TextField(
+              controller: _controller,
+              maxLines: 5,
+              maxLength: 1000,
+              autofocus: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              textCapitalization: TextCapitalization.sentences,
+              style: const TextStyle(
+                  color: AppColors.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Escribi tu observacion aqui...',
+                hintStyle:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                filled: true,
+                fillColor: AppColors.bgMuted,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+                  borderSide: BorderSide.none,
+                ),
+                counterStyle:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(AppConstants.cardRadius),
+                ),
+              ),
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.black),
+                    )
+                  : const Text('Guardar',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ObservationCard extends StatelessWidget {
+  final PlayerObservacionModel observation;
+
+  const _ObservationCard({required this.observation});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                _formatDate(observation.fecha),
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (observation.autorNombre.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '·  ${observation.autorNombre}',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            observation.contenido,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime d) {
+    final day = d.day.toString().padLeft(2, '0');
+    final month = d.month.toString().padLeft(2, '0');
+    return '$day/$month/${d.year}';
   }
 }
