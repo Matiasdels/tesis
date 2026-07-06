@@ -106,6 +106,36 @@ class PlayerApi {
     }
   }
 
+  Future<List<PlayerObservacionModel>> getPlayerObservations(
+      String playerId, String accessToken) async {
+    final response = await _getList(
+        '/api/Jugadores/$playerId/observaciones', accessToken);
+    return response
+        .map((item) =>
+            PlayerObservacionModel.fromApi(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<PlayerObservacionModel> createPlayerObservation(
+      String playerId, String contenido, String accessToken) async {
+    final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/api/Jugadores/$playerId/observaciones');
+    final response = await _client.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({'contenido': contenido}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw PlayerApiException(
+          _friendlyError(response.statusCode, response.body));
+    }
+    return PlayerObservacionModel.fromApi(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<List<PlayerMatchModel>> getPlayerMatches(
       String playerId, String accessToken) async {
     final response = await _getList(

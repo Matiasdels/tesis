@@ -13,6 +13,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
     public DbSet<Alineacion> Alineaciones => Set<Alineacion>();
     public DbSet<TipoEvento> TiposEvento => Set<TipoEvento>();
     public DbSet<EventoPartido> EventosPartido => Set<EventoPartido>();
+    public DbSet<Observacion> Observaciones => Set<Observacion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -115,6 +116,16 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.FechaRegistro).HasDefaultValueSql("SYSDATETIME()");
             entity.HasOne(x => x.Jugador).WithMany().HasForeignKey(x => x.JugadorId).IsRequired(false);
             entity.HasOne(x => x.TipoEvento).WithMany().HasForeignKey(x => x.TipoEventoId);
+        });
+
+        modelBuilder.Entity<Observacion>(entity =>
+        {
+            entity.ToTable("Observaciones");
+            entity.HasKey(x => x.ObservacionId);
+            entity.Property(x => x.Tipo).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Contenido).HasMaxLength(1000).IsRequired();
+            entity.HasOne(x => x.Jugador).WithMany().HasForeignKey(x => x.JugadorId);
+            entity.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.UsuarioId);
         });
     }
 }
