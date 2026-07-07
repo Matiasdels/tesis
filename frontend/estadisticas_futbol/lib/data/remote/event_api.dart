@@ -15,6 +15,11 @@ class EventApi {
     client: _client,
   );
 
+  Future<int> pendingSyncCount() => _syncService.pendingCount();
+
+  Future<SyncResult> syncPendingActions(String accessToken) =>
+      _syncService.syncPendingActions(accessToken);
+
   Future<List<TipoEventoModel>> getTiposEvento(String accessToken) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}/api/Catalogos/tipos-evento');

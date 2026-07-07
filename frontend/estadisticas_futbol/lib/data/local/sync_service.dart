@@ -13,9 +13,10 @@ class SyncService {
   final DatabaseHelper _databaseHelper;
   final http.Client _client;
 
-  Future<int> syncPendingActions(String accessToken) async {
+  Future<SyncResult> syncPendingActions(String accessToken) async {
     final pending = await _databaseHelper.getPendingSyncActions();
     var completed = 0;
+    Object? syncError;
 
     for (final action in pending) {
       try {
@@ -24,20 +25,27 @@ class SyncService {
           await _databaseHelper.markSyncActionCompleted(action.id);
           completed++;
         } else {
+          final error = response.body.isEmpty
+              ? 'HTTP ${response.statusCode}'
+              : response.body;
           await _databaseHelper.markSyncActionFailed(
             action.id,
-            response.body.isEmpty
-                ? 'HTTP ${response.statusCode}'
-                : response.body,
+            error,
           );
+          syncError ??= error;
         }
       } catch (error) {
         await _databaseHelper.markSyncActionFailed(action.id, error);
+        syncError = error;
         break;
       }
     }
 
-    return completed;
+    return SyncResult(
+      completedCount: completed,
+      pendingCount: await _databaseHelper.pendingSyncCount(),
+      error: syncError,
+    );
   }
 
   Future<int> pendingCount() => _databaseHelper.pendingSyncCount();
@@ -66,6 +74,20 @@ class SyncService {
         throw SyncServiceException('Metodo no soportado: ${action.method}');
     }
   }
+}
+
+class SyncResult {
+  final int completedCount;
+  final int pendingCount;
+  final Object? error;
+
+  const SyncResult({
+    required this.completedCount,
+    required this.pendingCount,
+    this.error,
+  });
+
+  bool get hasError => error != null;
 }
 
 class SyncServiceException implements Exception {
