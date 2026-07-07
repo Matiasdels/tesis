@@ -16,7 +16,7 @@ class SyncService {
   Future<SyncResult> syncPendingActions(String accessToken) async {
     final pending = await _databaseHelper.getPendingSyncActions();
     var completed = 0;
-    Object? syncError;
+    String? technicalError;
 
     for (final action in pending) {
       try {
@@ -25,18 +25,20 @@ class SyncService {
           await _databaseHelper.markSyncActionCompleted(action.id);
           completed++;
         } else {
-          final error = response.body.isEmpty
-              ? 'HTTP ${response.statusCode}'
-              : response.body;
+          final error = _formatHttpError(response);
           await _databaseHelper.markSyncActionFailed(
             action.id,
             error,
           );
-          syncError ??= error;
+          technicalError ??= error;
         }
       } catch (error) {
-        await _databaseHelper.markSyncActionFailed(action.id, error);
-        syncError = error;
+        final technicalMessage = _formatException(error);
+        await _databaseHelper.markSyncActionFailed(
+          action.id,
+          technicalMessage,
+        );
+        technicalError = technicalMessage;
         break;
       }
     }
@@ -44,7 +46,7 @@ class SyncService {
     return SyncResult(
       completedCount: completed,
       pendingCount: await _databaseHelper.pendingSyncCount(),
-      error: syncError,
+      technicalError: technicalError,
     );
   }
 
@@ -74,20 +76,36 @@ class SyncService {
         throw SyncServiceException('Metodo no soportado: ${action.method}');
     }
   }
+
+  String _formatHttpError(http.Response response) {
+    final body = response.body.trim();
+    final detail = body.isEmpty ? 'Sin cuerpo de respuesta' : body;
+    return _limitTechnicalError('HTTP ${response.statusCode}: $detail');
+  }
+
+  String _formatException(Object error) =>
+      _limitTechnicalError('${error.runtimeType}: $error');
+
+  String _limitTechnicalError(String value) {
+    const maxLength = 1000;
+    return value.length <= maxLength
+        ? value
+        : '${value.substring(0, maxLength)}...';
+  }
 }
 
 class SyncResult {
   final int completedCount;
   final int pendingCount;
-  final Object? error;
+  final String? technicalError;
 
   const SyncResult({
     required this.completedCount,
     required this.pendingCount,
-    this.error,
+    this.technicalError,
   });
 
-  bool get hasError => error != null;
+  bool get hasError => technicalError != null;
 }
 
 class SyncServiceException implements Exception {
