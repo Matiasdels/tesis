@@ -402,6 +402,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       });
 
       _beginUndo();
+      if (evento.eventoId < 0) _showSavedOnDeviceMessage();
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingEvent = false);
@@ -459,6 +460,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _savingEvent = false;
         _lastRegistered = null;
       });
+      if (assistEvento.eventoId < 0 || goalEvento.eventoId < 0) {
+        _showSavedOnDeviceMessage();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -526,6 +530,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       });
 
       _beginUndo();
+      if (evento.eventoId < 0) _showSavedOnDeviceMessage();
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingEvent = false);
@@ -657,6 +662,19 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       SnackBar(
         content: Text(msg),
         backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSavedOnDeviceMessage() {
+    setState(() => _hasServerConnection = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Evento guardado en el dispositivo. Se actualizará al recuperar la conexión.',
+        ),
+        backgroundColor: AppColors.info,
         behavior: SnackBarBehavior.floating,
       ),
     );
