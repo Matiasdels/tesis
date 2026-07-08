@@ -45,56 +45,91 @@ abstract class AppConstants {
 }
 
 abstract class EventTypes {
-  static const String passOk = 'Pase correcto';
-  static const String passKey = 'Pase clave';
-  static const String passBad = 'Pase incorrecto';
+  // Activos — se pueden registrar
   static const String shot = 'Remate';
+  static const String shotOnTarget = 'Remate al arco';
   static const String goal = 'Gol';
   static const String goalRival = 'Gol rival';
-  static const String recovery = 'Recuperación';
   static const String foul = 'Falta';
+  static const String yellowCard = 'Tarjeta amarilla';
+  static const String redCard = 'Tarjeta roja';
+  static const String recovery = 'Recuperación';
   static const String interception = 'Intercepción';
   static const String cross = 'Centro';
   static const String assist = 'Asistencia';
-  static const String yellowCard = 'Tarjeta amarilla';
-  static const String redCard = 'Tarjeta roja';
   static const String save = 'Atajada';
   static const String corner = 'Corner';
   static const String offside = 'Offside';
   static const String loss = 'Pérdida';
+  static const String passKey = 'Pase clave';
+  static const String penaltyFor = 'Penal a favor';
+  static const String penaltyAgainst = 'Penal en contra';
+
+  // Legacy — solo para mostrar partidos anteriores, no se pueden registrar nuevos
+  static const String passOk = 'Pase correcto';
+  static const String passBad = 'Pase incorrecto';
   static const String tackleOk = 'Entrada exitosa';
   static const String tackleBad = 'Entrada fallida';
 
+  // Todos (incluyendo legacy para compatibilidad de visualización)
   static const List<String> all = [
-    passOk,
-    passBad,
     shot,
+    shotOnTarget,
     goal,
-    recovery,
+    goalRival,
     foul,
+    yellowCard,
+    redCard,
+    recovery,
     interception,
     cross,
     assist,
-    yellowCard,
-    redCard,
     save,
     corner,
     offside,
     loss,
+    passKey,
+    penaltyFor,
+    penaltyAgainst,
+    // legacy
+    passOk,
+    passBad,
     tackleOk,
     tackleBad,
   ];
 
-  // Radial menu — 8 primary events (most common)
-  static const List<String> radialPrimary = [
-    passOk,
-    passBad,
+  // Eventos que se pueden registrar en partidos nuevos
+  static const List<String> registrable = [
     shot,
+    shotOnTarget,
+    goal,
+    goalRival,
+    foul,
+    yellowCard,
+    redCard,
+    recovery,
+    interception,
+    cross,
+    assist,
+    save,
+    corner,
+    offside,
+    loss,
+    passKey,
+    penaltyFor,
+    penaltyAgainst,
+  ];
+
+  // Radial menu — 8 eventos principales
+  static const List<String> radialPrimary = [
+    shot,
+    shotOnTarget,
     goal,
     foul,
+    yellowCard,
     recovery,
-    cross,
-    interception,
+    penaltyFor,
+    penaltyAgainst,
   ];
 }
 

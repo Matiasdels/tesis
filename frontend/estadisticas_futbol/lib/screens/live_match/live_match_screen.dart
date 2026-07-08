@@ -1474,11 +1474,10 @@ class _PitchPainter extends CustomPainter {
 
   static Color colorFor(String type) {
     return switch (type) {
-      EventTypes.passOk => AppColors.accent,
-      EventTypes.passKey => AppColors.accent,
-      EventTypes.passBad => AppColors.danger,
       EventTypes.shot => AppColors.warning,
+      EventTypes.shotOnTarget => const Color(0xFFFF9800),
       EventTypes.goal => const Color(0xFFFFEB3B),
+      EventTypes.goalRival => AppColors.danger,
       EventTypes.foul => AppColors.danger,
       EventTypes.recovery => AppColors.info,
       EventTypes.yellowCard => AppColors.warning,
@@ -1488,6 +1487,12 @@ class _PitchPainter extends CustomPainter {
       EventTypes.corner => AppColors.warning,
       EventTypes.interception => AppColors.info,
       EventTypes.cross => AppColors.textSecondary,
+      EventTypes.penaltyFor => AppColors.accent,
+      EventTypes.penaltyAgainst => AppColors.danger,
+      // legacy — solo visualización
+      EventTypes.passOk => AppColors.accent,
+      EventTypes.passKey => AppColors.accent,
+      EventTypes.passBad => AppColors.danger,
       _ => AppColors.textSecondary,
     };
   }
@@ -1693,23 +1698,15 @@ class _SectorData {
   const _SectorData(this.label, this.eventType, this.icon, this.color);
 }
 
-final _sectors = [
-  const _SectorData(
-      'Pase clave', EventTypes.passKey, Icons.key_rounded, AppColors.accent),
-  const _SectorData(
-      'Pase ✗', EventTypes.passBad, Icons.close_rounded, AppColors.danger),
-  const _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded,
-      AppColors.warning),
-  const _SectorData(
-      'Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
-  const _SectorData(
-      'Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
-  const _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded,
-      AppColors.warning),
-  const _SectorData(
-      'Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
-  _SectorData('Centro', EventTypes.cross, Icons.swap_horiz_rounded,
-      AppColors.textSecondary),
+const _sectors = [
+  _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded, AppColors.warning),
+  _SectorData('Al arco', EventTypes.shotOnTarget, Icons.gps_fixed_rounded, Color(0xFFFF9800)),
+  _SectorData('Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
+  _SectorData('Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
+  _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded, AppColors.warning),
+  _SectorData('Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
+  _SectorData('Penal ✓', EventTypes.penaltyFor, Icons.ads_click_rounded, AppColors.accent),
+  _SectorData('Penal ✗', EventTypes.penaltyAgainst, Icons.block_rounded, AppColors.danger),
 ];
 
 class _RadialOverlay extends StatelessWidget {
@@ -2378,22 +2375,24 @@ class _MoreEventsSheet extends StatelessWidget {
   const _MoreEventsSheet({required this.onSelect});
 
   static const _categories = {
-    'Pase / Distribución': [
-      EventTypes.passOk,
-      EventTypes.passBad,
-      EventTypes.cross,
-      EventTypes.assist,
-    ],
     'Remate / Gol': [
       EventTypes.shot,
+      EventTypes.shotOnTarget,
       EventTypes.goal,
       EventTypes.goalRival,
+    ],
+    'Penales': [
+      EventTypes.penaltyFor,
+      EventTypes.penaltyAgainst,
+    ],
+    'Distribución': [
+      EventTypes.passKey,
+      EventTypes.cross,
+      EventTypes.assist,
     ],
     'Defensivo': [
       EventTypes.recovery,
       EventTypes.interception,
-      EventTypes.tackleOk,
-      EventTypes.tackleBad,
       EventTypes.save,
     ],
     'Infracción': [

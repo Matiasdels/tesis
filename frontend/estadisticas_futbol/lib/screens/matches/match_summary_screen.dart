@@ -667,13 +667,18 @@ class _EventRow extends StatelessWidget {
 
   Color _color(String type) => switch (type) {
         'Gol' => const Color(0xFFFFEB3B),
+        'Gol rival' => AppColors.danger,
         'Remate' => AppColors.warning,
+        'Remate al arco' => const Color(0xFFFF9800),
+        'Penal a favor' => AppColors.accent,
+        'Penal en contra' => AppColors.danger,
         'Falta' => AppColors.danger,
         'Tarjeta amarilla' => AppColors.warning,
         'Tarjeta roja' => AppColors.danger,
         'Recuperación' => AppColors.info,
         'Intercepción' => AppColors.info,
         'Atajada' => AppColors.purple,
+        'Asistencia' => const Color(0xFF67E8F9),
         'Pase correcto' || 'Pase clave' => AppColors.accent,
         _ => AppColors.textMuted,
       };

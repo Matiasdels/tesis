@@ -16,9 +16,14 @@ INSERT INTO Roles (Nombre) VALUES
 
 -- TiposEvento (basado en EventTypes del frontend)
 INSERT INTO TiposEvento (Nombre) VALUES
+    -- Legacy (no disponibles para registro nuevo, se mantienen para historial)
     (N'Pase correcto'),
     (N'Pase incorrecto'),
+    (N'Entrada exitosa'),
+    (N'Entrada fallida'),
+    -- Activos
     (N'Remate'),
+    (N'Remate al arco'),
     (N'Gol'),
     (N'Recuperación'),
     (N'Falta'),
@@ -31,5 +36,6 @@ INSERT INTO TiposEvento (Nombre) VALUES
     (N'Corner'),
     (N'Offside'),
     (N'Pérdida'),
-    (N'Entrada exitosa'),
-    (N'Entrada fallida');
+    (N'Pase clave'),
+    (N'Penal a favor'),
+    (N'Penal en contra');
