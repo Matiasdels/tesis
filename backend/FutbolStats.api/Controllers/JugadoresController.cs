@@ -187,7 +187,7 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
                 new JugadorEstadisticasResponse(
                     evs.Count(e => e.TipoEvento?.Nombre == "Gol"),
                     evs.Count(e => e.TipoEvento?.Nombre == "Asistencia"),
-                    evs.Count(e => e.TipoEvento?.Nombre == "Remate"),
+                    evs.Count(e => e.TipoEvento?.Nombre == "Remate" || e.TipoEvento?.Nombre == "Remate al arco"),
                     evs.Count(e => e.TipoEvento?.Nombre == "Falta"),
                     evs.Count(e => e.TipoEvento?.Nombre == "Tarjeta amarilla"),
                     evs.Count(e => e.TipoEvento?.Nombre == "Tarjeta roja")
