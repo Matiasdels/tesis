@@ -179,7 +179,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadError = e.toString();
+        _loadError =
+            'No se pudo cargar la información del partido. Intentá nuevamente.';
         _loading = false;
       });
     }
@@ -430,7 +431,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     final tipoId = _tipoEventoIds[_pendingEvent];
     if (tipoId == null) {
-      _showError('Tipo de evento "$_pendingEvent" no encontrado en la base de datos.');
+      _showCatalogUpdateError();
       return;
     }
 
@@ -470,7 +471,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingEvent = false);
-      _showError(e.toString());
+      _showEventRegistrationError();
     }
   }
 
@@ -478,7 +479,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     final assistId = _tipoEventoIds[EventTypes.assist];
     final goalId = _tipoEventoIds[EventTypes.goal];
     if (assistId == null || goalId == null) {
-      _showError('Tipos de evento no encontrados en la base de datos.');
+      _showCatalogUpdateError();
       return;
     }
 
@@ -534,7 +535,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _pickingGoalScorer = false;
         _savingEvent = false;
       });
-      _showError(e.toString());
+      _showEventRegistrationError();
     }
   }
 
@@ -559,7 +560,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     final tipoId = _tipoEventoIds[_pendingEvent];
     if (tipoId == null) {
-      _showError('Tipo de evento "$_pendingEvent" no encontrado en la base de datos.');
+      _showCatalogUpdateError();
       return;
     }
 
@@ -598,7 +599,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingEvent = false);
-      _showError(e.toString());
+      _showEventRegistrationError();
     }
   }
 
@@ -729,6 +730,18 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+
+  void _showEventRegistrationError() {
+    _showError(
+      'No se pudo registrar el evento. Revisá la conexión e intentá nuevamente.',
+    );
+  }
+
+  void _showCatalogUpdateError() {
+    _showError(
+      'No se pudo registrar ese evento. Actualizá la información e intentá nuevamente.',
     );
   }
 
