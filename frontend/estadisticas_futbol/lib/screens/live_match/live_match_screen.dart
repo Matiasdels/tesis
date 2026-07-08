@@ -43,6 +43,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   String? _loadError;
   bool _hasServerConnection = true;
   int _pendingSyncCount = 0;
+  bool _syncingPending = false;
 
   // ── Live state ─────────────────────────────────────────────────────────────
   int _minute = 0;
@@ -194,6 +195,52 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     final count = await _eventApi.pendingSyncCount();
     if (!mounted) return;
     setState(() => _pendingSyncCount = count);
+  }
+
+  Future<void> _updatePendingNow() async {
+    if (_syncingPending || _pendingSyncCount == 0) return;
+
+    setState(() => _syncingPending = true);
+
+    try {
+      final result = await _eventApi.syncPendingActions(_token);
+      final events = await _eventApi.getEventos(
+        _matchId,
+        _token,
+        syncPending: false,
+      );
+      final pendingCount = await _eventApi.pendingSyncCount();
+      final homeScore =
+          events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
+      final awayScore = events
+          .where((e) => e.tipoEventoNombre == EventTypes.goalRival)
+          .length;
+
+      if (!mounted) return;
+      setState(() {
+        _events = List.from(events.reversed);
+        _homeScore = homeScore;
+        _awayScore = awayScore;
+        _pendingSyncCount = pendingCount;
+        _syncingPending = false;
+        _hasServerConnection = pendingCount == 0 || result.completedCount > 0;
+      });
+
+      if (pendingCount == 0 && result.completedCount > 0) {
+        _showInfo('Datos actualizados.');
+      } else if (result.completedCount > 0) {
+        _showInfo('Se actualizaron algunos datos. Quedan eventos pendientes.');
+      } else {
+        _showInfo('No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _syncingPending = false;
+        _hasServerConnection = false;
+      });
+      _showInfo('No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
+    }
   }
 
   // ==========================================================================
@@ -685,6 +732,16 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     );
   }
 
+  void _showInfo(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.info,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _showSavedOnDeviceMessage() {
     setState(() => _hasServerConnection = false);
     unawaited(_refreshPendingSyncCount());
@@ -753,6 +810,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               isRunning: _isRunning,
               hasServerConnection: _hasServerConnection,
               pendingSyncCount: _pendingSyncCount,
+              syncingPending: _syncingPending,
+              onUpdatePending: _updatePendingNow,
               finishing: _finishing,
               onToggle: _toggleTimer,
               onBack: _saveProgressAndPop,
@@ -859,8 +918,10 @@ class _TopBar extends StatelessWidget {
   final bool isRunning;
   final bool hasServerConnection;
   final int pendingSyncCount;
+  final bool syncingPending;
   final bool finishing;
   final VoidCallback onToggle, onBack;
+  final VoidCallback onUpdatePending;
   final Future<void> Function() onFinish;
 
   const _TopBar({
@@ -871,9 +932,11 @@ class _TopBar extends StatelessWidget {
     required this.isRunning,
     required this.hasServerConnection,
     required this.pendingSyncCount,
+    required this.syncingPending,
     required this.finishing,
     required this.onToggle,
     required this.onBack,
+    required this.onUpdatePending,
     required this.onFinish,
   });
 
@@ -895,7 +958,11 @@ class _TopBar extends StatelessWidget {
               alignment: WrapAlignment.end,
               children: [
                 if (pendingSyncCount > 0)
-                  _PendingUpdateIndicator(count: pendingSyncCount),
+                  _PendingUpdateIndicator(
+                    count: pendingSyncCount,
+                    syncing: syncingPending,
+                    onUpdate: syncingPending ? null : onUpdatePending,
+                  ),
                 _ConnectionIndicator(
                   hasConnection: hasServerConnection,
                 ),
@@ -1059,8 +1126,14 @@ class _ConnectionIndicator extends StatelessWidget {
 
 class _PendingUpdateIndicator extends StatelessWidget {
   final int count;
+  final bool syncing;
+  final VoidCallback? onUpdate;
 
-  const _PendingUpdateIndicator({required this.count});
+  const _PendingUpdateIndicator({
+    required this.count,
+    required this.syncing,
+    required this.onUpdate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1068,34 +1141,62 @@ class _PendingUpdateIndicator extends StatelessWidget {
         ? '1 evento pendiente'
         : '$count eventos pendientes';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.infoDim,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onUpdate,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.info.withValues(alpha: 0.35),
-          width: 0.5,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.cloud_upload_rounded,
-            size: 12,
-            color: AppColors.info,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              color: AppColors.info,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.infoDim,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.info.withValues(alpha: 0.35),
+              width: 0.5,
             ),
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (syncing)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.info,
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.cloud_upload_rounded,
+                  size: 12,
+                  color: AppColors.info,
+                ),
+              const SizedBox(width: 6),
+              Text(
+                syncing ? 'Actualizando...' : text,
+                style: const TextStyle(
+                  color: AppColors.info,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (!syncing) ...[
+                const SizedBox(width: 8),
+                const Text(
+                  'Actualizar ahora',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
