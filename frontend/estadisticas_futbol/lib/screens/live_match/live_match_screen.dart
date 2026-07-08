@@ -42,6 +42,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   bool _loading = true;
   String? _loadError;
   bool _hasServerConnection = true;
+  int _pendingSyncCount = 0;
 
   // ── Live state ─────────────────────────────────────────────────────────────
   int _minute = 0;
@@ -110,6 +111,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       curve: Curves.easeOut,
     );
     _refreshConnectionStatus();
+    _refreshPendingSyncCount();
   }
 
   @override
@@ -136,6 +138,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _loadError = null;
     });
     unawaited(_refreshConnectionStatus());
+    unawaited(_refreshPendingSyncCount());
     try {
       final token = _token;
       final results = await Future.wait([
@@ -164,6 +167,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       });
 
       if (_isRunning) _startMatchTimer();
+      unawaited(_refreshPendingSyncCount());
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -177,6 +181,12 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     final result = await _healthApi.checkServer();
     if (!mounted) return;
     setState(() => _hasServerConnection = result.canCommunicate);
+  }
+
+  Future<void> _refreshPendingSyncCount() async {
+    final count = await _eventApi.pendingSyncCount();
+    if (!mounted) return;
+    setState(() => _pendingSyncCount = count);
   }
 
   // ==========================================================================
@@ -594,6 +604,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         eventoId: evento.eventoId,
         accessToken: _token,
       );
+      unawaited(_refreshPendingSyncCount());
     } catch (_) {
       // Si falla el DELETE, volvemos a insertar el evento en la lista
       if (mounted) {
@@ -669,6 +680,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
   void _showSavedOnDeviceMessage() {
     setState(() => _hasServerConnection = false);
+    unawaited(_refreshPendingSyncCount());
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
@@ -733,6 +745,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               awayScore: _awayScore,
               isRunning: _isRunning,
               hasServerConnection: _hasServerConnection,
+              pendingSyncCount: _pendingSyncCount,
               finishing: _finishing,
               onToggle: _toggleTimer,
               onBack: _saveProgressAndPop,
@@ -838,6 +851,7 @@ class _TopBar extends StatelessWidget {
   final int minute, homeScore, awayScore;
   final bool isRunning;
   final bool hasServerConnection;
+  final int pendingSyncCount;
   final bool finishing;
   final VoidCallback onToggle, onBack;
   final Future<void> Function() onFinish;
@@ -849,6 +863,7 @@ class _TopBar extends StatelessWidget {
     required this.awayScore,
     required this.isRunning,
     required this.hasServerConnection,
+    required this.pendingSyncCount,
     required this.finishing,
     required this.onToggle,
     required this.onBack,
@@ -867,8 +882,17 @@ class _TopBar extends StatelessWidget {
           const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerRight,
-            child: _ConnectionIndicator(
-              hasConnection: hasServerConnection,
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
+              children: [
+                if (pendingSyncCount > 0)
+                  _PendingUpdateIndicator(count: pendingSyncCount),
+                _ConnectionIndicator(
+                  hasConnection: hasServerConnection,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 6),
@@ -1016,6 +1040,50 @@ class _ConnectionIndicator extends StatelessWidget {
             text,
             style: TextStyle(
               color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingUpdateIndicator extends StatelessWidget {
+  final int count;
+
+  const _PendingUpdateIndicator({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = count == 1
+        ? '1 evento pendiente'
+        : '$count eventos pendientes';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.infoDim,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.info.withValues(alpha: 0.35),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.cloud_upload_rounded,
+            size: 12,
+            color: AppColors.info,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.info,
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
