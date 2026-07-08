@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
+import '../../data/remote/match_api.dart';
 import '../../data/remote/player_api.dart';
 import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
@@ -20,12 +21,16 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _playerApi = PlayerApi();
+  final _matchApi = MatchApi();
 
   bool _showWelcome = true;
   bool _loadingPlayers = true;
+  bool _loadingMatches = true;
   bool _playersLoadRequested = false;
   String? _playersError;
   List<PlayerModel> _players = [];
+  PartidoModel? _nextMatch;
+  PartidoModel? _lastMatch;
   Timer? _welcomeTimer;
 
   @override
@@ -51,8 +56,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     _playersLoadRequested = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadPlayers();
+      if (mounted) _loadAll();
     });
+  }
+
+  Future<void> _loadAll() async {
+    await Future.wait([_loadPlayers(), _loadMatches()]);
   }
 
   Future<void> _loadPlayers() async {
@@ -88,6 +97,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _loadMatches() async {
+    setState(() => _loadingMatches = true);
+
+    try {
+      final token = context.read<AuthState>().session?.accessToken;
+      if (token == null) return;
+
+      final upcoming = await _matchApi.getMatches(
+        accessToken: token,
+        estado: 'Programado',
+      );
+      final finished = await _matchApi.getMatches(
+        accessToken: token,
+        estado: 'Finalizado',
+      );
+
+      upcoming.sort((a, b) => a.fecha.compareTo(b.fecha));
+      finished.sort((a, b) => b.fecha.compareTo(a.fecha));
+
+      if (!mounted) return;
+      setState(() {
+        _nextMatch = upcoming.isNotEmpty ? upcoming.first : null;
+        _lastMatch = finished.isNotEmpty ? finished.first : null;
+        _loadingMatches = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingMatches = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthState>();
@@ -109,7 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
       body: RefreshIndicator(
-        onRefresh: _loadPlayers,
+        onRefresh: _loadAll,
         child: ListView(
           padding: const EdgeInsets.all(AppConstants.pagePadding),
           children: [
@@ -130,11 +170,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onRetry: _loadPlayers,
             ),
             const SizedBox(height: AppConstants.sectionSpacing),
-            const _PendingDataCard(
-              icon: Icons.sports_soccer_outlined,
-              title: 'Partidos',
-              subtitle:
-                  'Crea, consulta y administra los partidos reales desde la seccion Partidos.',
+            _MatchesCard(
+              loading: _loadingMatches,
+              nextMatch: _nextMatch,
+              lastMatch: _lastMatch,
             ),
             const SizedBox(height: AppConstants.sectionSpacing),
             const _PendingDataCard(
@@ -369,6 +408,187 @@ class _PlayerRow extends StatelessWidget {
           ),
           StatusBadge(status: player.status),
         ],
+      ),
+    );
+  }
+}
+
+class _MatchesCard extends StatelessWidget {
+  final bool loading;
+  final PartidoModel? nextMatch;
+  final PartidoModel? lastMatch;
+
+  const _MatchesCard({
+    required this.loading,
+    required this.nextMatch,
+    required this.lastMatch,
+  });
+
+  String _formatDate(DateTime d) {
+    final day = d.day.toString().padLeft(2, '0');
+    final month = d.month.toString().padLeft(2, '0');
+    return '$day/$month/${d.year}';
+  }
+
+  String _score(PartidoModel m) {
+    if (m.golesEquipo == null || m.golesRival == null) return '-';
+    return m.esLocal
+        ? '${m.golesEquipo} - ${m.golesRival}'
+        : '${m.golesRival} - ${m.golesEquipo}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: 'Partidos',
+            action: 'Ver todos',
+            onAction: () => context.go(AppConstants.routeMatches),
+          ),
+          const SizedBox(height: 12),
+          if (loading)
+            const SizedBox(
+              height: 60,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else ...[
+            _MatchRow(
+              label: 'Próximo',
+              match: nextMatch,
+              emptyMessage: 'Sin partidos programados',
+              formatDate: _formatDate,
+              score: _score,
+            ),
+            if (lastMatch != null) ...[
+              const Divider(color: AppColors.borderSubtle, height: 20),
+              _MatchRow(
+                label: 'Último',
+                match: lastMatch,
+                emptyMessage: '',
+                formatDate: _formatDate,
+                score: _score,
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MatchRow extends StatelessWidget {
+  final String label;
+  final PartidoModel? match;
+  final String emptyMessage;
+  final String Function(DateTime) formatDate;
+  final String Function(PartidoModel) score;
+
+  const _MatchRow({
+    required this.label,
+    required this.match,
+    required this.emptyMessage,
+    required this.formatDate,
+    required this.score,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (match == null) {
+      return Row(
+        children: [
+          Container(
+            width: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.bgMuted,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppColors.textMuted,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            emptyMessage,
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ],
+      );
+    }
+
+    final rival = match!.rival;
+    final localLabel = match!.esLocal ? 'Local' : 'Visitante';
+    final scoreStr = label == 'Último' ? score(match!) : null;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => context.push('/matches/${match!.id}'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.accentDim,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'vs $rival',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    '${formatDate(match!.fecha)} · $localLabel · ${match!.tipoCompeticion}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (scoreStr != null)
+              Text(
+                scoreStr,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 16, color: AppColors.textMuted),
+          ],
+        ),
       ),
     );
   }
