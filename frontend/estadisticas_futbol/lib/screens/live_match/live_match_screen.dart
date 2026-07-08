@@ -10,6 +10,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
 import '../../data/remote/event_api.dart';
+import '../../data/remote/health_api.dart';
 import '../../data/remote/match_api.dart';
 import '../../models/models.dart';
 
@@ -30,6 +31,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   // ── APIs ───────────────────────────────────────────────────────────────────
   final _matchApi = MatchApi();
   final _eventApi = EventApi();
+  final _healthApi = HealthApi();
   bool _finishing = false;
 
   // ── Match data (loaded from API) ───────────────────────────────────────────
@@ -39,6 +41,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   List<EventoPartidoModel> _events = [];
   bool _loading = true;
   String? _loadError;
+  bool _hasServerConnection = true;
+  int _pendingSyncCount = 0;
+  bool _syncingPending = false;
 
   // ── Live state ─────────────────────────────────────────────────────────────
   int _minute = 0;
@@ -106,6 +111,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       parent: _radialAnimCtrl,
       curve: Curves.easeOut,
     );
+    _refreshConnectionStatus();
+    _refreshPendingSyncCount();
   }
 
   @override
@@ -131,19 +138,27 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _loading = true;
       _loadError = null;
     });
+    unawaited(_refreshConnectionStatus());
+    unawaited(_refreshPendingSyncCount());
     try {
       final token = _token;
+      await _eventApi.syncPendingActions(token);
       final results = await Future.wait([
         _matchApi.getMatch(_matchId, token),
         _matchApi.getLineup(_matchId, token),
         _eventApi.getTiposEvento(token),
-        _eventApi.getEventos(_matchId, token),
+        _eventApi.getEventos(_matchId, token, syncPending: false),
       ]);
 
       final partido = results[0] as PartidoModel;
       final lineup = results[1] as List<AlineacionEntradaModel>;
       final tipos = results[2] as List<TipoEventoModel>;
       final events = results[3] as List<EventoPartidoModel>;
+      final homeScore =
+          events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
+      final awayScore = events
+          .where((e) => e.tipoEventoNombre == EventTypes.goalRival)
+          .length;
 
       if (!mounted) return;
       setState(() {
@@ -152,19 +167,80 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _tiposEvento = tipos;
         _events = List.from(events.reversed);
         _minute = partido.minutoActual ?? 0;
-        _homeScore = events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
-        _awayScore = events.where((e) => e.tipoEventoNombre == EventTypes.goalRival).length;
+        _homeScore = homeScore;
+        _awayScore = awayScore;
         _isRunning = partido.isEnJuego;
         _loading = false;
       });
 
       if (_isRunning) _startMatchTimer();
+      unawaited(_refreshConnectionStatus());
+      unawaited(_refreshPendingSyncCount());
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadError = e.toString();
+        _loadError =
+            'No se pudo cargar la información del partido. Intentá nuevamente.';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _refreshConnectionStatus() async {
+    final result = await _healthApi.checkServer();
+    if (!mounted) return;
+    setState(() => _hasServerConnection = result.canCommunicate);
+  }
+
+  Future<void> _refreshPendingSyncCount() async {
+    final count = await _eventApi.pendingSyncCount();
+    if (!mounted) return;
+    setState(() => _pendingSyncCount = count);
+  }
+
+  Future<void> _updatePendingNow() async {
+    if (_syncingPending || _pendingSyncCount == 0) return;
+
+    setState(() => _syncingPending = true);
+
+    try {
+      final result = await _eventApi.syncPendingActions(_token);
+      final events = await _eventApi.getEventos(
+        _matchId,
+        _token,
+        syncPending: false,
+      );
+      final pendingCount = await _eventApi.pendingSyncCount();
+      final homeScore =
+          events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
+      final awayScore = events
+          .where((e) => e.tipoEventoNombre == EventTypes.goalRival)
+          .length;
+
+      if (!mounted) return;
+      setState(() {
+        _events = List.from(events.reversed);
+        _homeScore = homeScore;
+        _awayScore = awayScore;
+        _pendingSyncCount = pendingCount;
+        _syncingPending = false;
+        _hasServerConnection = pendingCount == 0 || result.completedCount > 0;
+      });
+
+      if (pendingCount == 0 && result.completedCount > 0) {
+        _showInfo('Datos actualizados.');
+      } else if (result.completedCount > 0) {
+        _showInfo('Se actualizaron algunos datos. Quedan eventos pendientes.');
+      } else {
+        _showInfo('No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _syncingPending = false;
+        _hasServerConnection = false;
+      });
+      _showInfo('No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
     }
   }
 
@@ -355,7 +431,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     final tipoId = _tipoEventoIds[_pendingEvent];
     if (tipoId == null) {
-      _showError('Tipo de evento "$_pendingEvent" no encontrado en la base de datos.');
+      _showCatalogUpdateError();
       return;
     }
 
@@ -391,10 +467,11 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       });
 
       _beginUndo();
+      if (evento.eventoId < 0) _showSavedOnDeviceMessage();
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingEvent = false);
-      _showError(e.toString());
+      _showEventRegistrationError();
     }
   }
 
@@ -402,7 +479,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     final assistId = _tipoEventoIds[EventTypes.assist];
     final goalId = _tipoEventoIds[EventTypes.goal];
     if (assistId == null || goalId == null) {
-      _showError('Tipos de evento no encontrados en la base de datos.');
+      _showCatalogUpdateError();
       return;
     }
 
@@ -448,6 +525,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _savingEvent = false;
         _lastRegistered = null;
       });
+      if (assistEvento.eventoId < 0 || goalEvento.eventoId < 0) {
+        _showSavedOnDeviceMessage();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -455,7 +535,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _pickingGoalScorer = false;
         _savingEvent = false;
       });
-      _showError(e.toString());
+      _showEventRegistrationError();
     }
   }
 
@@ -480,7 +560,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     final tipoId = _tipoEventoIds[_pendingEvent];
     if (tipoId == null) {
-      _showError('Tipo de evento "$_pendingEvent" no encontrado en la base de datos.');
+      _showCatalogUpdateError();
       return;
     }
 
@@ -515,10 +595,11 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       });
 
       _beginUndo();
+      if (evento.eventoId < 0) _showSavedOnDeviceMessage();
     } catch (e) {
       if (!mounted) return;
       setState(() => _savingEvent = false);
-      _showError(e.toString());
+      _showEventRegistrationError();
     }
   }
 
@@ -578,6 +659,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         eventoId: evento.eventoId,
         accessToken: _token,
       );
+      unawaited(_refreshPendingSyncCount());
     } catch (_) {
       // Si falla el DELETE, volvemos a insertar el evento en la lista
       if (mounted) {
@@ -651,6 +733,42 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     );
   }
 
+  void _showEventRegistrationError() {
+    _showError(
+      'No se pudo registrar el evento. Revisá la conexión e intentá nuevamente.',
+    );
+  }
+
+  void _showCatalogUpdateError() {
+    _showError(
+      'No se pudo registrar ese evento. Actualizá la información e intentá nuevamente.',
+    );
+  }
+
+  void _showInfo(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.info,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSavedOnDeviceMessage() {
+    setState(() => _hasServerConnection = false);
+    unawaited(_refreshPendingSyncCount());
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Evento guardado en el dispositivo. Se actualizará al recuperar la conexión.',
+        ),
+        backgroundColor: AppColors.info,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   // ==========================================================================
   //  BUILD
   // ==========================================================================
@@ -703,6 +821,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               homeScore: _homeScore,
               awayScore: _awayScore,
               isRunning: _isRunning,
+              hasServerConnection: _hasServerConnection,
+              pendingSyncCount: _pendingSyncCount,
+              syncingPending: _syncingPending,
+              onUpdatePending: _updatePendingNow,
               finishing: _finishing,
               onToggle: _toggleTimer,
               onBack: _saveProgressAndPop,
@@ -807,8 +929,12 @@ class _TopBar extends StatelessWidget {
   final PartidoModel partido;
   final int minute, homeScore, awayScore;
   final bool isRunning;
+  final bool hasServerConnection;
+  final int pendingSyncCount;
+  final bool syncingPending;
   final bool finishing;
   final VoidCallback onToggle, onBack;
+  final VoidCallback onUpdatePending;
   final Future<void> Function() onFinish;
 
   const _TopBar({
@@ -817,9 +943,13 @@ class _TopBar extends StatelessWidget {
     required this.homeScore,
     required this.awayScore,
     required this.isRunning,
+    required this.hasServerConnection,
+    required this.pendingSyncCount,
+    required this.syncingPending,
     required this.finishing,
     required this.onToggle,
     required this.onBack,
+    required this.onUpdatePending,
     required this.onFinish,
   });
 
@@ -832,6 +962,26 @@ class _TopBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(children: _buildScoreRow()),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
+              children: [
+                if (pendingSyncCount > 0)
+                  _PendingUpdateIndicator(
+                    count: pendingSyncCount,
+                    syncing: syncingPending,
+                    onUpdate: syncingPending ? null : onUpdatePending,
+                  ),
+                _ConnectionIndicator(
+                  hasConnection: hasServerConnection,
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
@@ -944,6 +1094,124 @@ class _TopBar extends StatelessWidget {
             ),
           ),
         ];
+  }
+}
+
+class _ConnectionIndicator extends StatelessWidget {
+  final bool hasConnection;
+
+  const _ConnectionIndicator({required this.hasConnection});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = hasConnection ? AppColors.accent : AppColors.warning;
+    final text = hasConnection ? 'Con conexión' : 'Sin conexión';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingUpdateIndicator extends StatelessWidget {
+  final int count;
+  final bool syncing;
+  final VoidCallback? onUpdate;
+
+  const _PendingUpdateIndicator({
+    required this.count,
+    required this.syncing,
+    required this.onUpdate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = count == 1
+        ? '1 evento pendiente'
+        : '$count eventos pendientes';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onUpdate,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.infoDim,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.info.withValues(alpha: 0.35),
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (syncing)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.info,
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.cloud_upload_rounded,
+                  size: 12,
+                  color: AppColors.info,
+                ),
+              const SizedBox(width: 6),
+              Text(
+                syncing ? 'Actualizando...' : text,
+                style: const TextStyle(
+                  color: AppColors.info,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (!syncing) ...[
+                const SizedBox(width: 8),
+                const Text(
+                  'Actualizar ahora',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
