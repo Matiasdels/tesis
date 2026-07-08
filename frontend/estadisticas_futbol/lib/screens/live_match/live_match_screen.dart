@@ -10,6 +10,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
 import '../../data/remote/event_api.dart';
+import '../../data/remote/health_api.dart';
 import '../../data/remote/match_api.dart';
 import '../../models/models.dart';
 
@@ -30,6 +31,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   // ── APIs ───────────────────────────────────────────────────────────────────
   final _matchApi = MatchApi();
   final _eventApi = EventApi();
+  final _healthApi = HealthApi();
   bool _finishing = false;
 
   // ── Match data (loaded from API) ───────────────────────────────────────────
@@ -39,6 +41,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   List<EventoPartidoModel> _events = [];
   bool _loading = true;
   String? _loadError;
+  bool _hasServerConnection = true;
 
   // ── Live state ─────────────────────────────────────────────────────────────
   int _minute = 0;
@@ -106,6 +109,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       parent: _radialAnimCtrl,
       curve: Curves.easeOut,
     );
+    _refreshConnectionStatus();
   }
 
   @override
@@ -131,6 +135,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _loading = true;
       _loadError = null;
     });
+    unawaited(_refreshConnectionStatus());
     try {
       final token = _token;
       final results = await Future.wait([
@@ -166,6 +171,12 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _loading = false;
       });
     }
+  }
+
+  Future<void> _refreshConnectionStatus() async {
+    final result = await _healthApi.checkServer();
+    if (!mounted) return;
+    setState(() => _hasServerConnection = result.canCommunicate);
   }
 
   // ==========================================================================
@@ -703,6 +714,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               homeScore: _homeScore,
               awayScore: _awayScore,
               isRunning: _isRunning,
+              hasServerConnection: _hasServerConnection,
               finishing: _finishing,
               onToggle: _toggleTimer,
               onBack: _saveProgressAndPop,
@@ -807,6 +819,7 @@ class _TopBar extends StatelessWidget {
   final PartidoModel partido;
   final int minute, homeScore, awayScore;
   final bool isRunning;
+  final bool hasServerConnection;
   final bool finishing;
   final VoidCallback onToggle, onBack;
   final Future<void> Function() onFinish;
@@ -817,6 +830,7 @@ class _TopBar extends StatelessWidget {
     required this.homeScore,
     required this.awayScore,
     required this.isRunning,
+    required this.hasServerConnection,
     required this.finishing,
     required this.onToggle,
     required this.onBack,
@@ -832,6 +846,13 @@ class _TopBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(children: _buildScoreRow()),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _ConnectionIndicator(
+              hasConnection: hasServerConnection,
+            ),
+          ),
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
@@ -944,6 +965,46 @@ class _TopBar extends StatelessWidget {
             ),
           ),
         ];
+  }
+}
+
+class _ConnectionIndicator extends StatelessWidget {
+  final bool hasConnection;
+
+  const _ConnectionIndicator({required this.hasConnection});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = hasConnection ? AppColors.accent : AppColors.warning;
+    final text = hasConnection ? 'Con conexión' : 'Sin conexión';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
