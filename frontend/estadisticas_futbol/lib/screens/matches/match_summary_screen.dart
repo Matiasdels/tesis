@@ -104,7 +104,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
             color: AppColors.textPrimary,
             onPressed: () => context.pop(),
           ),
-          title: const Text(
+          title: Text(
             'Resumen del partido',
             style: TextStyle(
               color: AppColors.textPrimary,
@@ -337,7 +337,7 @@ class _ScoreBanner extends StatelessWidget {
                 match.esLocal
                     ? '$golesOwn  —  $golesRival'
                     : '$golesRival  —  $golesOwn',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 38,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
@@ -379,12 +379,12 @@ class _TeamBadge extends StatelessWidget {
           radius: 22,
           backgroundColor: AppColors.bgMuted,
           child: Text(abbr,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 4),
         Text(name,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             overflow: TextOverflow.ellipsis),
       ],
     );
@@ -435,11 +435,11 @@ class _Row extends StatelessWidget {
           SizedBox(
             width: 120,
             child: Text(label,
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w500)),
           ),
         ],
@@ -491,10 +491,10 @@ class _StatRow extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(label,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ),
               Text('$count',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
             ],
           ),
@@ -587,11 +587,11 @@ class _HighlightSection extends StatelessWidget {
               child: Row(
                 children: [
                   Text("${e.minuto}'",
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
                   const SizedBox(width: 8),
                   Text(e.nombreJugador ?? 'Sin jugador',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
                 ],
               ),
             )),
@@ -615,7 +615,7 @@ class _EventsCard extends StatelessWidget {
           const SectionHeader(title: 'Todos los eventos'),
           const SizedBox(height: 10),
           if (events.isEmpty)
-            const Text('No se registraron eventos en este partido.',
+            Text('No se registraron eventos en este partido.',
                 style: TextStyle(fontSize: 13, color: AppColors.textSecondary))
           else
             ...events.map((e) => _EventRow(event: e)),
@@ -638,7 +638,7 @@ class _EventRow extends StatelessWidget {
           SizedBox(
             width: 32,
             child: Text("${event.minuto}'",
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
           ),
           Container(
@@ -652,10 +652,10 @@ class _EventRow extends StatelessWidget {
           ),
           Expanded(
             child: Text(event.tipoEventoNombre,
-                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
           ),
           Text(event.nombreJugador ?? 'Sin jugador',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         ],
       ),
     );

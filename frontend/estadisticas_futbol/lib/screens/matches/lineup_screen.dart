@@ -288,12 +288,12 @@ class _LineupScreenState extends State<LineupScreen> {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.swap_horiz,
+                      Icon(Icons.swap_horiz,
                           size: 16, color: AppColors.textMuted),
                       const SizedBox(width: 6),
                       Text(
                         'Suplentes (${_suplentes.length})',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -316,10 +316,10 @@ class _LineupScreenState extends State<LineupScreen> {
                     ],
                   ),
                 ),
-                const Divider(color: AppColors.borderSubtle, height: 0.5),
+                Divider(color: AppColors.borderSubtle, height: 0.5),
                 Expanded(
                   child: _suplentes.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             'Sin suplentes seleccionados',
                             style: TextStyle(color: AppColors.textMuted),
@@ -430,14 +430,14 @@ class _LineupScreenState extends State<LineupScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.bgSurface,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back,
+          icon: Icon(Icons.arrow_back,
               color: AppColors.textSecondary),
           onPressed: () => context.pop(false),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Alineación',
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -448,7 +448,7 @@ class _LineupScreenState extends State<LineupScreen> {
             if (_match != null)
               Text(
                 'vs ${_match!.rival}',
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.textSecondary, fontSize: 11),
               ),
           ],
@@ -801,25 +801,25 @@ class _SubstitutesBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Divider(color: AppColors.borderSubtle, height: 0.5),
+            Divider(color: AppColors.borderSubtle, height: 0.5),
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  const Icon(Icons.swap_horiz,
+                  Icon(Icons.swap_horiz,
                       size: 16, color: AppColors.textMuted),
                   const SizedBox(width: 8),
                   Text(
                     count == 0 ? 'Suplentes' : 'Suplentes ($count)',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.keyboard_arrow_up,
+                  Icon(Icons.keyboard_arrow_up,
                       size: 18, color: AppColors.textMuted),
                 ],
               ),
@@ -857,13 +857,13 @@ class _SuplenteTile extends StatelessWidget {
             width: 24,
             height: 24,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.bgMuted,
               shape: BoxShape.circle,
             ),
             child: Text(
               '$number',
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w600),
@@ -878,7 +878,7 @@ class _SuplenteTile extends StatelessWidget {
               children: [
                 Text(
                   player.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -886,7 +886,7 @@ class _SuplenteTile extends StatelessWidget {
                 ),
                 Text(
                   player.position.isNotEmpty ? player.position : '—',
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.textMuted, fontSize: 11),
                 ),
               ],
@@ -895,7 +895,7 @@ class _SuplenteTile extends StatelessWidget {
           if (player.number > 0)
             Text(
               '#${player.number}',
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.textMuted, fontSize: 11),
             ),
           const SizedBox(width: 8),
@@ -964,13 +964,13 @@ class _SubstitutePickerSheetState
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 10),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
             child: Row(
               children: [
-                Icon(Icons.swap_horiz,
+                const Icon(Icons.swap_horiz,
                     size: 18, color: AppColors.accent),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   'Agregar suplente',
                   style: TextStyle(
@@ -987,19 +987,19 @@ class _SubstitutePickerSheetState
             child: TextField(
               autofocus: false,
               onChanged: (v) => setState(() => _query = v),
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 14, color: AppColors.textPrimary),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Buscar jugador...',
                 prefixIcon: Icon(Icons.search,
                     size: 18, color: AppColors.textMuted),
               ),
             ),
           ),
-          const Divider(color: AppColors.borderSubtle, height: 0.5),
+          Divider(color: AppColors.borderSubtle, height: 0.5),
           Expanded(
             child: _available.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text('Sin jugadores disponibles',
                         style: TextStyle(color: AppColors.textMuted)))
                 : ListView.separated(
@@ -1102,7 +1102,7 @@ class _PlayerPickerSheetState extends State<_PlayerPickerSheet> {
                     children: [
                       Text(
                         'Slot $slotLabel',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
@@ -1110,7 +1110,7 @@ class _PlayerPickerSheetState extends State<_PlayerPickerSheet> {
                       ),
                       Text(
                         'Posición esperada: $posLabel',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11, color: AppColors.textMuted),
                       ),
                     ],
@@ -1130,19 +1130,19 @@ class _PlayerPickerSheetState extends State<_PlayerPickerSheet> {
             child: TextField(
               autofocus: false,
               onChanged: (v) => setState(() => _query = v),
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 14, color: AppColors.textPrimary),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Buscar jugador...',
                 prefixIcon: Icon(Icons.search,
                     size: 18, color: AppColors.textMuted),
               ),
             ),
           ),
-          const Divider(color: AppColors.borderSubtle, height: 0.5),
+          Divider(color: AppColors.borderSubtle, height: 0.5),
           Expanded(
             child: _sorted.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text('Sin resultados',
                         style: TextStyle(color: AppColors.textMuted)))
                 : ListView.separated(
@@ -1256,7 +1256,7 @@ class _PlayerPickerTile extends StatelessWidget {
               if (player.number > 0)
                 Text(
                   '#${player.number}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 11, color: AppColors.textMuted),
                 ),
               const SizedBox(width: 6),
@@ -1264,7 +1264,7 @@ class _PlayerPickerTile extends StatelessWidget {
                 const Icon(Icons.check_circle_rounded,
                     color: AppColors.accent, size: 18)
               else
-                const Icon(Icons.chevron_right,
+                Icon(Icons.chevron_right,
                     color: AppColors.textMuted, size: 18),
             ],
           ),

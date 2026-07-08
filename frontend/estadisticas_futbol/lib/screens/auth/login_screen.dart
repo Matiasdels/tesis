@@ -309,7 +309,7 @@ class _Header extends StatelessWidget {
               child: const Icon(Icons.sports_soccer, color: Colors.black),
             ),
             const SizedBox(width: 12),
-            const Text(
+            Text(
               'Kancha',
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -322,7 +322,7 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 18),
         Text(
           registerMode ? 'Crear acceso' : 'Inicio de sesión',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -333,7 +333,7 @@ class _Header extends StatelessWidget {
           registerMode
               ? 'Registrá un usuario para acceder al sistema.'
               : 'Ingresá con tu usuario o email registrado.',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textSecondary,
             fontSize: 13,
           ),

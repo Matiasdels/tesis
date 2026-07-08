@@ -1,6 +1,7 @@
 # Flutter
 frontend/**/build/
 frontend/**/.dart_tool/
+.dart_localappdata/
 frontend/**/.idea/
 frontend/**/*.iml
 frontend/**/.flutter-plugins-dependencies

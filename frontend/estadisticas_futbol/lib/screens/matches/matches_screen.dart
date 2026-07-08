@@ -45,11 +45,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: AppColors.bgSurface,
-        title: const Text(
+        title: Text(
           'Eliminar partido',
           style: TextStyle(color: AppColors.textPrimary),
         ),
-        content: const Text(
+        content: Text(
           '¿Estás seguro de que querés eliminar este partido? '
           'Esta acción ocultará el partido del listado.',
           style: TextStyle(color: AppColors.textSecondary),
@@ -321,7 +321,7 @@ class _MatchTile extends StatelessWidget {
                       Expanded(
                         child: Text(
                           match.rival,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
@@ -335,7 +335,7 @@ class _MatchTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${_formatDate(match.fecha)}  ·  ${match.tipoCompeticion}  ·  ${match.esLocal ? 'Local' : 'Visitante'}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 11,
                     ),
@@ -343,7 +343,7 @@ class _MatchTile extends StatelessWidget {
                   if (match.categoriaNombre != null)
                     Text(
                       match.categoriaNombre!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 10,
                       ),
@@ -351,7 +351,7 @@ class _MatchTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 18),
+            Icon(Icons.chevron_right, color: AppColors.textMuted, size: 18),
           ],
         ),
       ),

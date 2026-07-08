@@ -223,7 +223,7 @@ class _WelcomeCard extends StatelessWidget {
               children: [
                 Text(
                   'Hola, $displayName',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
@@ -351,8 +351,8 @@ class _RosterCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           if (display.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
               child: Center(
                 child: Text(
                   'Todavia no hay jugadores registrados.',
@@ -390,7 +390,7 @@ class _PlayerRow extends StatelessWidget {
               children: [
                 Text(
                   player.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
@@ -398,7 +398,7 @@ class _PlayerRow extends StatelessWidget {
                 ),
                 Text(
                   player.position.isEmpty ? 'Sin posicion' : player.position,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     color: AppColors.textMuted,
                   ),
@@ -463,7 +463,7 @@ class _MatchesCard extends StatelessWidget {
               score: _score,
             ),
             if (lastMatch != null) ...[
-              const Divider(color: AppColors.borderSubtle, height: 20),
+              Divider(color: AppColors.borderSubtle, height: 20),
               _MatchRow(
                 label: 'Último',
                 match: lastMatch,
@@ -508,7 +508,7 @@ class _MatchRow extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 color: AppColors.textMuted,
                 fontWeight: FontWeight.w500,
@@ -519,7 +519,7 @@ class _MatchRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             emptyMessage,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       );
@@ -560,7 +560,7 @@ class _MatchRow extends StatelessWidget {
                 children: [
                   Text(
                     'vs $rival',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
@@ -568,7 +568,7 @@ class _MatchRow extends StatelessWidget {
                   ),
                   Text(
                     '${formatDate(match!.fecha)} · $localLabel · ${match!.tipoCompeticion}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                     ),
@@ -579,14 +579,14 @@ class _MatchRow extends StatelessWidget {
             if (scoreStr != null)
               Text(
                 scoreStr,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
               ),
             const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, size: 16, color: AppColors.textMuted),
+            Icon(Icons.chevron_right, size: 16, color: AppColors.textMuted),
           ],
         ),
       ),
@@ -624,7 +624,7 @@ class _PendingDataCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
                   ),

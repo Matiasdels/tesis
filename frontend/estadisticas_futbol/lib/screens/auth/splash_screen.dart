@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
                   },
                 ),
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'Kancha',
                   style: TextStyle(
                     color: AppColors.textPrimary,
@@ -85,7 +85,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Preparando tu espacio de trabajo',
                   textAlign: TextAlign.center,
                   style: TextStyle(

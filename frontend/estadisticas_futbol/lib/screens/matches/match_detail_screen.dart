@@ -98,9 +98,9 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.bgSurface,
-        title: const Text('Eliminar partido',
+        title: Text('Eliminar partido',
             style: TextStyle(color: AppColors.textPrimary)),
-        content: const Text(
+        content: Text(
           '¿Estás seguro de que querés eliminar este partido? Esta acción no se puede deshacer.',
           style: TextStyle(color: AppColors.textSecondary),
         ),
@@ -168,7 +168,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
           ),
           title: Text(
             match.rival,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -283,13 +283,13 @@ class _DataRow extends StatelessWidget {
           SizedBox(
             width: 110,
             child: Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.textSecondary, fontSize: 12)),
           ),
           Expanded(
             child: Text(
               value.isEmpty ? '-' : value,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -324,8 +324,8 @@ class _LineupCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           if (lineup.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'Todavía no se cargó la alineación.',
                 style: TextStyle(
@@ -359,7 +359,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.textMuted,
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -467,8 +467,8 @@ class _PlayerParticipationCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           if (!s.hasActivity)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
                 'No se registraron eventos para este jugador en este partido.',
                 style: TextStyle(
@@ -548,13 +548,13 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.textSecondary, fontSize: 12),
             ),
           ),
           Text(
             '$value',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -599,7 +599,7 @@ class _PlayerTile extends StatelessWidget {
           Expanded(
             child: Text(
               entry.nombreJugador,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 13,
               ),
@@ -608,7 +608,7 @@ class _PlayerTile extends StatelessWidget {
           if (entry.posicionAsignada != null)
             Text(
               entry.posicionAsignada!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 11,
               ),

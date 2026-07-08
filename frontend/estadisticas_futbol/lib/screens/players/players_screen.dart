@@ -181,8 +181,8 @@ class _FilterBar extends StatelessWidget {
         children: [
           TextField(
             onChanged: onQuery,
-            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-            decoration: const InputDecoration(
+            style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+            decoration: InputDecoration(
               hintText: 'Buscar jugador...',
               prefixIcon: Icon(Icons.search, size: 18, color: AppColors.textMuted),
             ),
@@ -197,7 +197,7 @@ class _FilterBar extends StatelessWidget {
                 _Chip('Lesionados', filterStatus == 'injured', () => onStatus('injured')),
                 _Chip('Suspendidos', filterStatus == 'suspended', () => onStatus('suspended')),
                 const SizedBox(width: 10),
-                const VerticalDivider(color: AppColors.borderDefault, width: 1),
+                VerticalDivider(color: AppColors.borderDefault, width: 1),
                 const SizedBox(width: 10),
                 _Chip('Todas', filterPosition == 'all', () => onPosition('all')),
                 ...PlayerPositions.groups.keys.map((g) =>
@@ -277,7 +277,7 @@ class _PlayerCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(player.name,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -286,7 +286,7 @@ class _PlayerCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text('#${player.number}',
-                              style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                              style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
                         ),
                       ],
                     ),
@@ -294,7 +294,7 @@ class _PlayerCard extends StatelessWidget {
                     Text(
                         '${player.position} · '
                         '${player.hasPerformanceData ? '${player.matchesPlayed} partidos' : '— partidos'}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -328,7 +328,7 @@ class _PlayerCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
+              Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
             ],
           ),
         ),

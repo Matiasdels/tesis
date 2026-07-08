@@ -156,7 +156,7 @@ class _ReportMatchTile extends StatelessWidget {
                           child: Text(
                             match.rival,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
@@ -171,7 +171,7 @@ class _ReportMatchTile extends StatelessWidget {
                     Text(
                       '${_formatDate(match.fecha)} - ${match.tipoCompeticion} - ${match.esLocal ? 'Local' : 'Visitante'}',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 11,
                       ),
@@ -180,7 +180,7 @@ class _ReportMatchTile extends StatelessWidget {
                     Text(
                       match.categoriaNombre ?? 'Sin categoria',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 10,
                       ),
@@ -205,7 +205,7 @@ class _ReportMatchTile extends StatelessWidget {
                       )
                     : const Icon(Icons.picture_as_pdf_rounded, size: 20),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
                 color: AppColors.textMuted,
                 size: 18,

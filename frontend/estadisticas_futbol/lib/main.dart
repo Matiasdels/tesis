@@ -2,16 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:estadisticas_futbol/core/router/app_router.dart';
 import 'package:estadisticas_futbol/core/theme/app_theme.dart';
+import 'package:estadisticas_futbol/core/theme/theme_controller.dart';
 import 'package:estadisticas_futbol/data/remote/auth_state.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const KanchaApp());
+  final themeController = ThemeController();
+  await themeController.initialize();
+
+  runApp(KanchaApp(themeController: themeController));
 }
 
 class KanchaApp extends StatefulWidget {
-  const KanchaApp({super.key});
+  final ThemeController themeController;
+
+  const KanchaApp({super.key, required this.themeController});
 
   @override
   State<KanchaApp> createState() => _KanchaAppState();
@@ -34,13 +40,24 @@ class _KanchaAppState extends State<KanchaApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => _authState,
-      child: MaterialApp.router(
-        title: 'Kancha',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        routerConfig: _router,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: _authState),
+        ChangeNotifierProvider.value(value: widget.themeController),
+      ],
+      child: Consumer<ThemeController>(
+        builder: (context, themeController, _) {
+          return MaterialApp.router(
+            key: ValueKey(themeController.isDarkMode),
+            title: 'Kancha',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode:
+                themeController.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            routerConfig: _router,
+          );
+        },
       ),
     );
   }
