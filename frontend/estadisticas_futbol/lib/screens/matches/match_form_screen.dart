@@ -212,7 +212,7 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                           _fecha == null
                               ? 'Sin definir'
                               : _formatFecha(_fecha!),
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: TextStyle(color: AppColors.textPrimary),
                         ),
                       ),
                     ),
@@ -280,7 +280,7 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                         Expanded(
                           child: Text(
                             _esLocal ? 'Partido de local' : 'Partido de visitante',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
                             ),

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/theme_controller.dart';
 import '../../data/remote/auth_state.dart';
 
 class MainShell extends StatelessWidget {
@@ -21,7 +22,7 @@ class MainShell extends StatelessWidget {
         body: Row(
           children: [
             const _AppSidebar(),
-            const VerticalDivider(width: 0.5, color: AppColors.borderSubtle),
+            VerticalDivider(width: 0.5, color: AppColors.borderSubtle),
             Expanded(child: child),
           ],
         ),
@@ -47,6 +48,11 @@ class MainShell extends StatelessWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'Configuración',
+            onPressed: () => _showSettingsSheet(context),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+          IconButton(
             tooltip: 'Perfil',
             onPressed: () => _showProfileSheet(context),
             icon: const Icon(Icons.account_circle_outlined),
@@ -70,6 +76,172 @@ class MainShell extends StatelessWidget {
       ),
       body: child,
       bottomNavigationBar: const _AppBottomNav(),
+    );
+  }
+}
+
+void _showSettingsSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Configuración',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Consumer<ThemeController>(
+                builder: (context, themeController, _) {
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgSurface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.borderSubtle,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: themeController.isDarkMode
+                                ? AppColors.purpleDim
+                                : AppColors.warningDim,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            themeController.isDarkMode
+                                ? Icons.dark_mode_rounded
+                                : Icons.light_mode_rounded,
+                            color: themeController.isDarkMode
+                                ? AppColors.purple
+                                : AppColors.warning,
+                            size: 21,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tema de la aplicación',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                themeController.isDarkMode
+                                    ? 'Modo noche'
+                                    : 'Modo día',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _ThemeToggle(
+                          isDarkMode: themeController.isDarkMode,
+                          onChanged: themeController.setDarkMode,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _ThemeToggle extends StatelessWidget {
+  final bool isDarkMode;
+  final ValueChanged<bool> onChanged;
+
+  const _ThemeToggle({
+    required this.isDarkMode,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      checked: isDarkMode,
+      label: isDarkMode ? 'Activar modo día' : 'Activar modo noche',
+      child: InkWell(
+        onTap: () => onChanged(!isDarkMode),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          width: 68,
+          height: 36,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color:
+                isDarkMode ? const Color(0xFF2F3157) : const Color(0xFFFFE7A3),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDarkMode
+                  ? AppColors.purple.withValues(alpha: 0.45)
+                  : AppColors.warning.withValues(alpha: 0.55),
+            ),
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            alignment:
+                isDarkMode ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: isDarkMode
+                    ? const Color(0xFF17182E)
+                    : const Color(0xFFFFFFFF),
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x26000000),
+                    blurRadius: 5,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                size: 17,
+                color: isDarkMode ? AppColors.purple : AppColors.warning,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -100,7 +272,7 @@ void _showProfileSheet(BuildContext context) {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Perfil',
                 style: TextStyle(
                   color: AppColors.textPrimary,
@@ -142,7 +314,7 @@ void _showProfileSheet(BuildContext context) {
                         children: [
                           Text(
                             fullName.isEmpty ? 'Usuario' : fullName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -152,7 +324,7 @@ void _showProfileSheet(BuildContext context) {
                           const SizedBox(height: 5),
                           Text(
                             user?.email ?? 'Sesión activa',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12,
                             ),
@@ -200,13 +372,13 @@ void _showProfileSheet(BuildContext context) {
                       label: 'Usuario',
                       value: user?.nombreUsuario ?? '-',
                     ),
-                    const Divider(height: 1, color: AppColors.borderSubtle),
+                    Divider(height: 1, color: AppColors.borderSubtle),
                     _ProfileInfoRow(
                       icon: Icons.admin_panel_settings_outlined,
                       label: 'Rol',
                       value: user?.rol ?? 'Usuario',
                     ),
-                    const Divider(height: 1, color: AppColors.borderSubtle),
+                    Divider(height: 1, color: AppColors.borderSubtle),
                     const _ProfileInfoRow(
                       icon: Icons.verified_user_outlined,
                       label: 'Estado',
@@ -276,7 +448,7 @@ class _ProfileInfoRow extends StatelessWidget {
               width: 82,
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 12,
                   height: 1.0,
@@ -288,7 +460,7 @@ class _ProfileInfoRow extends StatelessWidget {
               child: Text(
                 value,
                 textAlign: TextAlign.right,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -387,7 +559,7 @@ class _SidebarLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: AppColors.borderSubtle, width: 0.5),
         ),
@@ -405,7 +577,7 @@ class _SidebarLogo extends StatelessWidget {
                 const Icon(Icons.sports_soccer, color: Colors.black, size: 18),
           ),
           const SizedBox(width: 10),
-          const Text(
+          Text(
             'Kancha',
             style: TextStyle(
               fontSize: 16,
@@ -434,7 +606,7 @@ class _SidebarSection extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
           child: Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9,
               letterSpacing: 0.8,
               color: AppColors.textMuted,
@@ -512,63 +684,74 @@ class _SidebarUser extends StatelessWidget {
         user == null ? 'Usuario' : '${user.nombre} ${user.apellido}'.trim();
     final role = user?.rol ?? 'Usuario';
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showProfileSheet(context),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: AppColors.borderSubtle, width: 0.5),
-            ),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.purpleDim,
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.purple,
-                    fontWeight: FontWeight.w500,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: AppColors.borderSubtle, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _showProfileSheet(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppColors.purpleDim,
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.purple,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              fullName.isEmpty ? 'Usuario' : fullName,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              role,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fullName.isEmpty ? 'Usuario' : fullName,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      role,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.expand_less,
-                size: 16,
-                color: AppColors.textMuted,
-              ),
-            ],
+            ),
           ),
-        ),
+          IconButton(
+            tooltip: 'Configuración',
+            onPressed: () => _showSettingsSheet(context),
+            icon: const Icon(Icons.settings_outlined),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
       ),
     );
   }
@@ -599,7 +782,7 @@ class _AppBottomNav extends StatelessWidget {
     }
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgSurface,
         border: Border(
           top: BorderSide(color: AppColors.borderSubtle, width: 0.5),

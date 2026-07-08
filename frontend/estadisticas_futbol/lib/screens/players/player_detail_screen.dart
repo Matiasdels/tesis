@@ -217,7 +217,7 @@ class _PlayerHeader extends StatelessWidget {
               children: [
                 Text(
                   player.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
@@ -315,7 +315,7 @@ class _MetaItem extends StatelessWidget {
         const SizedBox(width: 3),
         Text(
           text,
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -408,7 +408,7 @@ class _DataRow extends StatelessWidget {
             width: 130,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 12,
               ),
@@ -417,7 +417,7 @@ class _DataRow extends StatelessWidget {
           Expanded(
             child: Text(
               display,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -552,7 +552,7 @@ class _MatchCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'vs ${match.rival}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -574,7 +574,7 @@ class _MatchCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '${_formatDate(match.fecha)}  ·  ${match.tipoCompeticion}  ·  ${match.esLocal ? 'Local' : 'Visitante'}',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 11,
               ),
@@ -590,7 +590,7 @@ class _MatchCard extends StatelessWidget {
                   const Spacer(),
                   Text(
                     _statsText(match.estadisticas),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textMuted,
                       fontSize: 11,
                     ),
@@ -836,7 +836,7 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Nueva observacion',
             style: TextStyle(
               color: AppColors.textPrimary,
@@ -855,12 +855,12 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
               autocorrect: false,
               enableSuggestions: false,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.textPrimary, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Escribi tu observacion aqui...',
                 hintStyle:
-                    const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                    TextStyle(color: AppColors.textMuted, fontSize: 14),
                 filled: true,
                 fillColor: AppColors.bgMuted,
                 border: OutlineInputBorder(
@@ -868,7 +868,7 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
                   borderSide: BorderSide.none,
                 ),
                 counterStyle:
-                    const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
             ),
           ),
@@ -929,7 +929,7 @@ class _ObservationCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   '·  ${observation.autorNombre}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -940,7 +940,7 @@ class _ObservationCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             observation.contenido,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
               height: 1.45,

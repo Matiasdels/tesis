@@ -20,12 +20,21 @@ class StatCard extends StatelessWidget {
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSubtle, width: 0.5),
+        boxShadow: AppColors.isDarkMode
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x120F172A),
+                  blurRadius: 12,
+                  offset: Offset(0, 3),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(data.label,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           Text(data.value,
@@ -121,6 +130,15 @@ class AppCard extends StatelessWidget {
         color: color ?? AppColors.bgCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSubtle, width: 0.5),
+        boxShadow: AppColors.isDarkMode
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x120F172A),
+                  blurRadius: 12,
+                  offset: Offset(0, 3),
+                ),
+              ],
       ),
       child: child,
     );
@@ -223,13 +241,13 @@ class LabeledDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: AppColors.borderSubtle)),
+        Expanded(child: Divider(color: AppColors.borderSubtle)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text(label,
-              style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+              style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
         ),
-        const Expanded(child: Divider(color: AppColors.borderSubtle)),
+        Expanded(child: Divider(color: AppColors.borderSubtle)),
       ],
     );
   }
@@ -260,7 +278,7 @@ class MetricBarRow extends StatelessWidget {
           SizedBox(
             width: 110,
             child: Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11, color: AppColors.textSecondary)),
           ),
           Expanded(
@@ -321,7 +339,7 @@ class EmptyState extends StatelessWidget {
                 textAlign: TextAlign.center),
             const SizedBox(height: 6),
             Text(subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13, color: AppColors.textSecondary),
                 textAlign: TextAlign.center),
             if (actionLabel != null) ...[
@@ -391,7 +409,7 @@ class PageScaffold extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -404,7 +422,7 @@ class PageScaffold extends StatelessWidget {
                       subtitle!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w500,

@@ -313,7 +313,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                           _birthDate == null
                               ? 'Sin definir'
                               : _formatDate(_birthDate!),
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: TextStyle(color: AppColors.textPrimary),
                         ),
                       ),
                     ),
@@ -438,7 +438,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                                 ? 'Sin definir'
                                 : _formatDate(_fechaEstimadaRegreso!),
                             style:
-                                const TextStyle(color: AppColors.textPrimary),
+                                TextStyle(color: AppColors.textPrimary),
                           ),
                         ),
                       ),

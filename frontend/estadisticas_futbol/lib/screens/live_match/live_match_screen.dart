@@ -84,8 +84,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   int get _matchId => int.tryParse(widget.matchId) ?? 0;
-  String get _token =>
-      context.read<AuthState>().session!.accessToken;
+  String get _token => context.read<AuthState>().session!.accessToken;
 
   Map<String, int> get _tipoEventoIds =>
       {for (final t in _tiposEvento) t.nombre: t.tipoEventoId};
@@ -232,7 +231,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       } else if (result.completedCount > 0) {
         _showInfo('Se actualizaron algunos datos. Quedan eventos pendientes.');
       } else {
-        _showInfo('No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
+        _showInfo(
+            'No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
       }
     } catch (_) {
       if (!mounted) return;
@@ -240,7 +240,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _syncingPending = false;
         _hasServerConnection = false;
       });
-      _showInfo('No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
+      _showInfo(
+          'No se pudo actualizar. Intentá nuevamente cuando vuelva la conexión.');
     }
   }
 
@@ -475,7 +476,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     }
   }
 
-  Future<void> _registerAssistAndGoal(AlineacionEntradaModel? goalscorer) async {
+  Future<void> _registerAssistAndGoal(
+      AlineacionEntradaModel? goalscorer) async {
     final assistId = _tipoEventoIds[EventTypes.assist];
     final goalId = _tipoEventoIds[EventTypes.goal];
     if (assistId == null || goalId == null) {
@@ -678,11 +680,11 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.bgSurface,
-        title: const Text('Finalizar partido',
+        title: Text('Finalizar partido',
             style: TextStyle(color: AppColors.textPrimary)),
         content: Text(
           '¿Confirmás el resultado $_homeScore - $_awayScore?',
-          style: const TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -776,9 +778,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.bgDeep,
-        body: Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -795,7 +797,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                     color: AppColors.danger, size: 48),
                 const SizedBox(height: 16),
                 Text(_loadError!,
-                    style: const TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: AppColors.textSecondary),
                     textAlign: TextAlign.center),
                 const SizedBox(height: 20),
                 ElevatedButton(
@@ -849,8 +851,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                     key: _pitchKey,
                     builder: (ctx, constraints) => GestureDetector(
                       onTapDown: (d) => _handlePitchTapDown(d, constraints),
-                      onPanUpdate:
-                          _showRadial ? _handleRadialDragUpdate : null,
+                      onPanUpdate: _showRadial ? _handleRadialDragUpdate : null,
                       onPanEnd: _showRadial ? _handleRadialDragEnd : null,
                       child: _PitchCanvas(
                         events: _events,
@@ -860,7 +861,6 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                       ),
                     ),
                   ),
-
                   if (_showRadial && _tapLocal != null)
                     _RadialOverlay(
                       center: _tapLocal!,
@@ -871,9 +871,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                       onMoreTap: _openMoreEvents,
                       onDismiss: _closeRadial,
                     ),
-
                   if (!_showRadial && !_showPlayerPicker) const _TapHint(),
-
                   _TimelinePanel(
                     events: _events,
                     isExpanded: _timelineExpanded,
@@ -999,8 +997,8 @@ class _TopBar extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.danger,
                 foregroundColor: Colors.white,
-                textStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600),
+                textStyle:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
@@ -1013,87 +1011,83 @@ class _TopBar extends StatelessWidget {
   }
 
   List<Widget> _buildScoreRow() {
-    final homeTeam =
-        partido.esLocal ? 'Kancha' : partido.rival;
-    final awayTeam =
-        partido.esLocal ? partido.rival : 'Kancha';
+    final homeTeam = partido.esLocal ? 'Kancha' : partido.rival;
+    final awayTeam = partido.esLocal ? partido.rival : 'Kancha';
     final homeAbbr =
         homeTeam.substring(0, math.min(3, homeTeam.length)).toUpperCase();
     final awayAbbr =
         awayTeam.substring(0, math.min(3, awayTeam.length)).toUpperCase();
     return [
       IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+        icon: Icon(Icons.arrow_back_ios_new_rounded,
             size: 18, color: AppColors.textSecondary),
         onPressed: onBack,
         padding: EdgeInsets.zero,
       ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      Expanded(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _TeamChip(abbr: homeAbbr, name: homeTeam, color: AppColors.accent),
+            const SizedBox(width: 10),
+            Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _TeamChip(abbr: homeAbbr, name: homeTeam, color: AppColors.accent),
-                const SizedBox(width: 10),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ScoreBoard(homeScore: homeScore, awayScore: awayScore),
-                    const SizedBox(height: 2),
-                    Text(
-                      partido.tipoCompeticion,
-                      style: const TextStyle(
-                          fontSize: 9,
-                          color: AppColors.textMuted,
-                          letterSpacing: 0.5),
-                    ),
-                  ],
+                _ScoreBoard(homeScore: homeScore, awayScore: awayScore),
+                const SizedBox(height: 2),
+                Text(
+                  partido.tipoCompeticion,
+                  style: TextStyle(
+                      fontSize: 9,
+                      color: AppColors.textMuted,
+                      letterSpacing: 0.5),
                 ),
-                const SizedBox(width: 10),
-                _TeamChip(abbr: awayAbbr, name: awayTeam, color: AppColors.info),
               ],
             ),
-          ),
-          GestureDetector(
-            onTap: onToggle,
-            child: AnimatedContainer(
-              duration: AppConstants.animFast,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isRunning ? AppColors.accentDim : AppColors.bgMuted,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isRunning
-                      ? AppColors.accent.withValues(alpha: 0.45)
-                      : AppColors.borderDefault,
-                  width: 0.5,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isRunning) ...[
-                    _PulsingDot(),
-                    const SizedBox(width: 5),
-                  ] else ...[
-                    const Icon(Icons.pause_rounded,
-                        size: 12, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    "$minute'",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isRunning
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+            const SizedBox(width: 10),
+            _TeamChip(abbr: awayAbbr, name: awayTeam, color: AppColors.info),
+          ],
+        ),
+      ),
+      GestureDetector(
+        onTap: onToggle,
+        child: AnimatedContainer(
+          duration: AppConstants.animFast,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isRunning ? AppColors.accentDim : AppColors.bgMuted,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isRunning
+                  ? AppColors.accent.withValues(alpha: 0.45)
+                  : AppColors.borderDefault,
+              width: 0.5,
             ),
           ),
-        ];
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isRunning) ...[
+                _PulsingDot(),
+                const SizedBox(width: 5),
+              ] else ...[
+                Icon(Icons.pause_rounded,
+                    size: 12, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                "$minute'",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isRunning ? AppColors.accent : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
   }
 }
 
@@ -1150,9 +1144,8 @@ class _PendingUpdateIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = count == 1
-        ? '1 evento pendiente'
-        : '$count eventos pendientes';
+    final text =
+        count == 1 ? '1 evento pendiente' : '$count eventos pendientes';
 
     return Material(
       color: Colors.transparent,
@@ -1198,7 +1191,7 @@ class _PendingUpdateIndicator extends StatelessWidget {
               ),
               if (!syncing) ...[
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Actualizar ahora',
                   style: TextStyle(
                     color: AppColors.textPrimary,
@@ -1230,7 +1223,7 @@ class _ScoreBoard extends StatelessWidget {
       ),
       child: Text(
         '$homeScore : $awayScore',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
@@ -1244,7 +1237,8 @@ class _ScoreBoard extends StatelessWidget {
 class _TeamChip extends StatelessWidget {
   final String abbr, name;
   final Color color;
-  const _TeamChip({required this.abbr, required this.name, required this.color});
+  const _TeamChip(
+      {required this.abbr, required this.name, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1260,8 +1254,7 @@ class _TeamChip extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(name,
-            style: const TextStyle(
-                fontSize: 9, color: AppColors.textSecondary)),
+            style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
       ],
     );
   }
@@ -1346,8 +1339,7 @@ class _QuickBar extends StatelessWidget {
                 child: _UndoChip(seconds: undoSeconds),
               ),
               const SizedBox(width: 6),
-              Container(
-                  width: 0.5, height: 24, color: AppColors.borderDefault),
+              Container(width: 0.5, height: 24, color: AppColors.borderDefault),
               const SizedBox(width: 6),
             ],
             _QChip(
@@ -1369,30 +1361,33 @@ class _QuickBar extends StatelessWidget {
 class _QChip extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
+  final Color? color;
   final bool filled;
   final VoidCallback? onTap;
 
   const _QChip({
     required this.icon,
     required this.label,
-    this.color = AppColors.textSecondary,
+    this.color,
     this.filled = false,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final chipColor = color ?? AppColors.textSecondary;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: filled ? color.withValues(alpha: 0.15) : AppColors.bgMuted,
+          color: filled ? chipColor.withValues(alpha: 0.15) : AppColors.bgMuted,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color:
-                filled ? color.withValues(alpha: 0.4) : AppColors.borderDefault,
+            color: filled
+                ? chipColor.withValues(alpha: 0.4)
+                : AppColors.borderDefault,
             width: 0.5,
           ),
         ),
@@ -1400,13 +1395,12 @@ class _QChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon,
-                size: 13,
-                color: filled ? color : AppColors.textSecondary),
+                size: 13, color: filled ? chipColor : AppColors.textSecondary),
             const SizedBox(width: 5),
             Text(label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: filled ? color : AppColors.textSecondary,
+                  color: filled ? chipColor : AppColors.textSecondary,
                 )),
           ],
         ),
@@ -1509,7 +1503,8 @@ class _PitchPainter extends CustomPainter {
       final y = i * h / nStripes;
       canvas.drawRect(
         Rect.fromLTWH(0, y, w, h / nStripes),
-        Paint()..color = i.isEven ? AppColors.pitchGreen : AppColors.pitchGreenAlt,
+        Paint()
+          ..color = i.isEven ? AppColors.pitchGreen : AppColors.pitchGreenAlt,
       );
     }
 
@@ -1538,7 +1533,8 @@ class _PitchPainter extends CustomPainter {
     lp.strokeWidth = 0.8;
     canvas.drawLine(Offset(padH, h / 2), Offset(w - padH, h / 2), lp);
     canvas.drawCircle(Offset(w / 2, h / 2), innerW * 0.15, lp);
-    canvas.drawCircle(Offset(w / 2, h / 2), 3, Paint()..color = AppColors.pitchLine);
+    canvas.drawCircle(
+        Offset(w / 2, h / 2), 3, Paint()..color = AppColors.pitchLine);
 
     // Real proportions (FIFA):
     // Penalty area: 40.32m wide / 68m pitch = 0.593; 16.5m deep / 52.5m half = 0.314
@@ -1547,47 +1543,59 @@ class _PitchPainter extends CustomPainter {
     // Penalty spot: 11m / 52.5m = 0.21 of half-length from goal line
     // Arc radius:   9.15m / 52.5m = 0.174 of half-length
 
-    final paW    = innerW * 0.59;
-    final paD    = halfH  * 0.31;
-    final gaW    = innerW * 0.27;
-    final gaD    = halfH  * 0.105;
-    final goalW  = innerW * 0.18;
-    const goalH  = 10.0;
-    final arcR   = halfH  * 0.22; // slightly larger for visibility
+    final paW = innerW * 0.59;
+    final paD = halfH * 0.31;
+    final gaW = innerW * 0.27;
+    final gaD = halfH * 0.105;
+    final goalW = innerW * 0.18;
+    const goalH = 10.0;
+    final arcR = halfH * 0.22; // slightly larger for visibility
 
-    final paL    = (w - paW) / 2;
-    final paR    = paL + paW;
-    final gaL    = (w - gaW) / 2;
-    final gaR    = gaL + gaW;
-    final goalL  = (w - goalW) / 2;
-    final goalR  = goalL + goalW;
+    final paL = (w - paW) / 2;
+    final paR = paL + paW;
+    final gaL = (w - gaW) / 2;
+    final gaR = gaL + gaW;
+    final goalL = (w - goalW) / 2;
+    final goalR = goalL + goalW;
 
     // ── TOP GOAL ─────────────────────────────────────────────────────────────
-    final paTopBot  = padV + paD;
-    final topSpotY  = padV + halfH * 0.21;
+    final paTopBot = padV + paD;
+    final topSpotY = padV + halfH * 0.21;
 
-    canvas.drawRect(Rect.fromLTRB(paL, padV, paR, paTopBot), lp..strokeWidth = 1.0);
-    canvas.drawRect(Rect.fromLTRB(gaL, padV, gaR, padV + gaD), lp..strokeWidth = 0.7);
-    canvas.drawRect(Rect.fromLTRB(goalL, padV - goalH, goalR, padV), lp..strokeWidth = 1.2);
-    canvas.drawCircle(Offset(w / 2, topSpotY), 2, Paint()..color = AppColors.pitchLine);
+    canvas.drawRect(
+        Rect.fromLTRB(paL, padV, paR, paTopBot), lp..strokeWidth = 1.0);
+    canvas.drawRect(
+        Rect.fromLTRB(gaL, padV, gaR, padV + gaD), lp..strokeWidth = 0.7);
+    canvas.drawRect(
+        Rect.fromLTRB(goalL, padV - goalH, goalR, padV), lp..strokeWidth = 1.2);
+    canvas.drawCircle(
+        Offset(w / 2, topSpotY), 2, Paint()..color = AppColors.pitchLine);
 
     // Arc: only the portion below paTopBot (outside the penalty area)
     final topRatio = (paTopBot - topSpotY).clamp(-arcR, arcR) / arcR;
     final topStart = math.asin(topRatio);
     final topSweep = math.pi - 2 * topStart;
     canvas.drawArc(
-      Rect.fromCenter(center: Offset(w / 2, topSpotY), width: arcR * 2, height: arcR * 2),
-      topStart, topSweep, false, lp..strokeWidth = 0.7,
+      Rect.fromCenter(
+          center: Offset(w / 2, topSpotY), width: arcR * 2, height: arcR * 2),
+      topStart,
+      topSweep,
+      false,
+      lp..strokeWidth = 0.7,
     );
 
     // ── BOTTOM GOAL ──────────────────────────────────────────────────────────
-    final paBotTop  = h - padV - paD;
-    final botSpotY  = h - padV - halfH * 0.21;
+    final paBotTop = h - padV - paD;
+    final botSpotY = h - padV - halfH * 0.21;
 
-    canvas.drawRect(Rect.fromLTRB(paL, paBotTop, paR, h - padV), lp..strokeWidth = 1.0);
-    canvas.drawRect(Rect.fromLTRB(gaL, h - padV - gaD, gaR, h - padV), lp..strokeWidth = 0.7);
-    canvas.drawRect(Rect.fromLTRB(goalL, h - padV, goalR, h - padV + goalH), lp..strokeWidth = 1.2);
-    canvas.drawCircle(Offset(w / 2, botSpotY), 2, Paint()..color = AppColors.pitchLine);
+    canvas.drawRect(
+        Rect.fromLTRB(paL, paBotTop, paR, h - padV), lp..strokeWidth = 1.0);
+    canvas.drawRect(Rect.fromLTRB(gaL, h - padV - gaD, gaR, h - padV),
+        lp..strokeWidth = 0.7);
+    canvas.drawRect(Rect.fromLTRB(goalL, h - padV, goalR, h - padV + goalH),
+        lp..strokeWidth = 1.2);
+    canvas.drawCircle(
+        Offset(w / 2, botSpotY), 2, Paint()..color = AppColors.pitchLine);
 
     // Arc: only the portion above paBotTop (outside the penalty area)
     final botRatio = (botSpotY - paBotTop).clamp(-arcR, arcR) / arcR;
@@ -1595,21 +1603,28 @@ class _PitchPainter extends CustomPainter {
     final botStart = math.pi + botArcSin;
     final botSweep = math.pi - 2 * botArcSin;
     canvas.drawArc(
-      Rect.fromCenter(center: Offset(w / 2, botSpotY), width: arcR * 2, height: arcR * 2),
-      botStart, botSweep, false, lp..strokeWidth = 0.7,
+      Rect.fromCenter(
+          center: Offset(w / 2, botSpotY), width: arcR * 2, height: arcR * 2),
+      botStart,
+      botSweep,
+      false,
+      lp..strokeWidth = 0.7,
     );
 
     // ── CORNER ARCS ──────────────────────────────────────────────────────────
     const cR = 7.0;
     for (final (cx, cy, start) in [
-      (padH,     padV,     0.0),
-      (w - padH, padV,     math.pi / 2),
-      (padH,     h - padV, -math.pi / 2),
+      (padH, padV, 0.0),
+      (w - padH, padV, math.pi / 2),
+      (padH, h - padV, -math.pi / 2),
       (w - padH, h - padV, math.pi),
     ]) {
       canvas.drawArc(
         Rect.fromCenter(center: Offset(cx, cy), width: cR * 2, height: cR * 2),
-        start, math.pi / 2, false, lp..strokeWidth = 0.8,
+        start,
+        math.pi / 2,
+        false,
+        lp..strokeWidth = 0.8,
       );
     }
   }
@@ -1634,15 +1649,21 @@ class _PitchPainter extends CustomPainter {
 
   void _drawDot(Canvas canvas, Offset center, Color color) {
     canvas.drawCircle(
-      center, 10,
+      center,
+      10,
       Paint()
         ..color = color.withValues(alpha: 0.18)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
-    canvas.drawCircle(center, 4.5,
-        Paint()..color = color..style = PaintingStyle.fill);
     canvas.drawCircle(
-      center, 4.5,
+        center,
+        4.5,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill);
+    canvas.drawCircle(
+      center,
+      4.5,
       Paint()
         ..color = Colors.black.withValues(alpha: 0.35)
         ..style = PaintingStyle.stroke
@@ -1667,15 +1688,23 @@ class _SectorData {
   const _SectorData(this.label, this.eventType, this.icon, this.color);
 }
 
-const _sectors = [
-  _SectorData('Pase clave', EventTypes.passKey, Icons.key_rounded, AppColors.accent),
-  _SectorData('Pase ✗', EventTypes.passBad, Icons.close_rounded, AppColors.danger),
-  _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded, AppColors.warning),
-  _SectorData('Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
-  _SectorData('Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
-  _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded, AppColors.warning),
-  _SectorData('Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
-  _SectorData('Centro', EventTypes.cross, Icons.swap_horiz_rounded, AppColors.textSecondary),
+final _sectors = [
+  const _SectorData(
+      'Pase clave', EventTypes.passKey, Icons.key_rounded, AppColors.accent),
+  const _SectorData(
+      'Pase ✗', EventTypes.passBad, Icons.close_rounded, AppColors.danger),
+  const _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded,
+      AppColors.warning),
+  const _SectorData(
+      'Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
+  const _SectorData(
+      'Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
+  const _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded,
+      AppColors.warning),
+  const _SectorData(
+      'Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
+  _SectorData('Centro', EventTypes.cross, Icons.swap_horiz_rounded,
+      AppColors.textSecondary),
 ];
 
 class _RadialOverlay extends StatelessWidget {
@@ -1785,10 +1814,12 @@ class _RadialMenu extends StatelessWidget {
                       width: isHovered ? 1.5 : 0.5,
                     ),
                     boxShadow: isHovered
-                        ? [BoxShadow(
-                            color: s.color.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            spreadRadius: 1)]
+                        ? [
+                            BoxShadow(
+                                color: s.color.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                spreadRadius: 1)
+                          ]
                         : null,
                   ),
                   child: Column(
@@ -1800,9 +1831,8 @@ class _RadialMenu extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 8,
                             color: s.color,
-                            fontWeight: isHovered
-                                ? FontWeight.w600
-                                : FontWeight.w500,
+                            fontWeight:
+                                isHovered ? FontWeight.w600 : FontWeight.w500,
                           ),
                           textAlign: TextAlign.center),
                     ],
@@ -1823,10 +1853,9 @@ class _RadialMenu extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.bgSurface,
                   shape: BoxShape.circle,
-                  border:
-                      Border.all(color: AppColors.borderStrong, width: 1.0),
+                  border: Border.all(color: AppColors.borderStrong, width: 1.0),
                 ),
-                child: const Column(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.more_horiz_rounded,
@@ -1855,27 +1884,31 @@ class _RadialRingPainter extends CustomPainter {
     const outerR = AppConstants.radialMenuRadius;
     const innerR = AppConstants.radialCenterRadius + 4.0;
 
-    canvas.drawCircle(center, outerR,
-        Paint()..color = Colors.black.withValues(alpha: 0.45));
+    canvas.drawCircle(
+        center, outerR, Paint()..color = Colors.black.withValues(alpha: 0.45));
 
     if (hoveredSector >= 0) {
       const n = 8;
       const segAngle = 2 * math.pi / n;
-      final startAngle =
-          hoveredSector * segAngle - math.pi / 2 - segAngle / 2;
+      final startAngle = hoveredSector * segAngle - math.pi / 2 - segAngle / 2;
       final color = _sectors[hoveredSector].color;
 
       final path = Path()
         ..moveTo(center.dx, center.dy)
-        ..arcTo(Rect.fromCircle(center: center, radius: outerR),
-            startAngle, segAngle, false)
+        ..arcTo(Rect.fromCircle(center: center, radius: outerR), startAngle,
+            segAngle, false)
         ..close();
 
-      canvas.drawPath(path,
-          Paint()..color = color.withValues(alpha: 0.22)..style = PaintingStyle.fill);
+      canvas.drawPath(
+          path,
+          Paint()
+            ..color = color.withValues(alpha: 0.22)
+            ..style = PaintingStyle.fill);
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: outerR),
-        startAngle, segAngle, false,
+        startAngle,
+        segAngle,
+        false,
         Paint()
           ..color = color.withValues(alpha: 0.6)
           ..style = PaintingStyle.stroke
@@ -1883,8 +1916,12 @@ class _RadialRingPainter extends CustomPainter {
       );
     }
 
-    canvas.drawCircle(center, innerR,
-        Paint()..color = AppColors.bgDeep..blendMode = BlendMode.srcOver);
+    canvas.drawCircle(
+        center,
+        innerR,
+        Paint()
+          ..color = AppColors.bgDeep
+          ..blendMode = BlendMode.srcOver);
 
     final divPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.08)
@@ -1926,15 +1963,15 @@ class _TapHint extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.borderDefault, width: 0.5),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.touch_app_rounded,
                   size: 13, color: AppColors.textMuted),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text('Toca la cancha para registrar un evento',
-                  style: TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary)),
+                  style:
+                      TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
         ),
@@ -1993,8 +2030,8 @@ class _TimelinePanel extends StatelessWidget {
                   RotatedBox(
                     quarterTurns: 3,
                     child: Text('${events.length}',
-                        style: const TextStyle(
-                            fontSize: 9, color: AppColors.textMuted)),
+                        style:
+                            TextStyle(fontSize: 9, color: AppColors.textMuted)),
                   ),
                 ],
               ),
@@ -2012,13 +2049,12 @@ class _TimelinePanel extends StatelessWidget {
                       children: [
                         Container(
                           padding: const EdgeInsets.fromLTRB(10, 10, 6, 6),
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             border: Border(
                                 bottom: BorderSide(
-                                    color: AppColors.borderSubtle,
-                                    width: 0.5)),
+                                    color: AppColors.borderSubtle, width: 0.5)),
                           ),
-                          child: const Text('Eventos',
+                          child: Text('Eventos',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
@@ -2026,7 +2062,7 @@ class _TimelinePanel extends StatelessWidget {
                         ),
                         Expanded(
                           child: events.isEmpty
-                              ? const Center(
+                              ? Center(
                                   child: Text('Sin eventos',
                                       style: TextStyle(
                                           fontSize: 11,
@@ -2080,16 +2116,15 @@ class _MiniEventRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
                 Text(event.nombreJugador ?? 'Sin jugador',
-                    style: const TextStyle(
-                        fontSize: 9, color: AppColors.textSecondary),
+                    style:
+                        TextStyle(fontSize: 9, color: AppColors.textSecondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
           Text("${event.minuto}'",
-              style:
-                  const TextStyle(fontSize: 9, color: AppColors.textMuted)),
+              style: TextStyle(fontSize: 9, color: AppColors.textMuted)),
         ],
       ),
     );
@@ -2139,7 +2174,7 @@ class _PlayerPicker extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
                   bottom:
                       BorderSide(color: AppColors.borderSubtle, width: 0.5)),
@@ -2148,8 +2183,8 @@ class _PlayerPicker extends StatelessWidget {
               children: [
                 Text(
                   pickingGoalScorer ? '¿Quién hizo el gol?' : 'Registrando:',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
                 const SizedBox(width: 8),
                 Container(
@@ -2173,15 +2208,13 @@ class _PlayerPicker extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     '(asistencia: $assisterName)',
-                    style: const TextStyle(
-                        fontSize: 10, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 10, color: AppColors.textMuted),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
                 const Spacer(),
                 Text("$minute'",
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
                 const SizedBox(width: 8),
                 if (saving)
                   const SizedBox(
@@ -2191,7 +2224,7 @@ class _PlayerPicker extends StatelessWidget {
                 else
                   GestureDetector(
                     onTap: onDismiss,
-                    child: const Icon(Icons.close_rounded,
+                    child: Icon(Icons.close_rounded,
                         size: 18, color: AppColors.textMuted),
                   ),
               ],
@@ -2272,15 +2305,14 @@ class _PlayerCell extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 surname,
-                style: const TextStyle(
-                    fontSize: 9, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
                 player.posicionAsignada ?? '',
-                style: const TextStyle(fontSize: 8, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 8, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -2309,7 +2341,7 @@ class _NoPlayerCell extends StatelessWidget {
             border: Border.all(
                 color: AppColors.textMuted.withValues(alpha: 0.4), width: 0.5),
           ),
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
@@ -2318,11 +2350,10 @@ class _NoPlayerCell extends StatelessWidget {
                 child: Icon(Icons.person_off_rounded,
                     size: 14, color: AppColors.textMuted),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'Sin\njugador',
-                style:
-                    TextStyle(fontSize: 9, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 9, color: AppColors.textMuted),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -2390,8 +2421,8 @@ class _MoreEventsSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 10),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
             child: Row(
               children: [
                 Text('Todos los eventos',
@@ -2402,7 +2433,7 @@ class _MoreEventsSheet extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(color: AppColors.borderSubtle, height: 0.5),
+          Divider(color: AppColors.borderSubtle, height: 0.5),
           Expanded(
             child: ListView(
               controller: controller,
@@ -2414,7 +2445,7 @@ class _MoreEventsSheet extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 12, bottom: 6),
                       child: Text(entry.key.toUpperCase(),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 9,
                               letterSpacing: 0.8,
                               color: AppColors.textMuted,
@@ -2487,7 +2518,7 @@ class _FullTimeline extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
             child: Row(
               children: [
-                const Text('Timeline de eventos',
+                Text('Timeline de eventos',
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
@@ -2501,16 +2532,16 @@ class _FullTimeline extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text('${events.length} eventos',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11, color: AppColors.textSecondary)),
                 ),
               ],
             ),
           ),
-          const Divider(color: AppColors.borderSubtle, height: 0.5),
+          Divider(color: AppColors.borderSubtle, height: 0.5),
           Expanded(
             child: events.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text('No hay eventos registrados',
                         style: TextStyle(
                             fontSize: 13, color: AppColors.textSecondary)))
@@ -2587,8 +2618,9 @@ class _FullTimeline extends StatelessWidget {
                                                   fontWeight: FontWeight.w500,
                                                   color: color)),
                                           const SizedBox(height: 2),
-                                          Text(ev.nombreJugador ?? 'Sin jugador',
-                                              style: const TextStyle(
+                                          Text(
+                                              ev.nombreJugador ?? 'Sin jugador',
+                                              style: TextStyle(
                                                   fontSize: 12,
                                                   color:
                                                       AppColors.textSecondary)),
@@ -2599,7 +2631,7 @@ class _FullTimeline extends StatelessWidget {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(_zone(ev.pitchX),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 9,
                                                 color: AppColors.textMuted)),
                                         Container(
