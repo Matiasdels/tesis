@@ -141,17 +141,23 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     unawaited(_refreshPendingSyncCount());
     try {
       final token = _token;
+      await _eventApi.syncPendingActions(token);
       final results = await Future.wait([
         _matchApi.getMatch(_matchId, token),
         _matchApi.getLineup(_matchId, token),
         _eventApi.getTiposEvento(token),
-        _eventApi.getEventos(_matchId, token),
+        _eventApi.getEventos(_matchId, token, syncPending: false),
       ]);
 
       final partido = results[0] as PartidoModel;
       final lineup = results[1] as List<AlineacionEntradaModel>;
       final tipos = results[2] as List<TipoEventoModel>;
       final events = results[3] as List<EventoPartidoModel>;
+      final homeScore =
+          events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
+      final awayScore = events
+          .where((e) => e.tipoEventoNombre == EventTypes.goalRival)
+          .length;
 
       if (!mounted) return;
       setState(() {
@@ -160,13 +166,14 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _tiposEvento = tipos;
         _events = List.from(events.reversed);
         _minute = partido.minutoActual ?? 0;
-        _homeScore = events.where((e) => e.tipoEventoNombre == EventTypes.goal).length;
-        _awayScore = events.where((e) => e.tipoEventoNombre == EventTypes.goalRival).length;
+        _homeScore = homeScore;
+        _awayScore = awayScore;
         _isRunning = partido.isEnJuego;
         _loading = false;
       });
 
       if (_isRunning) _startMatchTimer();
+      unawaited(_refreshConnectionStatus());
       unawaited(_refreshPendingSyncCount());
     } catch (e) {
       if (!mounted) return;

@@ -48,11 +48,15 @@ class EventApi {
   Future<List<EventoPartidoModel>> getEventos(
     int partidoId,
     String accessToken,
-  ) async {
-    try {
-      await _syncService.syncPendingActions(accessToken);
-    } catch (_) {
-      // Si no hay conexion, se usan los eventos cacheados debajo.
+  {
+    bool syncPending = true,
+  }) async {
+    if (syncPending) {
+      try {
+        await _syncService.syncPendingActions(accessToken);
+      } catch (_) {
+        // Si no hay conexion, se usan los eventos cacheados debajo.
+      }
     }
 
     try {
