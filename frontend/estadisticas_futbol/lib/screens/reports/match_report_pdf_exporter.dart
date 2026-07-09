@@ -20,28 +20,96 @@ class _MatchStats {
   int _countIn(List<EventoPartidoModel> evs, String type) =>
       evs.where((e) => e.tipoEventoNombre == type).length;
 
+  // ── Conteos base ──────────────────────────────────────────────────────────
   late final goles = _count(EventTypes.goal);
   late final golesRival = _count(EventTypes.goalRival);
-  late final remates = _count(EventTypes.shot);
-  late final rematesAlArco = _count(EventTypes.shotOnTarget);
-  late final totalRemates = remates + rematesAlArco;
+  // Remate = disparo que no va al arco; Remate al arco = disparo salvado;
+  // Los goles también son remates al arco — se suman en las métricas derivadas.
+  late final rematesMisses = _count(EventTypes.shot);
+  late final rematesSalvados = _count(EventTypes.shotOnTarget);
   late final asistencias = _count(EventTypes.assist);
+  late final pasesClaves = _count(EventTypes.passKey);
+  late final centros = _count(EventTypes.cross);
   late final corners = _count(EventTypes.corner);
+  late final penalesAFavor = _count(EventTypes.penaltyFor);
+  late final penalesEnContra = _count(EventTypes.penaltyAgainst);
   late final recuperaciones = _count(EventTypes.recovery);
   late final intercepciones = _count(EventTypes.interception);
+  late final atajadas = _count(EventTypes.save);
   late final perdidas = _count(EventTypes.loss);
   late final faltas = _count(EventTypes.foul);
   late final amarillas = _count(EventTypes.yellowCard);
   late final rojas = _count(EventTypes.redCard);
 
+  // ── Métricas ofensivas derivadas ─────────────────────────────────────────
+  // Remates totales = errados + salvados + goles
+  late final totalRemates = rematesMisses + rematesSalvados + goles;
+  // Remates al arco reales = salvados + goles (todos los que fueron al palo)
+  late final rematesAlArcoReales = rematesSalvados + goles;
+  // Generación ofensiva = acciones que crean oportunidades
+  late final generacionOfensiva =
+      pasesClaves + centros + corners + penalesAFavor + asistencias;
+
+  // ── Métricas defensivas derivadas ────────────────────────────────────────
+  late final accionesDefensivasPositivas =
+      recuperaciones + intercepciones + atajadas;
+  late final balanceDefensivo = recuperaciones + intercepciones - perdidas;
+
+  // ── Disciplina ───────────────────────────────────────────────────────────
+  late final indiceDisciplinario = faltas + amarillas * 2 + rojas * 5;
+  late final labelDisciplina = indiceDisciplinario == 0
+      ? 'Sin incidentes disciplinarios'
+      : indiceDisciplinario <= 5
+          ? 'Bajo riesgo disciplinario'
+          : indiceDisciplinario <= 12
+              ? 'Riesgo disciplinario moderado'
+              : 'Alto riesgo disciplinario';
+
+  // ── Por tiempo ───────────────────────────────────────────────────────────
   late final firstHalf = events.where((e) => e.minuto <= 45).toList();
   late final secondHalf = events.where((e) => e.minuto > 45).toList();
 
   int firstHalfCount(String type) => _countIn(firstHalf, type);
   int secondHalfCount(String type) => _countIn(secondHalf, type);
 
-  late final bool hasIndicadores = totalRemates > 0 || perdidas > 0;
+  int get firstHalfTotalRemates =>
+      firstHalfCount(EventTypes.shot) +
+      firstHalfCount(EventTypes.shotOnTarget) +
+      firstHalfCount(EventTypes.goal);
+  int get secondHalfTotalRemates =>
+      secondHalfCount(EventTypes.shot) +
+      secondHalfCount(EventTypes.shotOnTarget) +
+      secondHalfCount(EventTypes.goal);
 
+  int get firstHalfGeneracion =>
+      firstHalfCount(EventTypes.passKey) +
+      firstHalfCount(EventTypes.cross) +
+      firstHalfCount(EventTypes.corner) +
+      firstHalfCount(EventTypes.penaltyFor) +
+      firstHalfCount(EventTypes.assist);
+  int get secondHalfGeneracion =>
+      secondHalfCount(EventTypes.passKey) +
+      secondHalfCount(EventTypes.cross) +
+      secondHalfCount(EventTypes.corner) +
+      secondHalfCount(EventTypes.penaltyFor) +
+      secondHalfCount(EventTypes.assist);
+
+  int get firstHalfDefensivePositive =>
+      firstHalfCount(EventTypes.recovery) +
+      firstHalfCount(EventTypes.interception) +
+      firstHalfCount(EventTypes.save);
+  int get secondHalfDefensivePositive =>
+      secondHalfCount(EventTypes.recovery) +
+      secondHalfCount(EventTypes.interception) +
+      secondHalfCount(EventTypes.save);
+
+  // ── Flags de disponibilidad ──────────────────────────────────────────────
+  late final bool hasOfensiva = totalRemates > 0 || generacionOfensiva > 0;
+  late final bool hasDefensiva =
+      accionesDefensivasPositivas > 0 || perdidas > 0;
+  late final bool hasDisciplina = indiceDisciplinario > 0;
+
+  // ── Stats por jugador ─────────────────────────────────────────────────────
   late final Map<String, Map<String, int>> playerStats = () {
     final result = <String, Map<String, int>>{};
     for (final e in events) {
@@ -58,6 +126,21 @@ class _MatchStats {
   int playerCount(String player, String type) =>
       playerStats[player]?[type] ?? 0;
 
+  int playerTotalRemates(String player) =>
+      playerCount(player, EventTypes.shot) +
+      playerCount(player, EventTypes.shotOnTarget) +
+      playerCount(player, EventTypes.goal);
+
+  int playerADPPos(String player) =>
+      playerCount(player, EventTypes.recovery) +
+      playerCount(player, EventTypes.interception) +
+      playerCount(player, EventTypes.save);
+
+  int playerIndiceDisciplinario(String player) =>
+      playerCount(player, EventTypes.foul) +
+      playerCount(player, EventTypes.yellowCard) * 2 +
+      playerCount(player, EventTypes.redCard) * 5;
+
   List<MapEntry<String, int>> topByEvent(String type, {int n = 5}) =>
       (playerStats.entries
               .map((e) => MapEntry(e.key, e.value[type] ?? 0))
@@ -67,43 +150,61 @@ class _MatchStats {
           .take(n)
           .toList();
 
+  // ── Aspectos destacados ───────────────────────────────────────────────────
   late final List<String> insights = () {
     final result = <String>[];
 
+    // Conversión de remates
     if (totalRemates > 0) {
       final pct = (goles / totalRemates * 100).round();
-      result.add('El equipo convirtió el $pct% de sus remates en gol.');
-    }
-    if (rematesAlArco > 0) {
-      final pct = (goles / rematesAlArco * 100).round();
-      result.add('Convirtió el $pct% de sus remates al arco en gol.');
+      result.add('El equipo convirtió el $pct% de sus remates en gol'
+          ' ($goles de $totalRemates).');
     }
 
-    final defTotal = recuperaciones + intercepciones;
-    if (defTotal > 0 || perdidas > 0) {
-      if (defTotal > perdidas) {
-        result.add(
-            'Balance defensivo positivo: $defTotal recuperaciones vs $perdidas pérdidas.');
-      } else if (perdidas > defTotal) {
-        result.add(
-            'Balance defensivo negativo: $perdidas pérdidas vs $defTotal recuperaciones.');
+    // Conversión al arco
+    if (rematesAlArcoReales > 0 && rematesAlArcoReales != totalRemates) {
+      final pct = (goles / rematesAlArcoReales * 100).round();
+      result.add('$pct% de los remates al arco terminaron en gol'
+          ' ($goles de $rematesAlArcoReales).');
+    }
+
+    // Balance defensivo — frase precisa
+    if (accionesDefensivasPositivas > 0 || perdidas > 0) {
+      if (accionesDefensivasPositivas > perdidas) {
+        result.add('Balance defensivo positivo: $recuperaciones recuperaciones'
+            ' + $intercepciones intercepciones'
+            ' frente a $perdidas pérdidas.');
+      } else if (perdidas > accionesDefensivasPositivas) {
+        result.add('Balance defensivo negativo: $perdidas pérdidas'
+            ' frente a $accionesDefensivasPositivas acciones defensivas positivas.');
       }
     }
 
-    final firstShots =
-        firstHalfCount(EventTypes.shot) + firstHalfCount(EventTypes.shotOnTarget);
-    final secondShots =
-        secondHalfCount(EventTypes.shot) + secondHalfCount(EventTypes.shotOnTarget);
-    if (firstShots + secondShots > 0) {
-      if (secondShots > firstShots) {
-        result.add(
-            'El segundo tiempo concentró más remates ($secondShots vs $firstShots).');
-      } else if (firstShots > secondShots) {
-        result.add(
-            'El primer tiempo concentró más remates ($firstShots vs $secondShots).');
+    // Comparativa ofensiva por tiempo
+    if (firstHalfTotalRemates + secondHalfTotalRemates > 0) {
+      if (firstHalfTotalRemates > secondHalfTotalRemates) {
+        result.add('El primer tiempo concentró más remates'
+            ' ($firstHalfTotalRemates vs $secondHalfTotalRemates).');
+      } else if (secondHalfTotalRemates > firstHalfTotalRemates) {
+        result.add('El segundo tiempo concentró más remates'
+            ' ($secondHalfTotalRemates vs $firstHalfTotalRemates).');
       }
     }
 
+    // Comparativa defensiva por tiempo
+    if (firstHalfDefensivePositive + secondHalfDefensivePositive > 0) {
+      if (secondHalfDefensivePositive > firstHalfDefensivePositive) {
+        result.add(
+            'La actividad defensiva se concentró en el segundo tiempo'
+            ' ($secondHalfDefensivePositive vs $firstHalfDefensivePositive acciones).');
+      } else if (firstHalfDefensivePositive > secondHalfDefensivePositive) {
+        result.add(
+            'La actividad defensiva se concentró en el primer tiempo'
+            ' ($firstHalfDefensivePositive vs $secondHalfDefensivePositive acciones).');
+      }
+    }
+
+    // Participación individual destacada
     for (final entry in playerStats.entries) {
       final g = playerCount(entry.key, EventTypes.goal);
       final a = playerCount(entry.key, EventTypes.assist);
@@ -113,7 +214,12 @@ class _MatchStats {
       }
     }
 
-    return result;
+    // Disciplina
+    if (hasDisciplina) {
+      result.add('$labelDisciplina (índice: $indiceDisciplinario).');
+    }
+
+    return result.take(6).toList();
   }();
 }
 
@@ -123,12 +229,13 @@ class _MatchStats {
 class MatchReportPdfExporter {
   const MatchReportPdfExporter._();
 
-  // Colors
   static const _green = PdfColor(0.063, 0.725, 0.506);
   static const _navy = PdfColor(0.059, 0.090, 0.165);
   static const _slate = PdfColor(0.118, 0.161, 0.231);
   static const _rowAlt = PdfColor(0.973, 0.980, 0.988);
   static const _muted = PdfColor(0.392, 0.455, 0.545);
+  static const _amber = PdfColor(0.918, 0.702, 0.0);
+  static const _red = PdfColor(0.863, 0.212, 0.267);
 
   // ── Entry point ─────────────────────────────────────────────────────────────
   static Future<void> export({
@@ -152,23 +259,37 @@ class MatchReportPdfExporter {
           pw.SizedBox(height: 14),
           _buildResumenGeneral(stats),
           pw.SizedBox(height: 14),
-          if (stats.hasIndicadores) ...[
-            _buildIndicadores(stats),
+          if (stats.hasOfensiva) ...[
+            _buildEmbudoOfensivo(stats),
+            pw.SizedBox(height: 14),
+          ],
+          if (stats.hasDefensiva) ...[
+            _buildIndicadoresDefensivos(stats),
+            pw.SizedBox(height: 14),
+          ],
+          if (stats.hasDisciplina) ...[
+            _buildDisciplina(stats),
             pw.SizedBox(height: 14),
           ],
           if (stats.hasPlayerData) ...[
             _buildDestacados(stats),
             pw.SizedBox(height: 14),
           ],
-          // ─ Página 2 ─
+          // ─ Página 2+ ─
           _buildEventosPorTipo(stats),
           pw.SizedBox(height: 14),
-          _buildComparativaTiempos(stats),
+          _buildComparativaOfensivaTiempos(stats),
           pw.SizedBox(height: 14),
+          if (stats.hasDefensiva) ...[
+            _buildComparativaDefensivaTiempos(stats),
+            pw.SizedBox(height: 14),
+          ],
           if (stats.hasPlayerData) ...[
             _buildParticipacionOfensiva(stats),
             pw.SizedBox(height: 14),
             _buildParticipacionDefensiva(stats),
+            pw.SizedBox(height: 14),
+            _buildDisciplinaIndividual(stats),
             pw.SizedBox(height: 14),
           ],
           _buildTimeline(sortedEvents),
@@ -202,7 +323,7 @@ class MatchReportPdfExporter {
               style: pw.TextStyle(
                   fontSize: 8, color: _muted, fontWeight: pw.FontWeight.bold)),
           pw.Text(_formatDate(match.fecha),
-              style: pw.TextStyle(fontSize: 8, color: _muted)),
+              style: const pw.TextStyle(fontSize: 8, color: _muted)),
         ],
       ),
     );
@@ -234,7 +355,7 @@ class MatchReportPdfExporter {
                       fontWeight: pw.FontWeight.bold,
                       letterSpacing: 1.0)),
               pw.Text('Kancha',
-                  style: pw.TextStyle(fontSize: 8, color: _muted)),
+                  style: const pw.TextStyle(fontSize: 8, color: _muted)),
             ],
           ),
           pw.SizedBox(height: 12),
@@ -284,7 +405,7 @@ class MatchReportPdfExporter {
           if (match.lugar != null && match.lugar!.isNotEmpty) ...[
             pw.SizedBox(height: 6),
             pw.Text('Lugar: ${match.lugar}',
-                style: pw.TextStyle(fontSize: 7, color: _muted)),
+                style: const pw.TextStyle(fontSize: 7, color: _muted)),
           ],
         ],
       ),
@@ -295,7 +416,7 @@ class MatchReportPdfExporter {
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
           pw.Text(label.toUpperCase(),
-              style: pw.TextStyle(
+              style: const pw.TextStyle(
                   fontSize: 6, color: _muted, letterSpacing: 0.4)),
           pw.SizedBox(height: 2),
           pw.Text(value,
@@ -309,12 +430,13 @@ class MatchReportPdfExporter {
   // ── 2. Resumen general ───────────────────────────────────────────────────
   static pw.Widget _buildResumenGeneral(_MatchStats stats) {
     final rows = [
-      ['Goles', '${stats.goles}', 'Remates totales', '${stats.totalRemates}'],
-      ['Goles rival', '${stats.golesRival}', 'Remates al arco', '${stats.rematesAlArco}'],
-      ['Asistencias', '${stats.asistencias}', 'Corners', '${stats.corners}'],
+      ['Goles', '${stats.goles}', 'Goles rival', '${stats.golesRival}'],
+      ['Remates totales', '${stats.totalRemates}', 'Remates al arco', '${stats.rematesAlArcoReales}'],
+      ['Asistencias', '${stats.asistencias}', 'Pases clave', '${stats.pasesClaves}'],
+      ['Centros', '${stats.centros}', 'Corners', '${stats.corners}'],
       ['Recuperaciones', '${stats.recuperaciones}', 'Intercepciones', '${stats.intercepciones}'],
-      ['Pérdidas', '${stats.perdidas}', 'Faltas cometidas', '${stats.faltas}'],
-      ['Tarjetas amarillas', '${stats.amarillas}', 'Tarjetas rojas', '${stats.rojas}'],
+      ['Atajadas', '${stats.atajadas}', 'Pérdidas', '${stats.perdidas}'],
+      ['Faltas', '${stats.faltas}', 'Amarillas / Rojas', '${stats.amarillas} / ${stats.rojas}'],
     ];
 
     return pw.Column(
@@ -356,65 +478,177 @@ class MatchReportPdfExporter {
     );
   }
 
-  // ── 3. Indicadores ──────────────────────────────────────────────────────
-  static pw.Widget _buildIndicadores(_MatchStats stats) {
-    final indicators = <_Indicator>[];
+  // ── 3. Embudo ofensivo ───────────────────────────────────────────────────
+  static pw.Widget _buildEmbudoOfensivo(_MatchStats stats) {
+    // Tarjetas del embudo: generación → remates → remates al arco → goles
+    final funnelItems = <_FunnelItem>[
+      if (stats.generacionOfensiva > 0)
+        _FunnelItem(
+          label: 'Generación ofensiva',
+          value: '${stats.generacionOfensiva}',
+          sub: 'P.clave ${stats.pasesClaves} · Centros ${stats.centros}'
+              ' · Corners ${stats.corners} · Asist. ${stats.asistencias}',
+        ),
+      if (stats.totalRemates > 0)
+        _FunnelItem(
+          label: 'Remates totales',
+          value: '${stats.totalRemates}',
+          sub: 'Errados ${stats.rematesMisses} · Al arco ${stats.rematesSalvados} · Goles ${stats.goles}',
+        ),
+      if (stats.rematesAlArcoReales > 0)
+        _FunnelItem(
+          label: 'Remates al arco',
+          value: '${stats.rematesAlArcoReales}',
+          sub: '${_pct(stats.rematesAlArcoReales, stats.totalRemates)} de precisión',
+        ),
+      _FunnelItem(
+        label: 'Goles convertidos',
+        value: '${stats.goles}',
+        sub: stats.totalRemates > 0
+            ? '${_pct(stats.goles, stats.totalRemates)} conversión total'
+            : stats.rematesAlArcoReales > 0
+                ? '${_pct(stats.goles, stats.rematesAlArcoReales)} conv. al arco'
+                : 'Sin remates registrados',
+      ),
+    ];
 
+    // Métricas de conversión
+    final convMetrics = <List<String>>[];
     if (stats.totalRemates > 0) {
-      indicators.add(_Indicator(
-        value: _pct(stats.rematesAlArco, stats.totalRemates),
-        label: 'Precisión de remate',
-        sub: '${stats.rematesAlArco} al arco / ${stats.totalRemates} totales',
-      ));
-      indicators.add(_Indicator(
-        value: _pct(stats.goles, stats.totalRemates),
-        label: 'Conversión de remates',
-        sub: '${stats.goles} goles / ${stats.totalRemates} remates',
-      ));
+      convMetrics.add([
+        'Precisión de remate',
+        _pct(stats.rematesAlArcoReales, stats.totalRemates),
+        '${stats.rematesAlArcoReales} al arco / ${stats.totalRemates} totales',
+      ]);
+      convMetrics.add([
+        'Conversión de remates',
+        _pct(stats.goles, stats.totalRemates),
+        '${stats.goles} goles / ${stats.totalRemates} remates',
+      ]);
     }
-    if (stats.rematesAlArco > 0) {
-      indicators.add(_Indicator(
-        value: _pct(stats.goles, stats.rematesAlArco),
-        label: 'Conversión al arco',
-        sub: '${stats.goles} goles / ${stats.rematesAlArco} al arco',
-      ));
+    if (stats.rematesAlArcoReales > 0) {
+      convMetrics.add([
+        'Conversión al arco',
+        _pct(stats.goles, stats.rematesAlArcoReales),
+        '${stats.goles} goles / ${stats.rematesAlArcoReales} al arco',
+      ]);
     }
-    if (stats.perdidas > 0) {
-      final defTotal = stats.recuperaciones + stats.intercepciones;
-      indicators.add(_Indicator(
-        value: _ratio(defTotal, stats.perdidas),
-        label: 'Balance recup. / pérdida',
-        sub: '$defTotal recuperaciones / ${stats.perdidas} pérdidas',
-      ));
-    }
-
-    if (indicators.isEmpty) return pw.SizedBox();
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Indicadores'),
+        _sectionTitle('Análisis ofensivo'),
+        pw.SizedBox(height: 6),
+        // Fila del embudo
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: funnelItems
+              .map((item) => pw.Expanded(
+                    child: pw.Container(
+                      margin: const pw.EdgeInsets.only(right: 6),
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: _rowAlt,
+                        border: pw.Border.all(
+                            color: PdfColors.grey300, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.Text(item.value,
+                              style: pw.TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _green)),
+                          pw.SizedBox(height: 2),
+                          pw.Text(item.label,
+                              textAlign: pw.TextAlign.center,
+                              style: pw.TextStyle(
+                                  fontSize: 7,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _navy)),
+                          pw.SizedBox(height: 2),
+                          pw.Text(item.sub,
+                              textAlign: pw.TextAlign.center,
+                              style:
+                                  const pw.TextStyle(fontSize: 6, color: _muted)),
+                        ],
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        // Métricas de conversión (si hay datos)
+        if (convMetrics.isNotEmpty) ...[
+          pw.SizedBox(height: 6),
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2.5),
+              1: const pw.FlexColumnWidth(1),
+              2: const pw.FlexColumnWidth(2.5),
+            },
+            children: [
+              _headerRow(['Métrica', 'Valor', 'Detalle']),
+              ...convMetrics.asMap().entries.map((entry) =>
+                  _dataRow(entry.value, alt: entry.key.isOdd)),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── 4. Indicadores defensivos ────────────────────────────────────────────
+  static pw.Widget _buildIndicadoresDefensivos(_MatchStats stats) {
+    final adp = stats.accionesDefensivasPositivas;
+    final efectividad = adp + stats.faltas > 0
+        ? _pct(adp, adp + stats.faltas)
+        : '—';
+
+    final cards = [
+      _Indicator(
+        value: '$adp',
+        label: 'Acciones def. positivas',
+        sub: 'Recup. ${stats.recuperaciones} + Intercep. ${stats.intercepciones} + Ataj. ${stats.atajadas}',
+      ),
+      _Indicator(
+        value: '${stats.balanceDefensivo > 0 ? '+' : ''}${stats.balanceDefensivo}',
+        label: 'Balance defensivo',
+        sub: '(Recup. + Intercep.) − Pérdidas',
+      ),
+      _Indicator(
+        value: efectividad,
+        label: 'Efectividad defensiva',
+        sub: '$adp acciones positivas / ${adp + stats.faltas} totales (incl. faltas)',
+      ),
+    ];
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Análisis defensivo'),
         pw.SizedBox(height: 6),
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: indicators
+          children: cards
               .map((ind) => pw.Expanded(
                     child: pw.Container(
                       margin: const pw.EdgeInsets.only(right: 6),
                       padding: const pw.EdgeInsets.all(10),
                       decoration: pw.BoxDecoration(
                         color: _rowAlt,
-                        border:
-                            pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                        border: pw.Border.all(
+                            color: PdfColors.grey300, width: 0.5),
                       ),
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.center,
                         children: [
                           pw.Text(ind.value,
                               style: pw.TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 18,
                                   fontWeight: pw.FontWeight.bold,
-                                  color: _green)),
+                                  color: _navy)),
                           pw.SizedBox(height: 3),
                           pw.Text(ind.label,
                               textAlign: pw.TextAlign.center,
@@ -425,7 +659,8 @@ class MatchReportPdfExporter {
                           pw.SizedBox(height: 2),
                           pw.Text(ind.sub,
                               textAlign: pw.TextAlign.center,
-                              style: pw.TextStyle(fontSize: 6, color: _muted)),
+                              style:
+                                  const pw.TextStyle(fontSize: 6, color: _muted)),
                         ],
                       ),
                     ),
@@ -436,13 +671,104 @@ class MatchReportPdfExporter {
     );
   }
 
-  // ── 4. Jugadores destacados ──────────────────────────────────────────────
+  // ── 5. Disciplina del equipo ─────────────────────────────────────────────
+  static pw.Widget _buildDisciplina(_MatchStats stats) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Disciplina'),
+        pw.SizedBox(height: 6),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2),
+            1: const pw.FlexColumnWidth(1),
+            2: const pw.FlexColumnWidth(2),
+            3: const pw.FlexColumnWidth(1),
+          },
+          children: [
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.white),
+              children: [
+                _disciplineCell('Faltas cometidas', '${stats.faltas}'),
+                _disciplineCell('Amarillas', '${stats.amarillas}',
+                    valueColor: stats.amarillas > 0 ? _amber : null),
+                _disciplineCell('Rojas', '${stats.rojas}',
+                    valueColor: stats.rojas > 0 ? _red : null),
+                _disciplineCell('Índice disciplinario',
+                    '${stats.indiceDisciplinario}'),
+              ],
+            ),
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: _rowAlt),
+              children: [
+                pw.Padding(
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: pw.Text(stats.labelDisciplina,
+                      style: pw.TextStyle(
+                          fontSize: 8,
+                          color: stats.indiceDisciplinario > 12
+                              ? _red
+                              : stats.indiceDisciplinario > 5
+                                  ? _amber
+                                  : _navy,
+                          fontWeight: pw.FontWeight.bold)),
+                ),
+                pw.SizedBox(),
+                pw.Padding(
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: pw.Text(
+                      'Fórmula: F + A×2 + R×5',
+                      style: const pw.TextStyle(fontSize: 7, color: _muted)),
+                ),
+                pw.SizedBox(),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _disciplineCell(String label, String value,
+      {PdfColor? valueColor}) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(value,
+                style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: valueColor ?? _navy)),
+            pw.SizedBox(height: 2),
+            pw.Text(label,
+                style: const pw.TextStyle(fontSize: 7, color: _muted)),
+          ],
+        ),
+      );
+
+  // ── 6. Jugadores destacados ──────────────────────────────────────────────
   static pw.Widget _buildDestacados(_MatchStats stats) {
+    // Ranking por participaciones de gol (goles + asistencias)
+    final participaciones = (stats.playerStats.entries
+            .map((e) => MapEntry(
+                e.key,
+                (e.value[EventTypes.goal] ?? 0) +
+                    (e.value[EventTypes.assist] ?? 0)))
+            .where((e) => e.value > 0)
+            .toList()
+          ..sort((a, b) => b.value.compareTo(a.value)))
+        .take(5)
+        .toList();
+
     final goleadores = stats.topByEvent(EventTypes.goal);
-    final asistidores = stats.topByEvent(EventTypes.assist);
     final recuperadores = stats.topByEvent(EventTypes.recovery);
 
-    if (goleadores.isEmpty && asistidores.isEmpty && recuperadores.isEmpty) {
+    if (participaciones.isEmpty && goleadores.isEmpty && recuperadores.isEmpty) {
       return pw.SizedBox();
     }
 
@@ -467,7 +793,7 @@ class MatchReportPdfExporter {
               pw.SizedBox(height: 5),
               if (entries.isEmpty)
                 pw.Text('Sin datos',
-                    style: pw.TextStyle(fontSize: 8, color: _muted))
+                    style: const pw.TextStyle(fontSize: 8, color: _muted))
               else
                 ...entries.map((e) => pw.Padding(
                       padding: const pw.EdgeInsets.only(bottom: 4),
@@ -477,7 +803,7 @@ class MatchReportPdfExporter {
                         children: [
                           pw.Expanded(
                             child: pw.Text(e.key,
-                                style: pw.TextStyle(
+                                style: const pw.TextStyle(
                                     fontSize: 8, color: PdfColors.black)),
                           ),
                           pw.Text('${e.value} $unit',
@@ -502,8 +828,8 @@ class MatchReportPdfExporter {
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
+            rankingCol('Part. en goles', participaciones, 'pt'),
             rankingCol('Goleadores', goleadores, 'gol'),
-            rankingCol('Asistencias', asistidores, 'ast'),
             rankingCol('Recuperaciones', recuperadores, 'rec'),
           ],
         ),
@@ -511,14 +837,13 @@ class MatchReportPdfExporter {
     );
   }
 
-  // ── 5. Eventos por tipo ──────────────────────────────────────────────────
+  // ── 7. Eventos por tipo ──────────────────────────────────────────────────
   static pw.Widget _buildEventosPorTipo(_MatchStats stats) {
     final entries = EventTypes.registrable
         .map((type) => MapEntry(type, stats._count(type)))
         .where((e) => e.value > 0)
         .toList();
 
-    // Legacy — solo si existen en el historial
     for (final type in [
       EventTypes.passOk,
       EventTypes.passBad,
@@ -536,7 +861,7 @@ class MatchReportPdfExporter {
         pw.SizedBox(height: 6),
         if (entries.isEmpty)
           pw.Text('No se registraron eventos.',
-              style: pw.TextStyle(fontSize: 9, color: _muted))
+              style: const pw.TextStyle(fontSize: 9, color: _muted))
         else
           pw.Table(
             border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
@@ -556,20 +881,55 @@ class MatchReportPdfExporter {
     );
   }
 
-  // ── 6. Comparativa por tiempos ───────────────────────────────────────────
-  static pw.Widget _buildComparativaTiempos(_MatchStats stats) {
+  // ── 8. Comparativa ofensiva por tiempos ─────────────────────────────────
+  static pw.Widget _buildComparativaOfensivaTiempos(_MatchStats stats) {
     final metrics = [
       ['Goles', EventTypes.goal],
-      ['Remates', EventTypes.shot],
-      ['Remates al arco', EventTypes.shotOnTarget],
-      ['Recuperaciones', EventTypes.recovery],
-      ['Faltas', EventTypes.foul],
+      ['Remates totales', '__totalRemates__'],
+      ['Remates al arco', '__rematesAlArco__'],
+      ['Generación ofensiva', '__generacion__'],
+      ['Faltas recibidas', EventTypes.foul],
     ];
+
+    String firstVal(String key) => switch (key) {
+          '__totalRemates__' => '${stats.firstHalfTotalRemates}',
+          '__rematesAlArco__' => '${stats.firstHalfCount(EventTypes.shotOnTarget) + stats.firstHalfCount(EventTypes.goal)}',
+          '__generacion__' => '${stats.firstHalfGeneracion}',
+          _ => '${stats.firstHalfCount(key)}',
+        };
+
+    String secondVal(String key) => switch (key) {
+          '__totalRemates__' => '${stats.secondHalfTotalRemates}',
+          '__rematesAlArco__' => '${stats.secondHalfCount(EventTypes.shotOnTarget) + stats.secondHalfCount(EventTypes.goal)}',
+          '__generacion__' => '${stats.secondHalfGeneracion}',
+          _ => '${stats.secondHalfCount(key)}',
+        };
+
+    // Lectura automática
+    String? lectura;
+    if (stats.firstHalfTotalRemates + stats.secondHalfTotalRemates > 0) {
+      final f1 = stats.firstHalfTotalRemates;
+      final f2 = stats.secondHalfTotalRemates;
+      final g1 = stats.firstHalfCount(EventTypes.goal);
+      final g2 = stats.secondHalfCount(EventTypes.goal);
+
+      if (f1 > f2 && g2 > g1) {
+        lectura =
+            'El equipo remató más en el primer tiempo, pero convirtió en el segundo.';
+      } else if (f2 > f1 && g1 > g2) {
+        lectura =
+            'El equipo remató más en el segundo tiempo, pero convirtió en el primero.';
+      } else if (f1 > f2) {
+        lectura = 'El primer tiempo concentró más acciones ofensivas.';
+      } else if (f2 > f1) {
+        lectura = 'El segundo tiempo concentró más acciones ofensivas.';
+      }
+    }
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Comparativa por tiempos'),
+        _sectionTitle('Comparativa ofensiva por tiempos'),
         pw.SizedBox(height: 6),
         pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
@@ -579,7 +939,72 @@ class MatchReportPdfExporter {
             2: const pw.FlexColumnWidth(1),
           },
           children: [
-            _headerRow(['Métrica', '1er tiempo (≤45\')', '2do tiempo (>45\')']),
+            _headerRow(['Métrica', "1T (≤45')", "2T (>45')"]),
+            ...metrics.asMap().entries.map((entry) => _dataRow(
+                  [
+                    entry.value[0],
+                    firstVal(entry.value[1]),
+                    secondVal(entry.value[1]),
+                  ],
+                  alt: entry.key.isOdd,
+                )),
+          ],
+        ),
+        if (lectura != null) ...[
+          pw.SizedBox(height: 5),
+          _insightLine(lectura),
+        ],
+      ],
+    );
+  }
+
+  // ── 9. Comparativa defensiva por tiempos ─────────────────────────────────
+  static pw.Widget _buildComparativaDefensivaTiempos(_MatchStats stats) {
+    final metrics = [
+      ['Recuperaciones', EventTypes.recovery],
+      ['Intercepciones', EventTypes.interception],
+      ['Atajadas', EventTypes.save],
+      ['Pérdidas', EventTypes.loss],
+      ['Faltas', EventTypes.foul],
+    ];
+
+    final f1def = stats.firstHalfDefensivePositive;
+    final f2def = stats.secondHalfDefensivePositive;
+    final f1loss = stats.firstHalfCount(EventTypes.loss);
+    final f2loss = stats.secondHalfCount(EventTypes.loss);
+
+    String? lectura;
+    if (f1def + f2def > 0) {
+      if (f2def > f1def) {
+        lectura =
+            'La actividad defensiva positiva se concentró en el segundo tiempo ($f2def vs $f1def acciones).';
+      } else if (f1def > f2def) {
+        lectura =
+            'La actividad defensiva positiva se concentró en el primer tiempo ($f1def vs $f2def acciones).';
+      }
+    }
+    if (lectura == null && f1loss + f2loss > 0) {
+      if (f1loss > f2loss) {
+        lectura = 'El equipo perdió más balones en el primer tiempo ($f1loss vs $f2loss).';
+      } else if (f2loss > f1loss) {
+        lectura = 'El equipo perdió más balones en el segundo tiempo ($f2loss vs $f1loss).';
+      }
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Comparativa defensiva por tiempos'),
+        pw.SizedBox(height: 6),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2.5),
+            1: const pw.FlexColumnWidth(1),
+            2: const pw.FlexColumnWidth(1),
+          },
+          children: [
+            _headerRow(['Métrica', "1T (≤45')", "2T (>45')"]),
             ...metrics.asMap().entries.map((entry) => _dataRow(
                   [
                     entry.value[0],
@@ -590,30 +1015,145 @@ class MatchReportPdfExporter {
                 )),
           ],
         ),
+        if (lectura != null) ...[
+          pw.SizedBox(height: 5),
+          _insightLine(lectura),
+        ],
       ],
     );
   }
 
-  // ── 7. Participación ofensiva ────────────────────────────────────────────
+  // ── 10. Participación ofensiva individual ────────────────────────────────
   static pw.Widget _buildParticipacionOfensiva(_MatchStats stats) {
     final offensiveTypes = [
       EventTypes.goal,
       EventTypes.assist,
       EventTypes.shot,
       EventTypes.shotOnTarget,
+      EventTypes.passKey,
     ];
     final players = stats.playerStats.entries
         .where((e) => offensiveTypes.any((t) => (e.value[t] ?? 0) > 0))
         .toList()
-      ..sort((a, b) =>
-          (b.value[EventTypes.goal] ?? 0) - (a.value[EventTypes.goal] ?? 0));
+      ..sort((a, b) {
+        final aPartG = (a.value[EventTypes.goal] ?? 0) + (a.value[EventTypes.assist] ?? 0);
+        final bPartG = (b.value[EventTypes.goal] ?? 0) + (b.value[EventTypes.assist] ?? 0);
+        if (bPartG != aPartG) return bPartG - aPartG;
+        return (b.value[EventTypes.goal] ?? 0) - (a.value[EventTypes.goal] ?? 0);
+      });
 
     if (players.isEmpty) return pw.SizedBox();
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Participación ofensiva'),
+        _sectionTitle('Participación ofensiva individual'),
+        pw.SizedBox(height: 6),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2.8),
+            1: const pw.FlexColumnWidth(1),
+            2: const pw.FlexColumnWidth(1),
+            3: const pw.FlexColumnWidth(1),
+            4: const pw.FlexColumnWidth(1),
+            5: const pw.FlexColumnWidth(1.2),
+          },
+          children: [
+            _headerRow(['Jugador', 'Part.G', 'Goles', 'Asist.', 'Rem.', 'P.Clave']),
+            ...players.asMap().entries.map((entry) {
+              final name = entry.value.key;
+              final partG = stats.playerCount(name, EventTypes.goal) +
+                  stats.playerCount(name, EventTypes.assist);
+              return _dataRow(
+                [
+                  name,
+                  '$partG',
+                  '${stats.playerCount(name, EventTypes.goal)}',
+                  '${stats.playerCount(name, EventTypes.assist)}',
+                  '${stats.playerTotalRemates(name)}',
+                  '${stats.playerCount(name, EventTypes.passKey)}',
+                ],
+                alt: entry.key.isOdd,
+              );
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── 11. Participación defensiva individual ───────────────────────────────
+  static pw.Widget _buildParticipacionDefensiva(_MatchStats stats) {
+    final defensiveTypes = [
+      EventTypes.recovery,
+      EventTypes.interception,
+      EventTypes.save,
+      EventTypes.loss,
+      EventTypes.foul,
+    ];
+    final players = stats.playerStats.entries
+        .where((e) => defensiveTypes.any((t) => (e.value[t] ?? 0) > 0))
+        .toList()
+      ..sort((a, b) {
+        final ar = stats.playerADPPos(a.key);
+        final br = stats.playerADPPos(b.key);
+        return br - ar;
+      });
+
+    if (players.isEmpty) return pw.SizedBox();
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Participación defensiva individual'),
+        pw.SizedBox(height: 6),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2.8),
+            1: const pw.FlexColumnWidth(1.2),
+            2: const pw.FlexColumnWidth(1.2),
+            3: const pw.FlexColumnWidth(1),
+            4: const pw.FlexColumnWidth(1),
+            5: const pw.FlexColumnWidth(1),
+          },
+          children: [
+            _headerRow(['Jugador', 'Recup.', 'Intercep.', 'Ataj.', 'Pérd.', 'Faltas']),
+            ...players.asMap().entries.map((entry) => _dataRow(
+                  [
+                    entry.value.key,
+                    '${stats.playerCount(entry.value.key, EventTypes.recovery)}',
+                    '${stats.playerCount(entry.value.key, EventTypes.interception)}',
+                    '${stats.playerCount(entry.value.key, EventTypes.save)}',
+                    '${stats.playerCount(entry.value.key, EventTypes.loss)}',
+                    '${stats.playerCount(entry.value.key, EventTypes.foul)}',
+                  ],
+                  alt: entry.key.isOdd,
+                )),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── 12. Disciplina individual ────────────────────────────────────────────
+  static pw.Widget _buildDisciplinaIndividual(_MatchStats stats) {
+    final discTypes = [EventTypes.foul, EventTypes.yellowCard, EventTypes.redCard];
+    final players = stats.playerStats.entries
+        .where((e) => discTypes.any((t) => (e.value[t] ?? 0) > 0))
+        .toList()
+      ..sort((a, b) {
+        return stats.playerIndiceDisciplinario(b.key) -
+            stats.playerIndiceDisciplinario(a.key);
+      });
+
+    if (players.isEmpty) return pw.SizedBox();
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Disciplina individual'),
         pw.SizedBox(height: 6),
         pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
@@ -625,14 +1165,14 @@ class MatchReportPdfExporter {
             4: const pw.FlexColumnWidth(1.2),
           },
           children: [
-            _headerRow(['Jugador', 'Goles', 'Asist.', 'Remates', 'Al arco']),
+            _headerRow(['Jugador', 'Faltas', 'Amarillas', 'Rojas', 'Índice']),
             ...players.asMap().entries.map((entry) => _dataRow(
                   [
                     entry.value.key,
-                    '${stats.playerCount(entry.value.key, EventTypes.goal)}',
-                    '${stats.playerCount(entry.value.key, EventTypes.assist)}',
-                    '${stats.playerCount(entry.value.key, EventTypes.shot)}',
-                    '${stats.playerCount(entry.value.key, EventTypes.shotOnTarget)}',
+                    '${stats.playerCount(entry.value.key, EventTypes.foul)}',
+                    '${stats.playerCount(entry.value.key, EventTypes.yellowCard)}',
+                    '${stats.playerCount(entry.value.key, EventTypes.redCard)}',
+                    '${stats.playerIndiceDisciplinario(entry.value.key)}',
                   ],
                   alt: entry.key.isOdd,
                 )),
@@ -642,64 +1182,10 @@ class MatchReportPdfExporter {
     );
   }
 
-  // ── 8. Participación defensiva ───────────────────────────────────────────
-  static pw.Widget _buildParticipacionDefensiva(_MatchStats stats) {
-    final defensiveTypes = [
-      EventTypes.recovery,
-      EventTypes.interception,
-      EventTypes.save,
-      EventTypes.loss,
-    ];
-    final players = stats.playerStats.entries
-        .where((e) => defensiveTypes.any((t) => (e.value[t] ?? 0) > 0))
-        .toList()
-      ..sort((a, b) {
-        final ar = (a.value[EventTypes.recovery] ?? 0) +
-            (a.value[EventTypes.interception] ?? 0);
-        final br = (b.value[EventTypes.recovery] ?? 0) +
-            (b.value[EventTypes.interception] ?? 0);
-        return br - ar;
-      });
-
-    if (players.isEmpty) return pw.SizedBox();
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _sectionTitle('Participación defensiva'),
-        pw.SizedBox(height: 6),
-        pw.Table(
-          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-          columnWidths: {
-            0: const pw.FlexColumnWidth(3),
-            1: const pw.FlexColumnWidth(1.2),
-            2: const pw.FlexColumnWidth(1.2),
-            3: const pw.FlexColumnWidth(1),
-            4: const pw.FlexColumnWidth(1),
-          },
-          children: [
-            _headerRow(['Jugador', 'Recup.', 'Intercep.', 'Ataj.', 'Pérd.']),
-            ...players.asMap().entries.map((entry) => _dataRow(
-                  [
-                    entry.value.key,
-                    '${stats.playerCount(entry.value.key, EventTypes.recovery)}',
-                    '${stats.playerCount(entry.value.key, EventTypes.interception)}',
-                    '${stats.playerCount(entry.value.key, EventTypes.save)}',
-                    '${stats.playerCount(entry.value.key, EventTypes.loss)}',
-                  ],
-                  alt: entry.key.isOdd,
-                )),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ── 9. Timeline ──────────────────────────────────────────────────────────
+  // ── 13. Timeline ─────────────────────────────────────────────────────────
   static pw.Widget _buildTimeline(List<EventoPartidoModel> sortedEvents) {
     if (sortedEvents.isEmpty) return pw.SizedBox();
 
-    // Agrupar por minuto
     final byMinute = <int, List<EventoPartidoModel>>{};
     for (final e in sortedEvents) {
       byMinute.putIfAbsent(e.minuto, () => []).add(e);
@@ -735,14 +1221,14 @@ class MatchReportPdfExporter {
                   alt: alt,
                 );
               });
-            }).toList(),
+            }),
           ],
         ),
       ],
     );
   }
 
-  // ── 10. Aspectos destacados ──────────────────────────────────────────────
+  // ── 14. Aspectos destacados ──────────────────────────────────────────────
   static pw.Widget _buildInsights(_MatchStats stats) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -770,7 +1256,7 @@ class MatchReportPdfExporter {
                                   fontWeight: pw.FontWeight.bold)),
                           pw.Expanded(
                             child: pw.Text(insight,
-                                style: pw.TextStyle(
+                                style: const pw.TextStyle(
                                     fontSize: 9, color: PdfColors.black)),
                           ),
                         ],
@@ -802,6 +1288,29 @@ class MatchReportPdfExporter {
         ),
       );
 
+  static pw.Widget _insightLine(String text) => pw.Container(
+        padding:
+            const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: pw.BoxDecoration(
+          color: _rowAlt,
+          border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+        ),
+        child: pw.Row(
+          children: [
+            pw.Text('→ ',
+                style: pw.TextStyle(
+                    fontSize: 8, color: _green, fontWeight: pw.FontWeight.bold)),
+            pw.Expanded(
+              child: pw.Text(text,
+                  style: pw.TextStyle(
+                      fontSize: 8,
+                      color: _navy,
+                      fontWeight: pw.FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
   static pw.TableRow _headerRow(List<String> cells) => pw.TableRow(
         decoration: const pw.BoxDecoration(color: _navy),
         children: cells
@@ -826,7 +1335,7 @@ class MatchReportPdfExporter {
                   padding: const pw.EdgeInsets.symmetric(
                       horizontal: 6, vertical: 4),
                   child: pw.Text(c,
-                      style: pw.TextStyle(
+                      style: const pw.TextStyle(
                           fontSize: 8, color: PdfColors.black)),
                 ))
             .toList(),
@@ -835,11 +1344,6 @@ class MatchReportPdfExporter {
   static String _pct(int num, int den) {
     if (den == 0) return '—';
     return '${(num / den * 100).round()}%';
-  }
-
-  static String _ratio(int num, int den) {
-    if (den == 0) return '—';
-    return '${(num / den).toStringAsFixed(1)}x';
   }
 
   static String _formatDate(DateTime date) =>
@@ -856,10 +1360,19 @@ class MatchReportPdfExporter {
       .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '');
 }
 
-// ── Data class para indicadores ──────────────────────────────────────────────
+// =============================================================================
+//  Data classes
+// =============================================================================
 class _Indicator {
   final String value;
   final String label;
   final String sub;
   const _Indicator({required this.value, required this.label, required this.sub});
+}
+
+class _FunnelItem {
+  final String label;
+  final String value;
+  final String sub;
+  const _FunnelItem({required this.label, required this.value, required this.sub});
 }
