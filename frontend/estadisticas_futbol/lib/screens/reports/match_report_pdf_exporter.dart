@@ -372,7 +372,7 @@ class MatchReportPdfExporter {
               ),
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(horizontal: 18),
-                child: pw.Text('$localScore  —  $visitScore',
+                child: pw.Text('$localScore - $visitScore',
                     style: pw.TextStyle(
                         fontSize: 26,
                         color: PdfColors.white,
@@ -486,14 +486,14 @@ class MatchReportPdfExporter {
         _FunnelItem(
           label: 'Generación ofensiva',
           value: '${stats.generacionOfensiva}',
-          sub: 'P.clave ${stats.pasesClaves} · Centros ${stats.centros}'
-              ' · Corners ${stats.corners} · Asist. ${stats.asistencias}',
+          sub: 'Pases clave: ${stats.pasesClaves} | Centros: ${stats.centros}'
+              ' | Corners: ${stats.corners} | Asistencias: ${stats.asistencias}',
         ),
       if (stats.totalRemates > 0)
         _FunnelItem(
           label: 'Remates totales',
           value: '${stats.totalRemates}',
-          sub: 'Errados ${stats.rematesMisses} · Al arco ${stats.rematesSalvados} · Goles ${stats.goles}',
+          sub: 'Errados: ${stats.rematesMisses} | Al arco: ${stats.rematesSalvados} | Goles: ${stats.goles}',
         ),
       if (stats.rematesAlArcoReales > 0)
         _FunnelItem(
@@ -604,18 +604,18 @@ class MatchReportPdfExporter {
     final adp = stats.accionesDefensivasPositivas;
     final efectividad = adp + stats.faltas > 0
         ? _pct(adp, adp + stats.faltas)
-        : '—';
+        : '-';
 
     final cards = [
       _Indicator(
         value: '$adp',
-        label: 'Acciones def. positivas',
-        sub: 'Recup. ${stats.recuperaciones} + Intercep. ${stats.intercepciones} + Ataj. ${stats.atajadas}',
+        label: 'Acciones defensivas',
+        sub: '${stats.recuperaciones} recup. + ${stats.intercepciones} intercep. + ${stats.atajadas} ataj.',
       ),
       _Indicator(
         value: '${stats.balanceDefensivo > 0 ? '+' : ''}${stats.balanceDefensivo}',
         label: 'Balance defensivo',
-        sub: '(Recup. + Intercep.) − Pérdidas',
+        sub: '${stats.recuperaciones} recup. + ${stats.intercepciones} intercep. - ${stats.perdidas} perd.',
       ),
       _Indicator(
         value: efectividad,
@@ -716,13 +716,7 @@ class MatchReportPdfExporter {
                           fontWeight: pw.FontWeight.bold)),
                 ),
                 pw.SizedBox(),
-                pw.Padding(
-                  padding:
-                      const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                  child: pw.Text(
-                      'Fórmula: F + A×2 + R×5',
-                      style: const pw.TextStyle(fontSize: 7, color: _muted)),
-                ),
+                pw.SizedBox(),
                 pw.SizedBox(),
               ],
             ),
@@ -839,20 +833,39 @@ class MatchReportPdfExporter {
 
   // ── 7. Eventos por tipo ──────────────────────────────────────────────────
   static pw.Widget _buildEventosPorTipo(_MatchStats stats) {
-    final entries = EventTypes.registrable
-        .map((type) => MapEntry(type, stats._count(type)))
-        .where((e) => e.value > 0)
-        .toList();
-
-    for (final type in [
+    const orderedTypes = [
+      // Ataque
+      EventTypes.goal,
+      EventTypes.assist,
+      EventTypes.shot,
+      EventTypes.shotOnTarget,
+      EventTypes.passKey,
+      EventTypes.cross,
+      EventTypes.corner,
+      EventTypes.offside,
+      EventTypes.penaltyFor,
+      // Defensa
+      EventTypes.goalRival,
+      EventTypes.save,
+      EventTypes.recovery,
+      EventTypes.interception,
+      EventTypes.loss,
+      // Disciplina
+      EventTypes.foul,
+      EventTypes.yellowCard,
+      EventTypes.redCard,
+      EventTypes.penaltyAgainst,
+      // Legado
       EventTypes.passOk,
       EventTypes.passBad,
       EventTypes.tackleOk,
       EventTypes.tackleBad,
-    ]) {
-      final c = stats._count(type);
-      if (c > 0) entries.add(MapEntry(type, c));
-    }
+    ];
+
+    final entries = orderedTypes
+        .map((type) => MapEntry(type, stats._count(type)))
+        .where((e) => e.value > 0)
+        .toList();
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -939,7 +952,7 @@ class MatchReportPdfExporter {
             2: const pw.FlexColumnWidth(1),
           },
           children: [
-            _headerRow(['Métrica', "1T (≤45')", "2T (>45')"]),
+            _headerRow(['Métrica', '1T (0-45 min)', '2T (46+ min)']),
             ...metrics.asMap().entries.map((entry) => _dataRow(
                   [
                     entry.value[0],
@@ -1004,7 +1017,7 @@ class MatchReportPdfExporter {
             2: const pw.FlexColumnWidth(1),
           },
           children: [
-            _headerRow(['Métrica', "1T (≤45')", "2T (>45')"]),
+            _headerRow(['Métrica', '1T (0-45 min)', '2T (46+ min)']),
             ...metrics.asMap().entries.map((entry) => _dataRow(
                   [
                     entry.value[0],
@@ -1216,7 +1229,7 @@ class MatchReportPdfExporter {
                   [
                     isFirst ? "$minute'" : '',
                     '${ev.tipoEventoNombre}'
-                        '${ev.nombreJugador != null ? " — ${ev.nombreJugador}" : ""}',
+                        '${ev.nombreJugador != null ? " - ${ev.nombreJugador}" : ""}',
                   ],
                   alt: alt,
                 );
@@ -1249,7 +1262,7 @@ class MatchReportPdfExporter {
                       child: pw.Row(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('• ',
+                          pw.Text('- ',
                               style: pw.TextStyle(
                                   fontSize: 9,
                                   color: _green,
@@ -1297,7 +1310,7 @@ class MatchReportPdfExporter {
         ),
         child: pw.Row(
           children: [
-            pw.Text('→ ',
+            pw.Text('> ',
                 style: pw.TextStyle(
                     fontSize: 8, color: _green, fontWeight: pw.FontWeight.bold)),
             pw.Expanded(
@@ -1342,7 +1355,7 @@ class MatchReportPdfExporter {
       );
 
   static String _pct(int num, int den) {
-    if (den == 0) return '—';
+    if (den == 0) return '-';
     return '${(num / den * 100).round()}%';
   }
 
