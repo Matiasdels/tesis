@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
 import '../../data/remote/match_api.dart';
@@ -139,6 +140,7 @@ class _LineupScreenState extends State<LineupScreen> {
     });
     try {
       final token = context.read<AuthState>().session!.accessToken;
+      final settings = context.read<AppSettingsController>().settings;
       final match = await _matchApi.getMatch(widget.matchId, token);
       final allPlayers = await _playerApi.getPlayers(accessToken: token);
       final existing = await _matchApi.getLineup(widget.matchId, token);
@@ -154,7 +156,7 @@ class _LineupScreenState extends State<LineupScreen> {
           .where((p) => p.isAvailable)
           .toList();
 
-      String formation = match.formacion ?? '4-3-3';
+      String formation = match.formacion ?? settings.defaultFormation;
       if (!_formations.containsKey(formation)) formation = '4-3-3';
 
       // Build empty slot map
@@ -403,12 +405,19 @@ class _LineupScreenState extends State<LineupScreen> {
 
     try {
       final token = context.read<AuthState>().session!.accessToken;
+      final settingsController = context.read<AppSettingsController>();
+      final settings = settingsController.settings;
       await _matchApi.setLineup(
         widget.matchId,
         [...titularEntries, ...suplenteEntries],
         token,
         formacion: _formation,
       );
+      if (settings.rememberLastFormation) {
+        await settingsController.save(
+          settings.copyWith(defaultFormation: _formation),
+        );
+      }
       if (mounted) context.pop(true);
     } on MatchApiException catch (e) {
       setState(() {

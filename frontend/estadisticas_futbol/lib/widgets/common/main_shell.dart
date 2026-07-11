@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../data/remote/auth_state.dart';
@@ -35,7 +36,9 @@ class MainShell extends StatelessWidget {
         elevation: 0,
         titleSpacing: 16,
         title: InkWell(
-          onTap: () => context.go(AppConstants.routeDashboard),
+          onTap: () {
+            context.go(AppConstants.routeDashboard);
+          },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
@@ -49,12 +52,16 @@ class MainShell extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Configuración',
-            onPressed: () => _showSettingsSheet(context),
+            onPressed: () {
+              _showSettingsPanel(context);
+            },
             icon: const Icon(Icons.settings_outlined),
           ),
           IconButton(
             tooltip: 'Perfil',
-            onPressed: () => _showProfileSheet(context),
+            onPressed: () {
+              _showProfileSheet(context);
+            },
             icon: const Icon(Icons.account_circle_outlined),
           ),
         ],
@@ -80,6 +87,7 @@ class MainShell extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 void _showSettingsSheet(BuildContext context) {
   showModalBottomSheet<void>(
     context: context,
@@ -178,6 +186,465 @@ void _showSettingsSheet(BuildContext context) {
   );
 }
 
+void _showSettingsPanel(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.82;
+      return Consumer<ThemeController>(
+        builder: (context, themeController, _) {
+          final sheetBackground =
+              themeController.isDarkMode ? AppColors.bgCard : AppColors.bgDeep;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: sheetBackground,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Configuracion',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _SettingsSection(
+                        title: 'Apariencia',
+                        children: [
+                          Consumer<ThemeController>(
+                            builder: (context, themeController, _) {
+                              return _SettingsTile(
+                                icon: themeController.isDarkMode
+                                    ? Icons.dark_mode_rounded
+                                    : Icons.light_mode_rounded,
+                                iconColor: themeController.isDarkMode
+                                    ? AppColors.purple
+                                    : AppColors.warning,
+                                iconBackground: themeController.isDarkMode
+                                    ? AppColors.purpleDim
+                                    : AppColors.warningDim,
+                                title: 'Tema de la aplicacion',
+                                subtitle: themeController.isDarkMode
+                                    ? 'Modo noche'
+                                    : 'Modo dia',
+                                trailing: _ThemeToggle(
+                                  isDarkMode: themeController.isDarkMode,
+                                  onChanged: themeController.setDarkMode,
+                                ),
+                              );
+                            },
+                          ),
+                          Divider(height: 1, color: AppColors.borderSubtle),
+                        Consumer<AppSettingsController>(
+                          builder: (context, settingsController, _) {
+                            final settings = settingsController.settings;
+                            return _SettingsSwitchTile(
+                                icon: Icons.waving_hand_outlined,
+                                title: 'Mostrar saludo del panel',
+                                subtitle: settings.showDashboardGreeting
+                                    ? 'El saludo inicial esta visible'
+                                    : 'El saludo inicial esta oculto',
+                                value: settings.showDashboardGreeting,
+                                onChanged: (value) {
+                                  settingsController.save(
+                                    settings.copyWith(
+                                      showDashboardGreeting: value,
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _SettingsSection(
+                      title: 'Alineacion',
+                      children: [
+                        Consumer<AppSettingsController>(
+                          builder: (context, settingsController, _) {
+                            final settings = settingsController.settings;
+                            return _SettingsActionTile(
+                              icon: Icons.account_tree_outlined,
+                              title: 'Formacion predeterminada',
+                              subtitle: settings.defaultFormation,
+                              onTap: () => _selectDefaultFormation(
+                                context,
+                                settingsController,
+                              ),
+                            );
+                          },
+                        ),
+                        Divider(height: 1, color: AppColors.borderSubtle),
+                        Consumer<AppSettingsController>(
+                          builder: (context, settingsController, _) {
+                            final settings = settingsController.settings;
+                            return _SettingsSwitchTile(
+                              icon: Icons.history_rounded,
+                              title: 'Recordar ultima formacion',
+                              subtitle: settings.rememberLastFormation
+                                  ? 'Usa la ultima formacion guardada'
+                                  : 'Mantiene la formacion predeterminada',
+                              value: settings.rememberLastFormation,
+                              onChanged: (value) {
+                                settingsController.save(
+                                  settings.copyWith(
+                                    rememberLastFormation: value,
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _SettingsSection(
+                      title: 'Cuenta y datos',
+                      children: [
+                        _SettingsActionTile(
+                          icon: Icons.logout_rounded,
+                          title: 'Cerrar sesion',
+                          subtitle: 'Salir de la cuenta actual',
+                          iconColor: AppColors.danger,
+                          iconBackground: AppColors.dangerDim,
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            await _logout(context);
+                          },
+                        ),
+                        Divider(height: 1, color: AppColors.borderSubtle),
+                        Consumer2<AppSettingsController, ThemeController>(
+                          builder: (
+                            context,
+                            settingsController,
+                            themeController,
+                            _,
+                          ) {
+                            return _SettingsActionTile(
+                              icon: Icons.restart_alt_rounded,
+                              title: 'Restablecer configuraciones',
+                              subtitle: 'Vuelve a los valores originales',
+                              onTap: () async {
+                                await settingsController.resetToDefaults();
+                                await themeController.resetToDefaults();
+                                if (!sheetContext.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Configuraciones restablecidas',
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<void> _selectDefaultFormation(
+  BuildContext context,
+  AppSettingsController settingsController,
+) async {
+  final current = settingsController.settings.defaultFormation;
+  final sheetBackground =
+      AppColors.isDarkMode ? AppColors.bgCard : AppColors.bgDeep;
+  final selected = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: sheetBackground,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Formacion predeterminada',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...AppSettingsController.availableFormations.map(
+                (formation) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    formation,
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                  trailing: current == formation
+                      ? const Icon(Icons.check_rounded, color: AppColors.accent)
+                      : null,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop(formation);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
+  if (selected == null) return;
+  await settingsController.save(
+    settingsController.settings.copyWith(defaultFormation: selected),
+  );
+}
+
+class _SettingsSection extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _SettingsSection({
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final sectionTitleColor =
+        AppColors.isDarkMode ? AppColors.textSecondary : AppColors.textPrimary;
+    final sectionBackground =
+        AppColors.isDarkMode ? AppColors.bgSurface : AppColors.bgCard;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: sectionTitleColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: sectionBackground,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.borderSubtle, width: 0.5),
+          ),
+          child: Column(children: children),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBackground;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBackground,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          _SettingsIcon(
+            icon: icon,
+            color: iconColor,
+            backgroundColor: iconBackground,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: _SettingsText(title: title, subtitle: subtitle)),
+          const SizedBox(width: 12),
+          trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color? iconColor;
+  final Color? iconBackground;
+  final VoidCallback onTap;
+
+  const _SettingsActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.iconColor,
+    this.iconBackground,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () {
+        onTap();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            _SettingsIcon(
+              icon: icon,
+              color: iconColor ?? AppColors.textSecondary,
+              backgroundColor: iconBackground ?? AppColors.bgMuted,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: _SettingsText(title: title, subtitle: subtitle)),
+            const SizedBox(width: 12),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMuted,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsSwitchTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingsSwitchTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsTile(
+      icon: icon,
+      iconColor: value ? AppColors.accent : AppColors.textSecondary,
+      iconBackground: value ? AppColors.accentDim : AppColors.bgMuted,
+      title: title,
+      subtitle: subtitle,
+      trailing: Switch(
+        value: value,
+        activeThumbColor: AppColors.accent,
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _SettingsIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final Color backgroundColor;
+
+  const _SettingsIcon({
+    required this.icon,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, color: color, size: 21),
+    );
+  }
+}
+
+class _SettingsText extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SettingsText({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ThemeToggle extends StatelessWidget {
   final bool isDarkMode;
   final ValueChanged<bool> onChanged;
@@ -194,7 +661,9 @@ class _ThemeToggle extends StatelessWidget {
       checked: isDarkMode,
       label: isDarkMode ? 'Activar modo día' : 'Activar modo noche',
       child: InkWell(
-        onTap: () => onChanged(!isDarkMode),
+        onTap: () {
+          onChanged(!isDarkMode);
+        },
         borderRadius: BorderRadius.circular(20),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
@@ -247,10 +716,43 @@ class _ThemeToggle extends StatelessWidget {
 }
 
 Future<void> _logout(BuildContext context) async {
-  await context.read<AuthState>().logout();
-  if (context.mounted) {
-    context.go(AppConstants.routeLogin);
-  }
+  final authState = context.read<AuthState>();
+  final router = GoRouter.of(context);
+  final shouldLogout = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text(
+          'Cerrar sesion',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '¿Seguro que queres salir de la sesion?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Cerrar sesion'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (shouldLogout != true) return;
+
+  await authState.logout();
+  router.go(AppConstants.routeLogin);
 }
 
 void _showProfileSheet(BuildContext context) {
@@ -359,9 +861,9 @@ void _showProfileSheet(BuildContext context) {
                 ),
               ),
               const SizedBox(height: 18),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bgSurface,
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.borderSubtle, width: 0.5),
                 ),
@@ -645,7 +1147,9 @@ class _SidebarItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => context.go(route),
+          onTap: () {
+            context.go(route);
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
@@ -697,7 +1201,9 @@ class _SidebarUser extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => _showProfileSheet(context),
+                onTap: () {
+                  _showProfileSheet(context);
+                },
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
@@ -747,7 +1253,9 @@ class _SidebarUser extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Configuración',
-            onPressed: () => _showSettingsSheet(context),
+            onPressed: () {
+              _showSettingsPanel(context);
+            },
             icon: const Icon(Icons.settings_outlined),
             visualDensity: VisualDensity.compact,
           ),
@@ -799,7 +1307,9 @@ class _AppBottomNav extends StatelessWidget {
 
               return Expanded(
                 child: InkWell(
-                  onTap: () => context.go(item.route),
+                  onTap: () {
+                    context.go(item.route);
+                  },
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
