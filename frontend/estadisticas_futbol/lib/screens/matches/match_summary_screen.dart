@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -13,6 +10,7 @@ import '../../data/remote/match_api.dart';
 import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
 import '../../widgets/match/pitch_view.dart';
+import '../reports/match_report_pdf_exporter.dart';
 
 class MatchSummaryScreen extends StatefulWidget {
   final int matchId;
@@ -162,7 +160,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _exportingPdf
                       ? null
-                      : () => _exportPdf(match, countByType, goals, yellowCards, redCards),
+                      : () => _exportPdf(match),
                   icon: _exportingPdf
                       ? const SizedBox(
                           width: 18,
@@ -190,116 +188,10 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
     );
   }
 
-  Future<void> _exportPdf(
-    PartidoModel match,
-    Map<String, int> countByType,
-    List<EventoPartidoModel> goals,
-    List<EventoPartidoModel> yellowCards,
-    List<EventoPartidoModel> redCards,
-  ) async {
+  Future<void> _exportPdf(PartidoModel match) async {
     setState(() => _exportingPdf = true);
     try {
-      final doc = pw.Document();
-      final golesOwn = match.golesEquipo ?? 0;
-      final golesRival = match.golesRival ?? 0;
-      const teamName = 'Kancha';
-
-      doc.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(32),
-          build: (ctx) => [
-            pw.Text('Kancha — Resumen del partido',
-                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 8),
-            pw.Text(
-              match.esLocal
-                  ? '$teamName $golesOwn – $golesRival ${match.rival}'
-                  : '${match.rival} $golesRival – $golesOwn $teamName',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text('Fecha: ${_formatDate(match.fecha)}'),
-            pw.Text('Tipo: ${match.tipoCompeticion}'),
-            if (match.categoriaNombre != null) pw.Text('Categoría: ${match.categoriaNombre}'),
-            if (match.lugar != null && match.lugar!.isNotEmpty) pw.Text('Lugar: ${match.lugar}'),
-            pw.Text('Condición: ${match.esLocal ? "Local" : "Visitante"}'),
-            pw.SizedBox(height: 16),
-
-            if (countByType.isNotEmpty) ...[
-              pw.Text('Estadísticas',
-                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey300),
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('Evento',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('Cantidad',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  ...countByType.entries.map(
-                    (e) => pw.TableRow(children: [
-                      pw.Padding(
-                          padding: const pw.EdgeInsets.all(6), child: pw.Text(e.key)),
-                      pw.Padding(
-                          padding: const pw.EdgeInsets.all(6),
-                          child: pw.Text('${e.value}')),
-                    ]),
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 16),
-            ],
-
-            if (goals.isNotEmpty) ...[
-              pw.Text('Goles',
-                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              ...goals.map((e) => pw.Text(
-                  '  ${e.minuto}\' — ${e.nombreJugador ?? "Sin jugador"}')),
-              pw.SizedBox(height: 12),
-            ],
-
-            if (yellowCards.isNotEmpty || redCards.isNotEmpty) ...[
-              pw.Text('Tarjetas',
-                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              ...yellowCards.map((e) => pw.Text(
-                  '  Amarilla — ${e.minuto}\' — ${e.nombreJugador ?? "Sin jugador"}')),
-              ...redCards.map((e) => pw.Text(
-                  '  Roja — ${e.minuto}\' — ${e.nombreJugador ?? "Sin jugador"}')),
-              pw.SizedBox(height: 12),
-            ],
-
-            pw.Text('Todos los eventos',
-                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 4),
-            if (_events.isEmpty)
-              pw.Text('No se registraron eventos.')
-            else
-              ..._events.map((e) => pw.Text(
-                  '  ${e.minuto}\' — ${e.tipoEventoNombre}'
-                  '${e.nombreJugador != null ? " — ${e.nombreJugador}" : ""}')),
-          ],
-        ),
-      );
-
-      await Printing.sharePdf(
-        bytes: await doc.save(),
-        filename:
-            'partido_vs_${match.rival.replaceAll(' ', '_')}_${_formatDateFile(match.fecha)}.pdf',
-      );
+      await MatchReportPdfExporter.export(match: match, events: _events);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -310,12 +202,6 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
       if (mounted) setState(() => _exportingPdf = false);
     }
   }
-
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-  String _formatDateFile(DateTime d) =>
-      '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 }
 
 // ── Score banner ──────────────────────────────────────────────────────────────
