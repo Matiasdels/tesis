@@ -1,9 +1,13 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../models/models.dart';
+import '../../widgets/match/pitch_view.dart';
 
 // =============================================================================
 //  Pre-computed stats
@@ -237,6 +241,182 @@ class MatchReportPdfExporter {
   static const _amber = PdfColor(0.918, 0.702, 0.0);
   static const _red = PdfColor(0.863, 0.212, 0.267);
 
+  // ── Render heat map off-screen → PNG bytes ──────────────────────────────────
+  static Future<Uint8List?> _renderPitchHeatMap(
+    List<EventoPartidoModel> events,
+  ) async {
+    if (events.isEmpty) return null;
+    const w = 750;
+    const h = 1005; // 1:1.34 ratio, matches app's height = width * 1.34
+    final recorder = ui.PictureRecorder();
+    MatchPitchPainter(
+      events: events,
+      showEventDots: false,
+      showHeatMap: true,
+    ).paint(ui.Canvas(recorder), ui.Size(w.toDouble(), h.toDouble()));
+    final img = await recorder.endRecording().toImage(w, h);
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return bytes?.buffer.asUint8List();
+  }
+
+  // ── Spatial distribution insights ────────────────────────────────────────────
+  static List<String> _spatialInsights(List<EventoPartidoModel> events) {
+    if (events.isEmpty) return [];
+    final n = events.length;
+    final result = <String>[];
+
+    // Horizontal zones: left (x<0.33), center (0.33-0.67), right (x>0.67)
+    final left = events.where((e) => e.pitchX < 0.33).length;
+    final center =
+        events.where((e) => e.pitchX >= 0.33 && e.pitchX <= 0.67).length;
+    final right = events.where((e) => e.pitchX > 0.67).length;
+
+    final maxH = [left, center, right].reduce((a, b) => a > b ? a : b);
+    final dominantZone = maxH == left
+        ? 'banda izquierda'
+        : maxH == right
+            ? 'banda derecha'
+            : 'zona central';
+    result.add(
+        'Mayor actividad por $dominantZone (${(maxH / n * 100).round()}% de las acciones).');
+
+    // Vertical split: upper half (y<0.5) vs lower half (y>=0.5)
+    final upper = events.where((e) => e.pitchY < 0.5).length;
+    final upperPct = (upper / n * 100).round();
+    final lowerPct = 100 - upperPct;
+    if (upperPct >= 60) {
+      result.add('Concentración en la mitad superior del campo ($upperPct%).');
+    } else if (lowerPct >= 60) {
+      result.add('Concentración en la mitad inferior del campo ($lowerPct%).');
+    } else {
+      result.add(
+          'Distribución equilibrada entre ambas mitades ($upperPct% superior / $lowerPct% inferior).');
+    }
+
+    return result;
+  }
+
+  // ── Análisis espacial page content ───────────────────────────────────────────
+  static pw.Widget _buildAnalisisEspacial({
+    required Uint8List? generalImg,
+    required Uint8List? offensiveImg,
+    required Uint8List? defensiveImg,
+    required List<EventoPartidoModel> allEvents,
+    required List<EventoPartidoModel> offensiveEvents,
+    required List<EventoPartidoModel> defensiveEvents,
+  }) {
+    // Column width: (A4-landscape usable 770pt - 2×10pt gaps) / 3 ≈ 250pt
+    const colW = 250.0;
+    const mapH = colW * 1.34; // maintains app's pitch aspect ratio
+
+    pw.Widget mapColumn({
+      required String title,
+      required Uint8List? imgBytes,
+      required List<EventoPartidoModel> events,
+    }) {
+      final insights = _spatialInsights(events);
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            width: double.infinity,
+            padding:
+                const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: const pw.BoxDecoration(color: _slate),
+            child: pw.Text(
+              title.toUpperCase(),
+              style: pw.TextStyle(
+                fontSize: 7,
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 5),
+          if (imgBytes == null)
+            pw.Container(
+              width: colW,
+              height: mapH,
+              decoration: pw.BoxDecoration(
+                color: _rowAlt,
+                border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+              ),
+              child: pw.Center(
+                child: pw.Text(
+                  'No hay eventos\nregistrados\npara este mapa.',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(fontSize: 8, color: _muted),
+                ),
+              ),
+            )
+          else
+            pw.Image(
+              pw.MemoryImage(imgBytes),
+              width: colW,
+              height: mapH,
+              fit: pw.BoxFit.fill,
+            ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            '${events.length} acciones',
+            style: pw.TextStyle(
+              fontSize: 7,
+              color: _navy,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 3),
+          ...insights.map(
+            (s) => pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 3),
+              child: pw.Text(
+                '- $s',
+                style: const pw.TextStyle(fontSize: 7, color: _muted),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Análisis espacial del partido'),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: mapColumn(
+                title: 'Distribución general de eventos',
+                imgBytes: generalImg,
+                events: allEvents,
+              ),
+            ),
+            pw.SizedBox(width: 10),
+            pw.Expanded(
+              child: mapColumn(
+                title: 'Distribución de acciones ofensivas',
+                imgBytes: offensiveImg,
+                events: offensiveEvents,
+              ),
+            ),
+            pw.SizedBox(width: 10),
+            pw.Expanded(
+              child: mapColumn(
+                title: 'Distribución de acciones defensivas',
+                imgBytes: defensiveImg,
+                events: defensiveEvents,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   // ── Entry point ─────────────────────────────────────────────────────────────
   static Future<void> export({
     required PartidoModel match,
@@ -246,6 +426,36 @@ class MatchReportPdfExporter {
     final stats = _MatchStats(match: match, events: events);
     final sortedEvents = List<EventoPartidoModel>.from(events)
       ..sort((a, b) => a.minuto.compareTo(b.minuto));
+
+    // ── Separate events by category for spatial analysis ────────────────────
+    const offensiveTypes = {
+      EventTypes.goal,
+      EventTypes.assist,
+      EventTypes.shot,
+      EventTypes.shotOnTarget,
+      EventTypes.passKey,
+      EventTypes.cross,
+      EventTypes.corner,
+      EventTypes.penaltyFor,
+      EventTypes.offside,
+    };
+    const defensiveTypes = {
+      EventTypes.recovery,
+      EventTypes.interception,
+      EventTypes.save,
+      EventTypes.loss,
+      EventTypes.foul,
+      EventTypes.penaltyAgainst,
+    };
+    final offensiveEvents =
+        events.where((e) => offensiveTypes.contains(e.tipoEventoNombre)).toList();
+    final defensiveEvents =
+        events.where((e) => defensiveTypes.contains(e.tipoEventoNombre)).toList();
+
+    // Render heat maps before building PDF (off-screen via PictureRecorder)
+    final generalImg = await _renderPitchHeatMap(events);
+    final offensiveImg = await _renderPitchHeatMap(offensiveEvents);
+    final defensiveImg = await _renderPitchHeatMap(defensiveEvents);
 
     doc.addPage(
       pw.MultiPage(
@@ -297,6 +507,25 @@ class MatchReportPdfExporter {
             pw.SizedBox(height: 14),
             _buildInsights(stats),
           ],
+        ],
+      ),
+    );
+
+    // ── Página de análisis espacial (A4 landscape, 3 mapas en columnas) ──────
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+        header: (ctx) => _miniHeader(match),
+        build: (ctx) => [
+          _buildAnalisisEspacial(
+            generalImg: generalImg,
+            offensiveImg: offensiveImg,
+            defensiveImg: defensiveImg,
+            allEvents: events,
+            offensiveEvents: offensiveEvents,
+            defensiveEvents: defensiveEvents,
+          ),
         ],
       ),
     );
