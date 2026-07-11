@@ -12,6 +12,7 @@ import '../../data/remote/event_api.dart';
 import '../../data/remote/match_api.dart';
 import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
+import '../../widgets/match/pitch_view.dart';
 
 class MatchSummaryScreen extends StatefulWidget {
   final int matchId;
@@ -146,6 +147,9 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
                 ),
                 const SizedBox(height: AppConstants.sectionSpacing),
               ],
+
+              _HeatMapCard(events: _events),
+              const SizedBox(height: AppConstants.sectionSpacing),
 
               _EventsCard(events: _events),
               const SizedBox(height: AppConstants.sectionSpacing),
@@ -676,6 +680,228 @@ class _EventRow extends StatelessWidget {
 }
 
 // ── Info banner ───────────────────────────────────────────────────────────────
+
+class _HeatMapCard extends StatefulWidget {
+  static const int minEvents = 3;
+
+  final List<EventoPartidoModel> events;
+
+  const _HeatMapCard({required this.events});
+
+  @override
+  State<_HeatMapCard> createState() => _HeatMapCardState();
+}
+
+class _HeatMapCardState extends State<_HeatMapCard> {
+  static const _allFilter = 'Todos';
+  String _selectedFilter = _allFilter;
+
+  List<EventoPartidoModel> _eventsForFilter(
+    List<EventoPartidoModel> events,
+    String filter,
+  ) {
+    return switch (filter) {
+      'Pases' => events
+          .where((event) =>
+              event.tipoEventoNombre == EventTypes.passOk ||
+              event.tipoEventoNombre == EventTypes.passKey ||
+              event.tipoEventoNombre == EventTypes.passBad)
+          .toList(),
+      'Remates' => events
+          .where((event) => event.tipoEventoNombre == EventTypes.shot)
+          .toList(),
+      'Recuperaciones' => events
+          .where((event) =>
+              event.tipoEventoNombre == EventTypes.recovery ||
+              event.tipoEventoNombre == EventTypes.interception)
+          .toList(),
+      'Faltas' => events
+          .where((event) => event.tipoEventoNombre == EventTypes.foul)
+          .toList(),
+      'Goles' => events
+          .where((event) =>
+              event.tipoEventoNombre == EventTypes.goal ||
+              event.tipoEventoNombre == EventTypes.goalRival)
+          .toList(),
+      _ => events,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locatedEvents = widget.events
+        .where((event) =>
+            event.pitchX >= 0 &&
+            event.pitchX <= 1 &&
+            event.pitchY >= 0 &&
+            event.pitchY <= 1)
+        .toList();
+    final filteredEvents = _eventsForFilter(locatedEvents, _selectedFilter);
+    final enoughData = filteredEvents.length >= _HeatMapCard.minEvents;
+    final selectedLabel =
+        _selectedFilter == _allFilter ? 'el partido' : _selectedFilter;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'Mapa de calor'),
+          const SizedBox(height: 6),
+          Text(
+            'Acciones con ubicacion en $selectedLabel: ${filteredEvents.length}',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Minimo necesario: ${_HeatMapCard.minEvents} acciones',
+            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 10),
+          _HeatMapFilters(
+            selected: _selectedFilter,
+            onSelected: (filter) => setState(() => _selectedFilter = filter),
+          ),
+          const SizedBox(height: 12),
+          if (!enoughData)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.bgMuted,
+                borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+                border: Border.all(
+                  color: AppColors.borderSubtle,
+                  width: 0.5,
+                ),
+              ),
+              child: Text(
+                'Todavia no hay datos suficientes para el mapa de calor. '
+                'Registra al menos ${_HeatMapCard.minEvents} acciones con ubicacion en este filtro para visualizarlo.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final height = width * 1.34;
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+                  child: MatchPitchView(
+                    events: filteredEvents,
+                    width: width,
+                    height: height,
+                    showEventDots: false,
+                    showHeatMap: true,
+                  ),
+                );
+              },
+            ),
+          if (enoughData) ...[
+            const SizedBox(height: 10),
+            const Row(
+              children: [
+                _HeatLegendItem(color: Color(0xFF16A34A), label: 'Baja'),
+                SizedBox(width: 8),
+                _HeatLegendItem(color: Color(0xFFFFEB3B), label: 'Media'),
+                SizedBox(width: 8),
+                _HeatLegendItem(color: Color(0xFFF97316), label: 'Alta'),
+                SizedBox(width: 8),
+                _HeatLegendItem(color: Color(0xFFDC2626), label: 'Mayor'),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HeatMapFilters extends StatelessWidget {
+  static const filters = [
+    'Todos',
+    'Pases',
+    'Remates',
+    'Recuperaciones',
+    'Faltas',
+    'Goles',
+  ];
+
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  const _HeatMapFilters({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filters.map((filter) {
+          final isSelected = selected == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              selected: isSelected,
+              label: Text(filter),
+              labelStyle: TextStyle(
+                fontSize: 12,
+                color:
+                    isSelected ? Colors.black : AppColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              selectedColor: AppColors.accent,
+              backgroundColor: AppColors.bgMuted,
+              side: BorderSide(
+                color: isSelected ? AppColors.accent : AppColors.borderSubtle,
+                width: 0.5,
+              ),
+              onSelected: (_) => onSelected(filter),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _HeatLegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _HeatLegendItem({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _InfoBanner extends StatelessWidget {
   @override

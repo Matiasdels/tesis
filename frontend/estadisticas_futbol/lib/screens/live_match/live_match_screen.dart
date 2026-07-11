@@ -13,6 +13,7 @@ import '../../data/remote/event_api.dart';
 import '../../data/remote/health_api.dart';
 import '../../data/remote/match_api.dart';
 import '../../models/models.dart';
+import '../../widgets/match/pitch_view.dart';
 
 // =============================================================================
 //  MAIN SCREEN
@@ -1454,17 +1455,21 @@ class _PitchCanvas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(width, height),
-      painter: _PitchPainter(events: events, pendingTap: pendingTap),
+    return MatchPitchView(
+      events: events,
+      pendingTap: pendingTap,
+      width: width,
+      height: height,
     );
   }
 }
 
+// ignore: unused_element
 class _PitchPainter extends CustomPainter {
   final List<EventoPartidoModel> events;
   final Offset? pendingTap;
 
+  // ignore: unused_element_parameter
   const _PitchPainter({required this.events, this.pendingTap});
 
   static Color colorFor(String type) {
@@ -2090,7 +2095,7 @@ class _MiniEventRow extends StatelessWidget {
   final EventoPartidoModel event;
   const _MiniEventRow({required this.event});
 
-  Color get _color => _PitchPainter.colorFor(event.tipoEventoNombre);
+  Color get _color => PitchEventColors.colorFor(event.tipoEventoNombre);
 
   @override
   Widget build(BuildContext context) {
@@ -2160,7 +2165,7 @@ class _PlayerPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final eventColor = _PitchPainter.colorFor(eventType);
+    final eventColor = PitchEventColors.colorFor(eventType);
 
     return Container(
       decoration: BoxDecoration(
@@ -2455,7 +2460,7 @@ class _MoreEventsSheet extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: entry.value.map((type) {
-                        final color = _PitchPainter.colorFor(type);
+                        final color = PitchEventColors.colorFor(type);
                         return GestureDetector(
                           onTap: () => onSelect(type),
                           child: Container(
@@ -2551,7 +2556,7 @@ class _FullTimeline extends StatelessWidget {
                     itemCount: events.length,
                     itemBuilder: (_, i) {
                       final ev = events[i];
-                      final color = _PitchPainter.colorFor(ev.tipoEventoNombre);
+                      final color = PitchEventColors.colorFor(ev.tipoEventoNombre);
                       final isLast = i == events.length - 1;
 
                       return IntrinsicHeight(
