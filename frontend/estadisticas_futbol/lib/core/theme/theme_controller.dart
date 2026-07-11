@@ -40,4 +40,8 @@ class ThemeController extends ChangeNotifier {
       // The selected theme remains active even if local persistence fails.
     }
   }
+
+  Future<void> resetToDefaults() async {
+    await setDarkMode(true);
+  }
 }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
 import '../../data/remote/match_api.dart';
@@ -134,9 +135,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _requestPlayersWhenSessionIsReady(authState);
 
     final user = authState.user;
+    final settings = context.watch<AppSettingsController>().settings;
     final fullName = '${user?.nombre ?? ''} ${user?.apellido ?? ''}'.trim();
     final displayName =
         fullName.isEmpty ? user?.nombreUsuario ?? 'Usuario' : fullName;
+    final showWelcome = settings.showDashboardGreeting && _showWelcome;
 
     return PageScaffold(
       title: 'Panel',
@@ -155,13 +158,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             AnimatedSwitcher(
               duration: AppConstants.animNormal,
-              child: _showWelcome
+              child: showWelcome
                   ? _WelcomeCard(displayName: displayName)
                   : const SizedBox.shrink(),
             ),
-            if (_showWelcome)
+            if (showWelcome)
               const SizedBox(height: AppConstants.sectionSpacing),
-            _KpiRow(players: _players, loading: _loadingPlayers),
+            _KpiRow(
+              players: _players,
+              loading: _loadingPlayers,
+            ),
             const SizedBox(height: AppConstants.sectionSpacing),
             _RosterCard(
               players: _players,
@@ -242,7 +248,10 @@ class _KpiRow extends StatelessWidget {
   final List<PlayerModel> players;
   final bool loading;
 
-  const _KpiRow({required this.players, required this.loading});
+  const _KpiRow({
+    required this.players,
+    required this.loading,
+  });
 
   @override
   Widget build(BuildContext context) {
