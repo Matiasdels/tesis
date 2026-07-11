@@ -90,6 +90,19 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   Map<String, int> get _tipoEventoIds =>
       {for (final t in _tiposEvento) t.nombre: t.tipoEventoId};
 
+  // Jugadores con tarjeta roja (directo o por doble amarilla) en este partido
+  Set<int> get _expelledPlayers => _events
+      .where((e) =>
+          e.jugadorId != null && e.tipoEventoNombre == EventTypes.redCard)
+      .map((e) => e.jugadorId!)
+      .toSet();
+
+  int _yellowsFor(int jugadorId) => _events
+      .where((e) =>
+          e.jugadorId == jugadorId &&
+          e.tipoEventoNombre == EventTypes.yellowCard)
+      .length;
+
   // ==========================================================================
   //  LIFECYCLE
   // ==========================================================================
@@ -416,6 +429,21 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     if (_tapNorm == null || _pendingEvent == null) return;
     if (_savingEvent) return;
 
+    // Jugador expulsado: no permite registrar más eventos
+    if (_expelledPlayers.contains(player.jugadorId)) {
+      _showInfo(
+          'Este jugador fue expulsado y ya no puede registrar eventos.');
+      _dismissPlayerPicker();
+      return;
+    }
+
+    // Segunda amarilla → registrar amarilla + roja automática
+    if (_pendingEvent == EventTypes.yellowCard &&
+        _yellowsFor(player.jugadorId) >= 1) {
+      await _registerSecondYellow(player);
+      return;
+    }
+
     // Assist step 1: save assister, move to goalscorer selection
     if (_pendingEvent == EventTypes.assist && !_pickingGoalScorer) {
       setState(() {
@@ -538,6 +566,72 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _pickingGoalScorer = false;
         _savingEvent = false;
       });
+      _showEventRegistrationError();
+    }
+  }
+
+  Future<void> _registerSecondYellow(AlineacionEntradaModel player) async {
+    final yellowId = _tipoEventoIds[EventTypes.yellowCard];
+    final redId = _tipoEventoIds[EventTypes.redCard];
+    if (yellowId == null || redId == null) {
+      _showCatalogUpdateError();
+      return;
+    }
+
+    HapticFeedback.heavyImpact();
+    setState(() => _savingEvent = true);
+
+    try {
+      final yellowEvento = await _eventApi.createEvento(
+        partidoId: _matchId,
+        jugadorId: player.jugadorId,
+        nombreJugador: player.nombreJugador,
+        tipoEventoId: yellowId,
+        tipoEventoNombre: EventTypes.yellowCard,
+        minuto: _minute,
+        pitchX: _tapNorm!.dx,
+        pitchY: _tapNorm!.dy,
+        accessToken: _token,
+      );
+
+      final redEvento = await _eventApi.createEvento(
+        partidoId: _matchId,
+        jugadorId: player.jugadorId,
+        nombreJugador: player.nombreJugador,
+        tipoEventoId: redId,
+        tipoEventoNombre: EventTypes.redCard,
+        minuto: _minute,
+        pitchX: _tapNorm!.dx,
+        pitchY: _tapNorm!.dy,
+        accessToken: _token,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _events.insert(0, redEvento);
+        _events.insert(1, yellowEvento);
+        _showPlayerPicker = false;
+        _pendingEvent = null;
+        _tapNorm = null;
+        _tapLocal = null;
+        _savingEvent = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Segunda amarilla: ${player.nombreJugador} fue expulsado.'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      if (yellowEvento.eventoId < 0 || redEvento.eventoId < 0) {
+        _showSavedOnDeviceMessage();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _savingEvent = false);
       _showEventRegistrationError();
     }
   }
@@ -892,6 +986,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                       eventType: _pendingEvent!,
                       minute: _minute,
                       lineup: _lineup,
+                      expelledPlayerIds: _expelledPlayers,
                       saving: _savingEvent,
                       pickingGoalScorer: _pickingGoalScorer,
                       assisterName: _assistPlayer?.nombreJugador,
@@ -1702,11 +1797,11 @@ const _sectors = [
   _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded, AppColors.warning),
   _SectorData('Al arco', EventTypes.shotOnTarget, Icons.gps_fixed_rounded, Color(0xFFFF9800)),
   _SectorData('Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
+  _SectorData('Gol rival', EventTypes.goalRival, Icons.sports_soccer_rounded, AppColors.danger),
   _SectorData('Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
   _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded, AppColors.warning),
   _SectorData('Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
-  _SectorData('Penal ✓', EventTypes.penaltyFor, Icons.ads_click_rounded, AppColors.accent),
-  _SectorData('Penal ✗', EventTypes.penaltyAgainst, Icons.block_rounded, AppColors.danger),
+  _SectorData('Pérdida', EventTypes.loss, Icons.remove_circle_outline_rounded, AppColors.purple),
 ];
 
 class _RadialOverlay extends StatelessWidget {
@@ -2141,6 +2236,7 @@ class _PlayerPicker extends StatelessWidget {
   final String eventType;
   final int minute;
   final List<AlineacionEntradaModel> lineup;
+  final Set<int> expelledPlayerIds;
   final bool saving;
   final bool pickingGoalScorer;
   final String? assisterName;
@@ -2152,6 +2248,7 @@ class _PlayerPicker extends StatelessWidget {
     required this.eventType,
     required this.minute,
     required this.lineup,
+    required this.expelledPlayerIds,
     required this.saving,
     this.pickingGoalScorer = false,
     this.assisterName,
@@ -2249,9 +2346,12 @@ class _PlayerPicker extends StatelessWidget {
                   onTap: saving ? null : onSelectNone,
                 );
               }
+              final isExpelled =
+                  expelledPlayerIds.contains(lineup[i].jugadorId);
               return _PlayerCell(
                 player: lineup[i],
                 eventColor: eventColor,
+                isExpelled: isExpelled,
                 onTap: saving ? null : () => onSelect(lineup[i]),
               );
             },
@@ -2262,14 +2362,30 @@ class _PlayerPicker extends StatelessWidget {
   }
 }
 
+// Retorna el color de la línea según la posición del jugador.
+// Elimina dígitos finales (MC1, DFC2...) antes de hacer el match.
+Color _positionLineColor(String? pos) {
+  if (pos == null || pos.isEmpty) return AppColors.textMuted;
+  final base = pos.replaceAll(RegExp(r'\d+$'), '');
+  return switch (base) {
+    'ARQ' => Colors.white,
+    'LD' || 'DFC' || 'LI' => AppColors.info,
+    'MD' || 'MCD' || 'MC' || 'MCO' || 'MI' => AppColors.warning,
+    'ED' || 'EI' || 'DC' || 'DEL' => AppColors.danger,
+    _ => AppColors.textMuted,
+  };
+}
+
 class _PlayerCell extends StatelessWidget {
   final AlineacionEntradaModel player;
   final Color eventColor;
+  final bool isExpelled;
   final VoidCallback? onTap;
 
   const _PlayerCell({
     required this.player,
     required this.eventColor,
+    required this.isExpelled,
     required this.onTap,
   });
 
@@ -2277,6 +2393,7 @@ class _PlayerCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final surname = player.nombreJugador.split(' ').last;
     final number = player.numeroCamiseta;
+    final posColor = _positionLineColor(player.posicionAsignada);
 
     return Material(
       color: Colors.transparent,
@@ -2286,36 +2403,71 @@ class _PlayerCell extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.all(2),
           decoration: BoxDecoration(
-            color: AppColors.bgMuted,
+            color: isExpelled ? AppColors.dangerDim : AppColors.bgMuted,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.borderSubtle, width: 0.5),
+            border: Border.all(
+              color: isExpelled
+                  ? AppColors.danger.withValues(alpha: 0.45)
+                  : AppColors.borderSubtle,
+              width: 0.5,
+            ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: eventColor.withValues(alpha: 0.15),
-                child: Text(
-                  number != null ? '$number' : '?',
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: eventColor,
-                      fontWeight: FontWeight.w600),
-                ),
+                backgroundColor: isExpelled
+                    ? AppColors.danger.withValues(alpha: 0.20)
+                    : eventColor.withValues(alpha: 0.15),
+                child: isExpelled
+                    ? const Icon(Icons.square_rounded,
+                        size: 14, color: AppColors.danger)
+                    : Text(
+                        number != null ? '$number' : '?',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: eventColor,
+                            fontWeight: FontWeight.w600),
+                      ),
               ),
               const SizedBox(height: 4),
               Text(
                 surname,
-                style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 9,
+                  color: isExpelled
+                      ? AppColors.textMuted
+                      : AppColors.textSecondary,
+                  decoration:
+                      isExpelled ? TextDecoration.lineThrough : null,
+                ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              Text(
-                player.posicionAsignada ?? '',
-                style: TextStyle(fontSize: 8, color: AppColors.textMuted),
-              ),
+              if (isExpelled)
+                const Text('Expulsado',
+                    style: TextStyle(
+                        fontSize: 7, color: AppColors.danger))
+              else if (player.posicionAsignada != null &&
+                  player.posicionAsignada!.isNotEmpty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: posColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    player.posicionAsignada!,
+                    style: TextStyle(
+                      fontSize: 7,
+                      color: posColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

@@ -11,6 +11,19 @@ import '../../data/remote/player_api.dart';
 import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
 
+// Retorna el color de la línea según la posición (MC1→MC, DFC2→DFC, etc.)
+Color _positionLineColor(String? pos) {
+  if (pos == null || pos.isEmpty) return AppColors.textMuted;
+  final base = pos.replaceAll(RegExp(r'\d+$'), '');
+  return switch (base) {
+    'ARQ' => Colors.white,
+    'LD' || 'DFC' || 'LI' => AppColors.info,
+    'MD' || 'MCD' || 'MC' || 'MCO' || 'MI' => AppColors.warning,
+    'ED' || 'EI' || 'DC' || 'DEL' => AppColors.danger,
+    _ => AppColors.textMuted,
+  };
+}
+
 // =============================================================================
 //  FORMATION DATA
 // =============================================================================
@@ -723,6 +736,7 @@ class _PositionSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assigned = player != null;
+    final posColor = _positionLineColor(slotDef.position);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -730,11 +744,11 @@ class _PositionSlot extends StatelessWidget {
           shape: BoxShape.circle,
           color: assigned
               ? AppColors.accent.withValues(alpha: 0.92)
-              : AppColors.bgCard.withValues(alpha: 0.82),
+              : posColor.withValues(alpha: 0.18),
           border: Border.all(
             color: assigned
                 ? AppColors.accent
-                : Colors.white.withValues(alpha: 0.5),
+                : posColor.withValues(alpha: 0.7),
             width: assigned ? 2.0 : 1.5,
           ),
           boxShadow: [
@@ -771,13 +785,12 @@ class _PositionSlot extends StatelessWidget {
               Text(
                 slotDef.position,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: posColor,
                   fontSize: 8,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Icon(Icons.add,
-                  size: 10, color: Colors.white.withValues(alpha: 0.6)),
+              Icon(Icons.add, size: 10, color: posColor.withValues(alpha: 0.7)),
             ],
           ],
         ),
@@ -1240,8 +1253,8 @@ class _PlayerPickerTile extends StatelessWidget {
                               ? player.position
                               : '—',
                           style: TextStyle(
-                            color: isPreferred
-                                ? AppColors.accent
+                            color: player.position.isNotEmpty
+                                ? _positionLineColor(player.position)
                                 : AppColors.textMuted,
                             fontSize: 11,
                             fontWeight: isPreferred
