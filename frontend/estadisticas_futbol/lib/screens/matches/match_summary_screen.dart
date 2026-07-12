@@ -31,6 +31,8 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
   bool _loading = true;
   String? _error;
   bool _exportingPdf = false;
+  bool _generatingAnalysis = false;
+  AnalisisPartidoModel? _analysis;
 
   @override
   void initState() {
@@ -149,6 +151,13 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
               ],
 
               _HeatMapCard(events: _events),
+              const SizedBox(height: AppConstants.sectionSpacing),
+
+              _IntelligentAnalysisCard(
+                analysis: _analysis,
+                generating: _generatingAnalysis,
+                onGenerate: _generateAnalysis,
+              ),
               const SizedBox(height: AppConstants.sectionSpacing),
 
               _EventsCard(events: _events),
@@ -316,6 +325,51 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
 
   String _formatDateFile(DateTime d) =>
       '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _generateAnalysis() async {
+    if (_generatingAnalysis) return;
+
+    setState(() => _generatingAnalysis = true);
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      final result =
+          await _matchApi.generateIntelligentAnalysis(widget.matchId, token);
+
+      if (!mounted) return;
+      setState(() {
+        _analysis = result;
+        _generatingAnalysis = false;
+      });
+
+      final message = result.generadoConIa
+          ? 'Análisis generado correctamente.'
+          : result.mensaje ??
+              'Esta función necesita conexión a internet para generar el análisis.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is MatchApiException
+          ? error.message
+          : 'No se pudo conectar con el servidor. Verifica que este iniciado e intenta nuevamente.';
+      setState(() {
+        _analysis = AnalisisPartidoModel(
+          resumenGeneral: '',
+          puntosPositivos: const [],
+          aspectosAMejorar: const [],
+          sugerenciasEntrenamiento: const [],
+          analisisZonas: '',
+          generadoConIa: false,
+          mensaje: message,
+        );
+        _generatingAnalysis = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
 }
 
 // ── Score banner ──────────────────────────────────────────────────────────────
@@ -895,6 +949,269 @@ class _HeatLegendItem extends StatelessWidget {
               label,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IntelligentAnalysisCard extends StatelessWidget {
+  final AnalisisPartidoModel? analysis;
+  final bool generating;
+  final VoidCallback onGenerate;
+
+  const _IntelligentAnalysisCard({
+    required this.analysis,
+    required this.generating,
+    required this.onGenerate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMessage = analysis?.mensaje?.trim().isNotEmpty ?? false;
+    final hasContent = analysis?.hasContent ?? false;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: SectionHeader(title: 'Análisis inteligente'),
+              ),
+              if (analysis?.generadoConIa ?? false)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.purpleDim,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppColors.purple.withValues(alpha: 0.4),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: const Text(
+                    'IA',
+                    style: TextStyle(
+                      color: AppColors.purple,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Generá una lectura del partido a partir de los eventos registrados.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: generating ? null : onGenerate,
+              icon: generating
+                  ? SizedBox(
+                      width: 17,
+                      height: 17,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.bgDeep,
+                      ),
+                    )
+                  : const Icon(Icons.auto_awesome_rounded, size: 18),
+              label: Text(
+                generating
+                    ? 'Generando análisis...'
+                    : 'Generar análisis inteligente',
+              ),
+            ),
+          ),
+          if (hasMessage) ...[
+            const SizedBox(height: 12),
+            _AnalysisMessage(message: analysis!.mensaje!),
+          ],
+          if (hasContent) ...[
+            const SizedBox(height: 14),
+            _AnalysisTextSection(
+              title: 'Resumen general',
+              content: analysis!.resumenGeneral,
+            ),
+            _AnalysisListSection(
+              title: 'Puntos positivos',
+              items: analysis!.puntosPositivos,
+              icon: Icons.check_circle_outline_rounded,
+              color: AppColors.accent,
+            ),
+            _AnalysisListSection(
+              title: 'Aspectos a mejorar',
+              items: analysis!.aspectosAMejorar,
+              icon: Icons.tips_and_updates_outlined,
+              color: AppColors.warning,
+            ),
+            _AnalysisListSection(
+              title: 'Sugerencias para entrenar',
+              items: analysis!.sugerenciasEntrenamiento,
+              icon: Icons.sports_soccer_rounded,
+              color: AppColors.info,
+            ),
+            if (analysis!.analisisZonas.trim().isNotEmpty)
+              _AnalysisTextSection(
+                title: 'Análisis por zonas',
+                content: analysis!.analisisZonas,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalysisMessage extends StatelessWidget {
+  final String message;
+
+  const _AnalysisMessage({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warningDim,
+        borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+        border: Border.all(
+          color: AppColors.warning.withValues(alpha: 0.35),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            color: AppColors.warning,
+            size: 18,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.warning,
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalysisTextSection extends StatelessWidget {
+  final String title;
+  final String content;
+
+  const _AnalysisTextSection({
+    required this.title,
+    required this.content,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (content.trim().isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            content,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              height: 1.42,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalysisListSection extends StatelessWidget {
+  final String title;
+  final List<String> items;
+  final IconData icon;
+  final Color color;
+
+  const _AnalysisListSection({
+    required this.title,
+    required this.items,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 7),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 15, color: color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

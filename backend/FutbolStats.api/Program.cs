@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+var geminiSection = builder.Configuration.GetSection("Gemini");
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -54,6 +55,8 @@ builder.Services.AddDbContext<FutbolStatsDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddScoped<PasswordHasher>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.Configure<GeminiOptions>(geminiSection);
+builder.Services.AddHttpClient<AnalisisPartidoService>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

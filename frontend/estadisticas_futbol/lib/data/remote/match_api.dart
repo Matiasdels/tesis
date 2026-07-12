@@ -139,6 +139,26 @@ class MatchApi {
     }
   }
 
+  Future<AnalisisPartidoModel> generateIntelligentAnalysis(
+    int id,
+    String accessToken,
+  ) async {
+    final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/api/Partidos/$id/analisis-inteligente');
+    final response = await _client.post(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw MatchApiException(
+          _friendlyError(response.statusCode, response.body));
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return AnalisisPartidoModel.fromApi(json);
+  }
+
   Future<List<AlineacionEntradaModel>> getLineup(
     int matchId,
     String accessToken,
