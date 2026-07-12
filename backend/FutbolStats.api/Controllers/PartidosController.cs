@@ -1,5 +1,6 @@
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
+using FutbolStats.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,9 @@ namespace FutbolStats.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class PartidosController(FutbolStatsDbContext context) : ControllerBase
+public class PartidosController(
+    FutbolStatsDbContext context,
+    AnalisisPartidoService analisisPartidoService) : ControllerBase
 {
     private static readonly string[] TiposCompeticionValidos = ["Liga", "Copa", "Amistoso", "Torneo"];
     private static readonly string[] EstadosValidos = ["Programado", "EnJuego", "Finalizado", "Cancelado"];
@@ -122,6 +125,13 @@ public class PartidosController(FutbolStatsDbContext context) : ControllerBase
         partido.Activo = false;
         await context.SaveChangesAsync();
         return NoContent();
+    }
+
+    [HttpPost("{id:int}/analisis-inteligente")]
+    public async Task<IActionResult> GenerarAnalisisInteligente(int id, CancellationToken cancellationToken)
+    {
+        var analisis = await analisisPartidoService.GenerarAsync(id, cancellationToken);
+        return analisis is null ? NotFound("Partido no encontrado.") : Ok(analisis);
     }
 
     [HttpGet("{id:int}/alineacion")]

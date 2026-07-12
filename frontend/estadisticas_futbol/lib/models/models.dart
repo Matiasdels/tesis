@@ -334,6 +334,50 @@ class EventoPartidoModel {
       );
 }
 
+class AnalisisPartidoModel {
+  final String resumenGeneral;
+  final List<String> puntosPositivos;
+  final List<String> aspectosAMejorar;
+  final List<String> sugerenciasEntrenamiento;
+  final String analisisZonas;
+  final bool generadoConIa;
+  final String? mensaje;
+
+  const AnalisisPartidoModel({
+    required this.resumenGeneral,
+    required this.puntosPositivos,
+    required this.aspectosAMejorar,
+    required this.sugerenciasEntrenamiento,
+    required this.analisisZonas,
+    required this.generadoConIa,
+    this.mensaje,
+  });
+
+  bool get hasContent =>
+      resumenGeneral.trim().isNotEmpty ||
+      puntosPositivos.isNotEmpty ||
+      aspectosAMejorar.isNotEmpty ||
+      sugerenciasEntrenamiento.isNotEmpty ||
+      analisisZonas.trim().isNotEmpty;
+
+  factory AnalisisPartidoModel.fromApi(Map<String, dynamic> json) {
+    return AnalisisPartidoModel(
+      resumenGeneral: json['resumenGeneral'] as String? ?? '',
+      puntosPositivos: _stringList(json['puntosPositivos']),
+      aspectosAMejorar: _stringList(json['aspectosAMejorar']),
+      sugerenciasEntrenamiento: _stringList(json['sugerenciasEntrenamiento']),
+      analisisZonas: json['analisisZonas'] as String? ?? '',
+      generadoConIa: json['generadoConIa'] as bool? ?? false,
+      mensaje: json['mensaje'] as String?,
+    );
+  }
+
+  static List<String> _stringList(Object? value) {
+    if (value is! List) return const [];
+    return value.whereType<String>().toList();
+  }
+}
+
 class TipoEventoModel {
   final int tipoEventoId;
   final String nombre;
