@@ -166,6 +166,13 @@ abstract class EstadosPartido {
   ];
 }
 
+abstract class MatchPeriod {
+  static const String primerTiempo = 'PrimerTiempo';
+  static const String entretiempo = 'Entretiempo';
+  static const String segundoTiempo = 'SegundoTiempo';
+  static const String finalizado = 'Finalizado';
+}
+
 abstract class PlayerPositions {
   static const String goalkeeper = 'ARQ';
 
