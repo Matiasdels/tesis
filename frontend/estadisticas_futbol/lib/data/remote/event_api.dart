@@ -95,6 +95,7 @@ class EventApi {
     required double pitchX,
     required double pitchY,
     String? observacion,
+    String? periodo,
     required String accessToken,
   }) async {
     final endpoint = '/api/Partidos/$partidoId/eventos';
@@ -107,6 +108,7 @@ class EventApi {
       'pitchX': pitchX,
       'pitchY': pitchY,
       if (observacion != null) 'observacion': observacion,
+      if (periodo != null) 'periodo': periodo,
     };
 
     try {
@@ -121,6 +123,8 @@ class EventApi {
       );
       _checkStatus(response);
       final json = jsonDecode(response.body) as Map<String, dynamic>;
+      // Preserve periodo in local cache since backend may not return it
+      if (periodo != null && json['periodo'] == null) json['periodo'] = periodo;
       await _appendCachedEvento(partidoId, json);
       return EventoPartidoModel.fromApi(json);
     } on EventApiException {
@@ -145,6 +149,7 @@ class EventApi {
         'pitchX': pitchX,
         'pitchY': pitchY,
         'observacion': observacion,
+        'periodo': periodo,
       };
       await _appendCachedEvento(partidoId, localJson);
       return EventoPartidoModel.fromApi(localJson);

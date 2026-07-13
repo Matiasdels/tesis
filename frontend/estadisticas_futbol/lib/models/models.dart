@@ -305,6 +305,7 @@ class EventoPartidoModel {
   final double pitchX;
   final double pitchY;
   final String? observacion;
+  final String? periodo; // 'PrimerTiempo' | 'SegundoTiempo' | null (legado)
 
   const EventoPartidoModel({
     required this.eventoId,
@@ -317,6 +318,7 @@ class EventoPartidoModel {
     required this.pitchX,
     required this.pitchY,
     this.observacion,
+    this.periodo,
   });
 
   factory EventoPartidoModel.fromApi(Map<String, dynamic> json) =>
@@ -331,6 +333,7 @@ class EventoPartidoModel {
         pitchX: (json['pitchX'] as num?)?.toDouble() ?? 0.5,
         pitchY: (json['pitchY'] as num?)?.toDouble() ?? 0.5,
         observacion: json['observacion'] as String?,
+        periodo: json['periodo'] as String?,
       );
 }
 
