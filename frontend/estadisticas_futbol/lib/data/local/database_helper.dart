@@ -186,6 +186,19 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> deletePendingMatchEstado(int partidoId) async {
+    final db = await database;
+    await db.delete(
+      'sync_queue',
+      where: "entity = ? AND action = ? AND endpoint LIKE ?",
+      whereArgs: [
+        'partido_estado',
+        'update_period',
+        '%/api/Partidos/$partidoId/estado%',
+      ],
+    );
+  }
+
   Future<int> pendingSyncCount() async {
     final db = await database;
     final result =

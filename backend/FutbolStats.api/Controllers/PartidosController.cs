@@ -63,6 +63,7 @@ public class PartidosController(
             TipoCompeticion = request.TipoCompeticion,
             Lugar = string.IsNullOrWhiteSpace(request.Lugar) ? null : request.Lugar.Trim(),
             Estado = request.Estado,
+            DefinicionEmpate = request.DefinicionEmpate ?? "TerminaEnEmpate",
         };
 
         context.Partidos.Add(partido);
@@ -88,6 +89,7 @@ public class PartidosController(
         partido.TipoCompeticion = request.TipoCompeticion;
         partido.Lugar = string.IsNullOrWhiteSpace(request.Lugar) ? null : request.Lugar.Trim();
         partido.Estado = request.Estado;
+        partido.DefinicionEmpate = request.DefinicionEmpate ?? partido.DefinicionEmpate;
 
         await context.SaveChangesAsync();
         await context.Entry(partido).Reference(p => p.Categoria).LoadAsync();
@@ -109,6 +111,8 @@ public class PartidosController(
         if (request.GolesEquipo.HasValue) partido.GolesEquipo = request.GolesEquipo;
         if (request.GolesRival.HasValue) partido.GolesRival = request.GolesRival;
         if (request.MinutoActual.HasValue) partido.MinutoActual = request.MinutoActual;
+        if (request.PeriodoActual != null) partido.PeriodoActual = request.PeriodoActual;
+        if (request.HuboAlargue.HasValue) partido.HuboAlargue = request.HuboAlargue.Value;
 
         await context.SaveChangesAsync();
         await context.Entry(partido).Reference(p => p.Categoria).LoadAsync();
@@ -259,7 +263,10 @@ public class PartidosController(
         p.GolesEquipo,
         p.GolesRival,
         p.MinutoActual,
-        p.Formacion);
+        p.Formacion,
+        p.DefinicionEmpate,
+        p.PeriodoActual,
+        p.HuboAlargue);
 
     private static AlineacionEntradaResponse ToAlineacionResponse(Alineacion a) => new(
         a.AlineacionId,
@@ -277,7 +284,8 @@ public record PartidoRequest(
     DateTime Fecha,
     string TipoCompeticion,
     string? Lugar,
-    string Estado);
+    string Estado,
+    string? DefinicionEmpate);
 
 public record PartidoResponse(
     int PartidoId,
@@ -292,9 +300,18 @@ public record PartidoResponse(
     int? GolesEquipo,
     int? GolesRival,
     int? MinutoActual,
-    string? Formacion);
+    string? Formacion,
+    string DefinicionEmpate,
+    string? PeriodoActual,
+    bool HuboAlargue);
 
-public record EstadoRequest(string Estado, int? GolesEquipo, int? GolesRival, int? MinutoActual);
+public record EstadoRequest(
+    string Estado,
+    int? GolesEquipo,
+    int? GolesRival,
+    int? MinutoActual,
+    string? PeriodoActual,
+    bool? HuboAlargue);
 
 public record AlineacionRequest(string? Formacion, List<AlineacionEntrada>? Jugadores);
 public record AlineacionEntrada(int JugadorId, bool EsTitular, string? PosicionAsignada);

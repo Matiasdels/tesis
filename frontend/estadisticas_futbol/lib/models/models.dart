@@ -218,6 +218,9 @@ class PartidoModel {
   final int? golesRival;
   final int? minutoActual;
   final String? formacion;
+  final String definicionEmpate;
+  final String? periodoActual;
+  final bool huboAlargue;
 
   const PartidoModel({
     required this.id,
@@ -233,6 +236,9 @@ class PartidoModel {
     this.golesRival,
     this.minutoActual,
     this.formacion,
+    this.definicionEmpate = 'TerminaEnEmpate',
+    this.periodoActual,
+    this.huboAlargue = false,
   });
 
   bool get isProgramado => estado == 'Programado';
@@ -253,6 +259,10 @@ class PartidoModel {
         golesRival: json['golesRival'] as int?,
         minutoActual: json['minutoActual'] as int?,
         formacion: json['formacion'] as String?,
+        definicionEmpate:
+            json['definicionEmpate'] as String? ?? 'TerminaEnEmpate',
+        periodoActual: json['periodoActual'] as String?,
+        huboAlargue: json['huboAlargue'] as bool? ?? false,
       );
 
   Map<String, dynamic> toApiJson() => {
@@ -263,6 +273,7 @@ class PartidoModel {
         'tipoCompeticion': tipoCompeticion,
         'lugar': lugar,
         'estado': estado,
+        'definicionEmpate': definicionEmpate,
       };
 }
 

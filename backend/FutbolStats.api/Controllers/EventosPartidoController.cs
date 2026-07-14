@@ -60,6 +60,7 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
             PitchX = request.PitchX,
             PitchY = request.PitchY,
             Observacion = string.IsNullOrWhiteSpace(request.Observacion) ? null : request.Observacion.Trim(),
+            Periodo = string.IsNullOrWhiteSpace(request.Periodo) ? null : request.Periodo.Trim(),
             FechaRegistro = DateTime.UtcNow,
         };
 
@@ -96,7 +97,8 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
         e.PitchX,
         e.PitchY,
         e.Observacion,
-        e.FechaRegistro);
+        e.FechaRegistro,
+        e.Periodo);
 }
 
 public class EventoRequest
@@ -107,6 +109,7 @@ public class EventoRequest
     public decimal? PitchX { get; set; }
     public decimal? PitchY { get; set; }
     public string? Observacion { get; set; }
+    public string? Periodo { get; set; }
 }
 
 public record EventoResponse(
@@ -120,4 +123,5 @@ public record EventoResponse(
     decimal? PitchX,
     decimal? PitchY,
     string? Observacion,
-    DateTime FechaRegistro);
+    DateTime FechaRegistro,
+    string? Periodo);

@@ -39,6 +39,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   // ── Period management ──────────────────────────────────────────────────────
   String _currentPeriod = MatchPeriod.primerTiempo;
   int? _firstHalfEndSeconds;
+  int? _secondHalfEndSeconds;
+  int? _primerTiempoAlargueEndSeconds;
+  String _definicionEmpate = DefinicionEmpate.terminaEnEmpate;
 
   // ── Match data (loaded from API) ───────────────────────────────────────────
   PartidoModel? _partido;
@@ -180,8 +183,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
           .length;
 
       // Restore local period state (overrides server minutoActual if present)
-      var restoredPeriod = MatchPeriod.primerTiempo;
+      var restoredPeriod = partido.periodoActual ?? MatchPeriod.primerTiempo;
       int? restoredFirstHalfEnd;
+      int? restoredSecondHalfEnd;
+      int? restoredPrimerTiempoAlargueEnd;
       var restoredMinute = partido.minutoActual ?? 0;
       var restoredRunning = partido.isEnJuego;
 
@@ -189,23 +194,23 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
           .readJsonMap('match:$_matchId:period_state');
       if (periodState != null) {
         restoredPeriod =
-            periodState['period'] as String? ?? MatchPeriod.primerTiempo;
+            periodState['period'] as String? ?? restoredPeriod;
         restoredFirstHalfEnd = periodState['firstHalfEndSeconds'] as int?;
+        restoredSecondHalfEnd = periodState['secondHalfEndSeconds'] as int?;
+        restoredPrimerTiempoAlargueEnd =
+            periodState['primerTiempoAlargueEndSeconds'] as int?;
         final savedElapsed = periodState['elapsedSeconds'] as int?;
         final wasRunning = periodState['wasRunning'] as bool? ?? false;
         final savedAtMs = periodState['savedAtMs'] as int?;
         if (savedElapsed != null) {
           var elapsed = savedElapsed;
-          if (wasRunning &&
-              savedAtMs != null &&
-              restoredPeriod != MatchPeriod.entretiempo) {
+          if (wasRunning && savedAtMs != null && MatchPeriod.isActive(restoredPeriod)) {
             elapsed +=
                 (DateTime.now().millisecondsSinceEpoch - savedAtMs) ~/ 1000;
           }
           restoredMinute = elapsed;
         }
-        // Entretiempo: clock must not be running
-        if (restoredPeriod == MatchPeriod.entretiempo) restoredRunning = false;
+        if (MatchPeriod.isBreak(restoredPeriod)) restoredRunning = false;
       }
 
       if (!mounted) return;
@@ -217,9 +222,12 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _minute = restoredMinute;
         _currentPeriod = restoredPeriod;
         _firstHalfEndSeconds = restoredFirstHalfEnd;
+        _secondHalfEndSeconds = restoredSecondHalfEnd;
+        _primerTiempoAlargueEndSeconds = restoredPrimerTiempoAlargueEnd;
         _homeScore = homeScore;
         _awayScore = awayScore;
         _isRunning = restoredRunning;
+        _definicionEmpate = partido.definicionEmpate;
         _loading = false;
       });
 
@@ -329,6 +337,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
           golesEquipo: _homeScore,
           golesRival: _awayScore,
           minutoActual: _minute ~/ 60,
+          periodoActual: _currentPeriod,
         )
         .ignore();
   }
@@ -343,7 +352,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   // ==========================================================================
 
   void _handlePitchTapDown(TapDownDetails details, BoxConstraints constraints) {
-    if (_currentPeriod == MatchPeriod.entretiempo) return;
+    if (MatchPeriod.isBreak(_currentPeriod)) return;
     if (_showRadial) {
       _closeRadial();
       return;
@@ -439,7 +448,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   }
 
   void _openMoreEvents() {
-    if (_currentPeriod == MatchPeriod.entretiempo) return;
+    if (MatchPeriod.isBreak(_currentPeriod)) return;
     _radialAnimCtrl.reverse();
     setState(() => _showRadial = false);
 
@@ -824,7 +833,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         title: Text('Finalizar primer tiempo',
             style: TextStyle(color: AppColors.textPrimary)),
         content: Text(
-          '¿Confirmas que termino el primer tiempo?',
+          '¿Confirmas que terminó el primer tiempo?',
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
@@ -842,32 +851,16 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     );
     if (confirm != true || !mounted) return;
 
-    setState(() => _finishing = true);
-    _matchTimer?.cancel();
-    _firstHalfEndSeconds = _minute;
-
-    try {
-      await _matchApi.patchEstado(
-        _matchId,
-        'EnJuego',
-        _token,
-        golesEquipo: _homeScore,
-        golesRival: _awayScore,
-        minutoActual: _minute ~/ 60,
-      );
-      if (!mounted) return;
-      setState(() {
-        _currentPeriod = MatchPeriod.entretiempo;
-        _isRunning = false;
-        _finishing = false;
-      });
-      await _savePeriodState();
-    } catch (_) {
-      if (mounted) {
-        _showError('No se pudo finalizar el primer tiempo. Intente nuevamente.');
-        setState(() => _finishing = false);
-      }
-    }
+    setState(() {
+      _finishing = true;
+      _matchTimer?.cancel();
+      _firstHalfEndSeconds = _minute;
+      _isRunning = false;
+      _currentPeriod = MatchPeriod.entretiempo;
+    });
+    await _savePeriodState();
+    await _patchPeriodTransition(periodoActual: MatchPeriod.entretiempo, huboAlargue: false);
+    if (mounted) setState(() => _finishing = false);
   }
 
   Future<void> _startSecondHalf() async {
@@ -878,16 +871,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     });
     _startMatchTimer();
     await _savePeriodState();
-    _matchApi
-        .patchEstado(
-          _matchId,
-          'EnJuego',
-          _token,
-          golesEquipo: _homeScore,
-          golesRival: _awayScore,
-          minutoActual: _minute ~/ 60,
-        )
-        .ignore();
+    await _patchPeriodTransition(periodoActual: MatchPeriod.segundoTiempo, huboAlargue: false);
   }
 
   Future<void> _finishSecondHalf() async {
@@ -916,9 +900,123 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     );
     if (confirm != true || !mounted) return;
 
-    setState(() => _finishing = true);
-    _matchTimer?.cancel();
+    setState(() {
+      _finishing = true;
+      _matchTimer?.cancel();
+      _secondHalfEndSeconds = _minute;
+      _isRunning = false;
+      _currentPeriod = MatchPeriod.segundoTiempoFinalizado;
+    });
+    await _savePeriodState();
+    await _patchPeriodTransition(
+        periodoActual: MatchPeriod.segundoTiempoFinalizado, huboAlargue: false);
+    if (mounted) setState(() => _finishing = false);
+  }
 
+  Future<void> _startAlargue() async {
+    if (!mounted) return;
+    setState(() {
+      _currentPeriod = MatchPeriod.primerTiempoAlargue;
+      _isRunning = true;
+    });
+    _startMatchTimer();
+    await _savePeriodState();
+    await _patchPeriodTransition(
+        periodoActual: MatchPeriod.primerTiempoAlargue, huboAlargue: true);
+  }
+
+  Future<void> _finishPrimerTiempoAlargue() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.bgSurface,
+        title: Text('Finalizar 1T del alargue',
+            style: TextStyle(color: AppColors.textPrimary)),
+        content: Text(
+          '¿Confirmas que terminó el primer tiempo del alargue?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Finalizar',
+                style: TextStyle(color: AppColors.warning)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() {
+      _finishing = true;
+      _matchTimer?.cancel();
+      _primerTiempoAlargueEndSeconds = _minute;
+      _isRunning = false;
+      _currentPeriod = MatchPeriod.descansoAlargue;
+    });
+    await _savePeriodState();
+    await _patchPeriodTransition(
+        periodoActual: MatchPeriod.descansoAlargue, huboAlargue: true);
+    if (mounted) setState(() => _finishing = false);
+  }
+
+  Future<void> _startSegundoTiempoAlargue() async {
+    if (!mounted) return;
+    setState(() {
+      _currentPeriod = MatchPeriod.segundoTiempoAlargue;
+      _isRunning = true;
+    });
+    _startMatchTimer();
+    await _savePeriodState();
+    await _patchPeriodTransition(
+        periodoActual: MatchPeriod.segundoTiempoAlargue, huboAlargue: true);
+  }
+
+  Future<void> _finishAlargue() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.bgSurface,
+        title: Text('Finalizar alargue',
+            style: TextStyle(color: AppColors.textPrimary)),
+        content: Text(
+          '¿Confirmas el resultado $_homeScore - $_awayScore al terminar el alargue?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Finalizar',
+                style: TextStyle(color: AppColors.accent)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() {
+      _finishing = true;
+      _matchTimer?.cancel();
+      _isRunning = false;
+      _currentPeriod = MatchPeriod.alargueFinalizado;
+    });
+    await _savePeriodState();
+    await _patchPeriodTransition(
+        periodoActual: MatchPeriod.alargueFinalizado, huboAlargue: true);
+    if (mounted) setState(() => _finishing = false);
+  }
+
+  Future<void> _confirmFinishMatch() async {
+    setState(() => _finishing = true);
+    final huboAlargue = MatchPeriod.hasExtraTime(_currentPeriod);
     try {
       await _matchApi.patchEstado(
         _matchId,
@@ -927,16 +1025,51 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         golesEquipo: _homeScore,
         golesRival: _awayScore,
         minutoActual: _minute ~/ 60,
+        periodoActual: MatchPeriod.finalizado,
+        huboAlargue: huboAlargue,
       );
       if (mounted) context.go('/matches/$_matchId/summary');
     } catch (_) {
       if (mounted) {
         _showError('No se pudo finalizar el partido. Intente nuevamente.');
-        setState(() {
-          _finishing = false;
-          _isRunning = false;
-        });
+        setState(() => _finishing = false);
       }
+    }
+  }
+
+  Future<void> _patchPeriodTransition({
+    required String periodoActual,
+    required bool huboAlargue,
+    String estado = 'EnJuego',
+  }) async {
+    final payload = {
+      'estado': estado,
+      'periodoActual': periodoActual,
+      'huboAlargue': huboAlargue,
+      'golesEquipo': _homeScore,
+      'golesRival': _awayScore,
+      'minutoActual': _minute ~/ 60,
+    };
+    try {
+      await _matchApi.patchEstado(
+        _matchId,
+        estado,
+        _token,
+        golesEquipo: _homeScore,
+        golesRival: _awayScore,
+        minutoActual: _minute ~/ 60,
+        periodoActual: periodoActual,
+        huboAlargue: huboAlargue,
+      );
+    } catch (_) {
+      await DatabaseHelper.instance.deletePendingMatchEstado(_matchId);
+      await DatabaseHelper.instance.enqueueSyncAction(
+        entity: 'partido_estado',
+        action: 'update_period',
+        method: 'PATCH',
+        endpoint: '/api/Partidos/$_matchId/estado',
+        payload: payload,
+      );
     }
   }
 
@@ -945,6 +1078,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       'period': _currentPeriod,
       if (_firstHalfEndSeconds != null)
         'firstHalfEndSeconds': _firstHalfEndSeconds,
+      if (_secondHalfEndSeconds != null)
+        'secondHalfEndSeconds': _secondHalfEndSeconds,
+      if (_primerTiempoAlargueEndSeconds != null)
+        'primerTiempoAlargueEndSeconds': _primerTiempoAlargueEndSeconds,
       'elapsedSeconds': _minute,
       'wasRunning': _isRunning,
       'savedAtMs': DateTime.now().millisecondsSinceEpoch,
@@ -1039,7 +1176,13 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     final partido = _partido!;
 
-    final inEntretiempo = _currentPeriod == MatchPeriod.entretiempo;
+    final finishCallback = switch (_currentPeriod) {
+      MatchPeriod.primerTiempo => _finishFirstHalf,
+      MatchPeriod.segundoTiempo => _finishSecondHalf,
+      MatchPeriod.primerTiempoAlargue => _finishPrimerTiempoAlargue,
+      MatchPeriod.segundoTiempoAlargue => _finishAlargue,
+      _ => null,
+    };
 
     return Scaffold(
       backgroundColor: AppColors.bgDeep,
@@ -1061,8 +1204,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               finishing: _finishing,
               onToggle: _toggleTimer,
               onBack: _saveProgressAndPop,
-              onFinishFirstHalf: _finishFirstHalf,
-              onFinish: _finishSecondHalf,
+              onFinishPeriod: finishCallback,
             ),
 
             // ② Quick-action chips (last event + undo)
@@ -1074,65 +1216,85 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               onMoreEvents: _openMoreEvents,
             ),
 
-            // ③ Pitch or halftime panel
+            // ③ Pitch or break/decision panel
             Expanded(
-              child: inEntretiempo
-                  ? _EntretiempoPanel(
-                      homeScore: _homeScore,
-                      awayScore: _awayScore,
-                      firstHalfEndSeconds:
-                          _firstHalfEndSeconds ?? _minute,
-                      onStartSecondHalf: _startSecondHalf,
-                    )
-                  : Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        LayoutBuilder(
-                          key: _pitchKey,
-                          builder: (ctx, constraints) => GestureDetector(
-                            onTapDown: (d) =>
-                                _handlePitchTapDown(d, constraints),
-                            onPanUpdate:
-                                _showRadial ? _handleRadialDragUpdate : null,
-                            onPanEnd:
-                                _showRadial ? _handleRadialDragEnd : null,
-                            child: _PitchCanvas(
-                              events: _events,
-                              pendingTap: _tapNorm,
-                              width: constraints.maxWidth,
-                              height: constraints.maxHeight,
-                            ),
+              child: switch (_currentPeriod) {
+                MatchPeriod.entretiempo => _EntretiempoPanel(
+                    homeScore: _homeScore,
+                    awayScore: _awayScore,
+                    firstHalfEndSeconds: _firstHalfEndSeconds ?? _minute,
+                    onStartSecondHalf: _startSecondHalf,
+                  ),
+                MatchPeriod.descansoAlargue => _DescansoAlarguePanel(
+                    homeScore: _homeScore,
+                    awayScore: _awayScore,
+                    onStartSegundoTiempoAlargue: _startSegundoTiempoAlargue,
+                  ),
+                MatchPeriod.segundoTiempoFinalizado =>
+                  _SegundoTiempoFinalizadoPanel(
+                    homeScore: _homeScore,
+                    awayScore: _awayScore,
+                    definicionEmpate: _definicionEmpate,
+                    finishing: _finishing,
+                    onStartAlargue: _startAlargue,
+                    onConfirmFinish: _confirmFinishMatch,
+                  ),
+                MatchPeriod.alargueFinalizado => _AlargueFinalizadoPanel(
+                    homeScore: _homeScore,
+                    awayScore: _awayScore,
+                    finishing: _finishing,
+                    onConfirmFinish: _confirmFinishMatch,
+                  ),
+                _ => Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      LayoutBuilder(
+                        key: _pitchKey,
+                        builder: (ctx, constraints) => GestureDetector(
+                          onTapDown: (d) =>
+                              _handlePitchTapDown(d, constraints),
+                          onPanUpdate:
+                              _showRadial ? _handleRadialDragUpdate : null,
+                          onPanEnd:
+                              _showRadial ? _handleRadialDragEnd : null,
+                          child: _PitchCanvas(
+                            events: _events,
+                            pendingTap: _tapNorm,
+                            width: constraints.maxWidth,
+                            height: constraints.maxHeight,
                           ),
                         ),
-                        if (_showRadial && _tapLocal != null)
-                          _RadialOverlay(
-                            center: _tapLocal!,
-                            scaleAnim: _radialScaleAnim,
-                            fadeAnim: _radialFadeAnim,
-                            hoveredSector: _dragSector,
-                            onSectorTap: _selectSector,
-                            onMoreTap: _openMoreEvents,
-                            onDismiss: _closeRadial,
-                          ),
-                        if (!_showRadial && !_showPlayerPicker)
-                          const _TapHint(),
-                        _TimelinePanel(
-                          events: _events,
-                          isExpanded: _timelineExpanded,
-                          onToggle: () => setState(
-                              () => _timelineExpanded = !_timelineExpanded),
+                      ),
+                      if (_showRadial && _tapLocal != null)
+                        _RadialOverlay(
+                          center: _tapLocal!,
+                          scaleAnim: _radialScaleAnim,
+                          fadeAnim: _radialFadeAnim,
+                          hoveredSector: _dragSector,
+                          onSectorTap: _selectSector,
+                          onMoreTap: _openMoreEvents,
+                          onDismiss: _closeRadial,
                         ),
-                      ],
-                    ),
+                      if (!_showRadial && !_showPlayerPicker)
+                        const _TapHint(),
+                      _TimelinePanel(
+                        events: _events,
+                        isExpanded: _timelineExpanded,
+                        onToggle: () => setState(
+                            () => _timelineExpanded = !_timelineExpanded),
+                      ),
+                    ],
+                  ),
+              },
             ),
 
-            // ④ Player picker (bottom panel — hidden during entretiempo)
+            // ④ Player picker (bottom panel — hidden during breaks)
             AnimatedSize(
               duration: AppConstants.animNormal,
               curve: Curves.easeOutCubic,
               child: _showPlayerPicker &&
                       _pendingEvent != null &&
-                      !inEntretiempo
+                      !MatchPeriod.isBreak(_currentPeriod)
                   ? _PlayerPicker(
                       eventType: _pendingEvent!,
                       minute: _minute ~/ 60,
@@ -1154,8 +1316,6 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   }
 
   void _openTimeline() {
-    final firstHalfEndMinute =
-        _firstHalfEndSeconds != null ? _firstHalfEndSeconds! ~/ 60 : null;
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.bgCard,
@@ -1163,10 +1323,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _FullTimeline(
-        events: _events,
-        firstHalfEndMinute: firstHalfEndMinute,
-      ),
+      builder: (_) => _FullTimeline(events: _events),
     );
   }
 }
@@ -1186,8 +1343,8 @@ class _TopBar extends StatelessWidget {
   final bool finishing;
   final VoidCallback onToggle, onBack;
   final VoidCallback onUpdatePending;
-  final Future<void> Function() onFinishFirstHalf;
-  final Future<void> Function() onFinish;
+  // null = currently in a break/decision period (no finish button)
+  final Future<void> Function()? onFinishPeriod;
 
   const _TopBar({
     required this.partido,
@@ -1203,14 +1360,36 @@ class _TopBar extends StatelessWidget {
     required this.onToggle,
     required this.onBack,
     required this.onUpdatePending,
-    required this.onFinishFirstHalf,
-    required this.onFinish,
+    required this.onFinishPeriod,
   });
+
+  static const _breakLabels = {
+    MatchPeriod.entretiempo: 'ENTRETIEMPO',
+    MatchPeriod.descansoAlargue: 'DESCANSO ALARGUE',
+    MatchPeriod.segundoTiempoFinalizado: 'FIN SEGUNDO TIEMPO',
+    MatchPeriod.alargueFinalizado: 'FIN ALARGUE',
+  };
+
+  static const _finishLabels = {
+    MatchPeriod.primerTiempo: 'Finalizar primer tiempo',
+    MatchPeriod.segundoTiempo: 'Finalizar segundo tiempo',
+    MatchPeriod.primerTiempoAlargue: 'Finalizar 1T alargue',
+    MatchPeriod.segundoTiempoAlargue: 'Finalizar alargue',
+  };
 
   @override
   Widget build(BuildContext context) {
-    final inEntretiempo = currentPeriod == MatchPeriod.entretiempo;
-    final isPrimerTiempo = currentPeriod == MatchPeriod.primerTiempo;
+    final isBreak = MatchPeriod.isBreak(currentPeriod);
+    final isAlargue = MatchPeriod.hasExtraTime(currentPeriod) &&
+        MatchPeriod.isActive(currentPeriod);
+    final breakLabel = _breakLabels[currentPeriod];
+    final finishLabel = _finishLabels[currentPeriod] ?? 'Finalizar';
+    final buttonColor = (currentPeriod == MatchPeriod.primerTiempo ||
+            currentPeriod == MatchPeriod.primerTiempoAlargue)
+        ? AppColors.warning
+        : isAlargue
+            ? AppColors.accent
+            : AppColors.danger;
 
     return Container(
       color: AppColors.bgSurface,
@@ -1238,7 +1417,7 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          if (inEntretiempo)
+          if (isBreak)
             Container(
               width: double.infinity,
               height: 34,
@@ -1250,9 +1429,9 @@ class _TopBar extends StatelessWidget {
                     color: AppColors.warning.withValues(alpha: 0.35),
                     width: 0.5),
               ),
-              child: const Text(
-                'ENTRETIEMPO',
-                style: TextStyle(
+              child: Text(
+                breakLabel ?? 'PAUSA',
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.warning,
@@ -1265,9 +1444,8 @@ class _TopBar extends StatelessWidget {
               width: double.infinity,
               height: 34,
               child: ElevatedButton.icon(
-                onPressed: finishing
-                    ? null
-                    : (isPrimerTiempo ? onFinishFirstHalf : onFinish),
+                onPressed:
+                    finishing || onFinishPeriod == null ? null : onFinishPeriod,
                 icon: finishing
                     ? const SizedBox(
                         width: 14,
@@ -1275,16 +1453,10 @@ class _TopBar extends StatelessWidget {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.black))
                     : const Icon(Icons.flag_rounded, size: 16),
-                label: Text(
-                  finishing
-                      ? 'Finalizando...'
-                      : isPrimerTiempo
-                          ? 'Finalizar primer tiempo'
-                          : 'Finalizar segundo tiempo',
-                ),
+                label:
+                    Text(finishing ? 'Finalizando...' : finishLabel),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      isPrimerTiempo ? AppColors.warning : AppColors.danger,
+                  backgroundColor: buttonColor,
                   foregroundColor: Colors.black,
                   textStyle: const TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w600),
@@ -1306,11 +1478,10 @@ class _TopBar extends StatelessWidget {
         homeTeam.substring(0, math.min(3, homeTeam.length)).toUpperCase();
     final awayAbbr =
         awayTeam.substring(0, math.min(3, awayTeam.length)).toUpperCase();
-    final inEntretiempo = currentPeriod == MatchPeriod.entretiempo;
+    final isBreak = MatchPeriod.isBreak(currentPeriod);
     final displayM = minute ~/ 60;
     final displayS = minute % 60;
-    final clockText =
-        '$displayM:${displayS.toString().padLeft(2, '0')}';
+    final clockText = '$displayM:${displayS.toString().padLeft(2, '0')}';
 
     return [
       IconButton(
@@ -1345,7 +1516,7 @@ class _TopBar extends StatelessWidget {
         ),
       ),
       GestureDetector(
-        onTap: inEntretiempo ? null : onToggle,
+        onTap: isBreak ? null : onToggle,
         child: AnimatedContainer(
           duration: AppConstants.animFast,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -2936,46 +3107,332 @@ class _EntretiempoPanel extends StatelessWidget {
 }
 
 // =============================================================================
+//  BREAK / DECISION PANELS
+// =============================================================================
+
+class _DescansoAlarguePanel extends StatelessWidget {
+  final int homeScore, awayScore;
+  final Future<void> Function() onStartSegundoTiempoAlargue;
+
+  const _DescansoAlarguePanel({
+    required this.homeScore,
+    required this.awayScore,
+    required this.onStartSegundoTiempoAlargue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.4),
+                    width: 0.5),
+              ),
+              child: const Text(
+                'DESCANSO ALARGUE',
+                style: TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Text(
+              '$homeScore : $awayScore',
+              style: TextStyle(
+                fontSize: 56,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: 6,
+              ),
+            ),
+            const SizedBox(height: 36),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: onStartSegundoTiempoAlargue,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Comenzar 2T del alargue'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.black,
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SegundoTiempoFinalizadoPanel extends StatelessWidget {
+  final int homeScore, awayScore;
+  final String definicionEmpate;
+  final bool finishing;
+  final Future<void> Function() onStartAlargue;
+  final Future<void> Function() onConfirmFinish;
+
+  const _SegundoTiempoFinalizadoPanel({
+    required this.homeScore,
+    required this.awayScore,
+    required this.definicionEmpate,
+    required this.finishing,
+    required this.onStartAlargue,
+    required this.onConfirmFinish,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isEmpate = homeScore == awayScore;
+    final showAlargueOption =
+        isEmpate && definicionEmpate == DefinicionEmpate.alargueYPenales;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: AppColors.info.withValues(alpha: 0.4), width: 0.5),
+              ),
+              child: const Text(
+                'FIN DEL PARTIDO',
+                style: TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  color: AppColors.info,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Text(
+              '$homeScore : $awayScore',
+              style: TextStyle(
+                fontSize: 56,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: 6,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (isEmpate)
+              Text(
+                'Empate — ${DefinicionEmpate.label(definicionEmpate)}',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            const SizedBox(height: 36),
+            if (showAlargueOption) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: finishing ? null : onStartAlargue,
+                  icon: const Icon(Icons.timer_outlined),
+                  label: const Text('Ir al alargue'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.black,
+                    textStyle: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: finishing ? null : onConfirmFinish,
+                icon: finishing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.black))
+                    : const Icon(Icons.sports_score_rounded),
+                label: Text(
+                    finishing ? 'Finalizando...' : 'Finalizar partido'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  foregroundColor: Colors.black,
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AlargueFinalizadoPanel extends StatelessWidget {
+  final int homeScore, awayScore;
+  final bool finishing;
+  final Future<void> Function() onConfirmFinish;
+
+  const _AlargueFinalizadoPanel({
+    required this.homeScore,
+    required this.awayScore,
+    required this.finishing,
+    required this.onConfirmFinish,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: AppColors.info.withValues(alpha: 0.4), width: 0.5),
+              ),
+              child: const Text(
+                'FIN DEL ALARGUE',
+                style: TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  color: AppColors.info,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Text(
+              '$homeScore : $awayScore',
+              style: TextStyle(
+                fontSize: 56,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: 6,
+              ),
+            ),
+            const SizedBox(height: 36),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: finishing ? null : onConfirmFinish,
+                icon: finishing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.black))
+                    : const Icon(Icons.sports_score_rounded),
+                label: Text(
+                    finishing ? 'Finalizando...' : 'Finalizar partido'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  foregroundColor: Colors.black,
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
 //  FULL TIMELINE
 // =============================================================================
 
 class _FullTimeline extends StatelessWidget {
   final List<EventoPartidoModel> events;
-  final int? firstHalfEndMinute;
 
-  const _FullTimeline({required this.events, this.firstHalfEndMinute});
+  const _FullTimeline({required this.events});
 
-  String _periodFor(EventoPartidoModel ev) {
-    if (ev.periodo != null && ev.periodo!.isNotEmpty) return ev.periodo!;
-    return ev.minuto <= (firstHalfEndMinute ?? 45)
-        ? MatchPeriod.primerTiempo
-        : MatchPeriod.segundoTiempo;
-  }
+  static const _periodOrder = [
+    MatchPeriod.primerTiempo,
+    MatchPeriod.segundoTiempo,
+    MatchPeriod.primerTiempoAlargue,
+    MatchPeriod.segundoTiempoAlargue,
+  ];
+
+  static const _periodLabels = {
+    MatchPeriod.primerTiempo: 'Primer tiempo',
+    MatchPeriod.segundoTiempo: 'Segundo tiempo',
+    MatchPeriod.primerTiempoAlargue: 'Alargue — 1T',
+    MatchPeriod.segundoTiempoAlargue: 'Alargue — 2T',
+  };
 
   @override
   Widget build(BuildContext context) {
     final sorted = List.of(events)
       ..sort((a, b) => a.minuto.compareTo(b.minuto));
-    final firstHalf = sorted
-        .where((e) => _periodFor(e) == MatchPeriod.primerTiempo)
-        .toList();
-    final secondHalf = sorted
-        .where((e) => _periodFor(e) == MatchPeriod.segundoTiempo)
-        .toList();
 
-    // Flat list of items: period headers + events
+    final Map<String, List<EventoPartidoModel>> byPeriod = {};
+    final List<EventoPartidoModel> noPeriod = [];
+
+    for (final ev in sorted) {
+      if (ev.periodo != null && ev.periodo!.isNotEmpty) {
+        byPeriod.putIfAbsent(ev.periodo!, () => []).add(ev);
+      } else {
+        noPeriod.add(ev);
+      }
+    }
+
     final items = <_TLItem>[];
-    if (firstHalf.isNotEmpty) {
-      items.add(_TLItem.header('Primer tiempo'));
-      items.addAll(firstHalf.map(_TLItem.event));
+    for (final p in _periodOrder) {
+      final evs = byPeriod[p];
+      if (evs != null && evs.isNotEmpty) {
+        items.add(_TLItem.header(_periodLabels[p] ?? p));
+        items.addAll(evs.map(_TLItem.event));
+        byPeriod.remove(p);
+      }
     }
-    if (secondHalf.isNotEmpty) {
-      items.add(_TLItem.header('Segundo tiempo'));
-      items.addAll(secondHalf.map(_TLItem.event));
+    // Any remaining known-but-unordered periods
+    for (final entry in byPeriod.entries) {
+      items.add(_TLItem.header(entry.key));
+      items.addAll(entry.value.map(_TLItem.event));
     }
-    if (items.isEmpty && events.isNotEmpty) {
-      // Fallback: no period info, show all
-      items.addAll(sorted.map(_TLItem.event));
+    if (noPeriod.isNotEmpty) {
+      items.add(_TLItem.header('Eventos sin período'));
+      items.addAll(noPeriod.map(_TLItem.event));
     }
 
     return DraggableScrollableSheet(

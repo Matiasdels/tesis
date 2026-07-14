@@ -292,17 +292,45 @@ class _ScoreBanner extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.accentDim,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              match.isFinished ? 'Partido finalizado' : match.estado,
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w600),
-            ),
+          Wrap(
+            spacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accentDim,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  match.isFinished ? 'Partido finalizado' : match.estado,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (match.huboAlargue)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.info.withValues(alpha: 0.4),
+                        width: 0.5),
+                  ),
+                  child: const Text(
+                    'Con alargue',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.info,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

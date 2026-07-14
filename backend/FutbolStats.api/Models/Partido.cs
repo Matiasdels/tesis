@@ -16,6 +16,9 @@ public class Partido
     public int? UsuarioCreadorId { get; set; }
     public bool Activo { get; set; } = true;
     public string? Formacion { get; set; }
+    public string DefinicionEmpate { get; set; } = "TerminaEnEmpate";
+    public string? PeriodoActual { get; set; }
+    public bool HuboAlargue { get; set; } = false;
 
     public Categoria? Categoria { get; set; }
 }

@@ -80,6 +80,8 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.TipoCompeticion).HasMaxLength(20).IsRequired().HasDefaultValue("Amistoso");
             entity.Property(x => x.Lugar).HasMaxLength(150);
             entity.Property(x => x.Estado).HasMaxLength(20).HasDefaultValue("Programado");
+            entity.Property(x => x.DefinicionEmpate).HasMaxLength(20).IsRequired().HasDefaultValue("TerminaEnEmpate");
+            entity.Property(x => x.PeriodoActual).HasMaxLength(30);
             entity.HasOne(x => x.Categoria).WithMany().HasForeignKey(x => x.CategoriaId);
         });
 
@@ -114,6 +116,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.PitchX).HasPrecision(4, 3);
             entity.Property(x => x.PitchY).HasPrecision(4, 3);
             entity.Property(x => x.Observacion).HasMaxLength(255);
+            entity.Property(x => x.Periodo).HasMaxLength(30);
             entity.Property(x => x.FechaRegistro).HasDefaultValueSql("SYSDATETIME()");
             entity.HasOne(x => x.Jugador).WithMany().HasForeignKey(x => x.JugadorId).IsRequired(false);
             entity.HasOne(x => x.TipoEvento).WithMany().HasForeignKey(x => x.TipoEventoId);

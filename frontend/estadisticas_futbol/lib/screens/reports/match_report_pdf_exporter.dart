@@ -70,8 +70,13 @@ class _MatchStats {
               : 'Alto riesgo disciplinario';
 
   // ── Por tiempo ───────────────────────────────────────────────────────────
-  late final firstHalf = events.where((e) => e.minuto <= 45).toList();
-  late final secondHalf = events.where((e) => e.minuto > 45).toList();
+  // evento.periodo is the source of truth; minute thresholds are NOT used.
+  late final firstHalf = events
+      .where((e) => e.periodo == MatchPeriod.primerTiempo)
+      .toList();
+  late final secondHalf = events
+      .where((e) => e.periodo == MatchPeriod.segundoTiempo)
+      .toList();
 
   int firstHalfCount(String type) => _countIn(firstHalf, type);
   int secondHalfCount(String type) => _countIn(secondHalf, type);
@@ -1425,14 +1430,98 @@ class MatchReportPdfExporter {
   }
 
   // ── 13. Timeline ─────────────────────────────────────────────────────────
+  static const _timelinePeriodOrder = [
+    MatchPeriod.primerTiempo,
+    MatchPeriod.segundoTiempo,
+    MatchPeriod.primerTiempoAlargue,
+    MatchPeriod.segundoTiempoAlargue,
+  ];
+
+  static const _timelinePeriodLabels = {
+    MatchPeriod.primerTiempo: 'Primer tiempo',
+    MatchPeriod.segundoTiempo: 'Segundo tiempo',
+    MatchPeriod.primerTiempoAlargue: 'Alargue — 1T',
+    MatchPeriod.segundoTiempoAlargue: 'Alargue — 2T',
+  };
+
   static pw.Widget _buildTimeline(List<EventoPartidoModel> sortedEvents) {
     if (sortedEvents.isEmpty) return pw.SizedBox();
 
-    final byMinute = <int, List<EventoPartidoModel>>{};
+    // Group by explicit periodo field
+    final Map<String, List<EventoPartidoModel>> byPeriod = {};
+    final List<EventoPartidoModel> noPeriod = [];
     for (final e in sortedEvents) {
-      byMinute.putIfAbsent(e.minuto, () => []).add(e);
+      if (e.periodo != null && e.periodo!.isNotEmpty) {
+        byPeriod.putIfAbsent(e.periodo!, () => []).add(e);
+      } else {
+        noPeriod.add(e);
+      }
     }
-    final minutes = byMinute.keys.toList()..sort();
+
+    // Build ordered list of (periodLabel, events) pairs
+    final sections = <(String, List<EventoPartidoModel>)>[];
+    for (final p in _timelinePeriodOrder) {
+      final evs = byPeriod.remove(p);
+      if (evs != null && evs.isNotEmpty) {
+        sections.add((_timelinePeriodLabels[p] ?? p, evs));
+      }
+    }
+    for (final entry in byPeriod.entries) {
+      if (entry.value.isNotEmpty) sections.add((entry.key, entry.value));
+    }
+    if (noPeriod.isNotEmpty) {
+      sections.add(('Sin período', noPeriod));
+    }
+
+    // Build table rows from sections
+    final rows = <pw.TableRow>[_headerRow(["Min'", 'Evento'])];
+    int rowIndex = 0;
+    for (final section in sections) {
+      final (label, evs) = section;
+      // Period separator row
+      rows.add(pw.TableRow(
+        decoration: const pw.BoxDecoration(color: _slate),
+        children: [
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: pw.Text('',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: pw.Text(
+              label.toUpperCase(),
+              style: pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.white,
+                  fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+        ],
+      ));
+
+      final byMinute = <int, List<EventoPartidoModel>>{};
+      for (final e in evs) {
+        byMinute.putIfAbsent(e.minuto, () => []).add(e);
+      }
+      final minutes = byMinute.keys.toList()..sort();
+
+      for (final minute in minutes) {
+        final minuteEvts = byMinute[minute]!;
+        for (int i = 0; i < minuteEvts.length; i++) {
+          final ev = minuteEvts[i];
+          rows.add(_dataRow(
+            [
+              i == 0 ? "$minute'" : '',
+              '${ev.tipoEventoNombre}'
+                  '${ev.nombreJugador != null ? " - ${ev.nombreJugador}" : ""}',
+            ],
+            alt: rowIndex.isOdd,
+          ));
+          rowIndex++;
+        }
+      }
+    }
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -1445,26 +1534,7 @@ class MatchReportPdfExporter {
             0: const pw.FixedColumnWidth(36),
             1: const pw.FlexColumnWidth(1),
           },
-          children: [
-            _headerRow(["Min'", 'Evento']),
-            ...minutes.asMap().entries.expand((minuteEntry) {
-              final minute = minuteEntry.value;
-              final evts = byMinute[minute]!;
-              return evts.asMap().entries.map((evEntry) {
-                final ev = evEntry.value;
-                final isFirst = evEntry.key == 0;
-                final alt = minuteEntry.key.isOdd;
-                return _dataRow(
-                  [
-                    isFirst ? "$minute'" : '',
-                    '${ev.tipoEventoNombre}'
-                        '${ev.nombreJugador != null ? " - ${ev.nombreJugador}" : ""}',
-                  ],
-                  alt: alt,
-                );
-              });
-            }),
-          ],
+          children: rows,
         ),
       ],
     );
