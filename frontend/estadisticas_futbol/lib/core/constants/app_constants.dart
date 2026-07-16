@@ -170,7 +170,46 @@ abstract class MatchPeriod {
   static const String primerTiempo = 'PrimerTiempo';
   static const String entretiempo = 'Entretiempo';
   static const String segundoTiempo = 'SegundoTiempo';
+  static const String segundoTiempoFinalizado = 'SegundoTiempoFinalizado';
+  static const String primerTiempoAlargue = 'PrimerTiempoAlargue';
+  static const String descansoAlargue = 'DescansoAlargue';
+  static const String segundoTiempoAlargue = 'SegundoTiempoAlargue';
+  static const String alargueFinalizado = 'AlargueFinalizado';
   static const String finalizado = 'Finalizado';
+
+  static bool isActive(String period) => period == primerTiempo ||
+      period == segundoTiempo ||
+      period == primerTiempoAlargue ||
+      period == segundoTiempoAlargue;
+
+  static bool isBreak(String period) => period == entretiempo ||
+      period == descansoAlargue ||
+      period == segundoTiempoFinalizado ||
+      period == alargueFinalizado;
+
+  static bool hasExtraTime(String period) => period == primerTiempoAlargue ||
+      period == descansoAlargue ||
+      period == segundoTiempoAlargue ||
+      period == alargueFinalizado;
+}
+
+abstract class DefinicionEmpate {
+  static const String terminaEnEmpate = 'TerminaEnEmpate';
+  static const String alargueYPenales = 'AlargueYPenales';
+  static const String penalesDirectos = 'PenalesDirectos';
+
+  static String label(String value) {
+    switch (value) {
+      case terminaEnEmpate:
+        return 'Termina en empate';
+      case alargueYPenales:
+        return 'Alargue y penales';
+      case penalesDirectos:
+        return 'Penales directos';
+      default:
+        return value;
+    }
+  }
 }
 
 abstract class PlayerPositions {

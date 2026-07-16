@@ -102,6 +102,8 @@ class MatchApi {
     int? golesEquipo,
     int? golesRival,
     int? minutoActual,
+    String? periodoActual,
+    bool? huboAlargue,
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/Partidos/$id/estado');
     final body = jsonEncode({
@@ -109,6 +111,8 @@ class MatchApi {
       if (golesEquipo != null) 'golesEquipo': golesEquipo,
       if (golesRival != null) 'golesRival': golesRival,
       if (minutoActual != null) 'minutoActual': minutoActual,
+      if (periodoActual != null) 'periodoActual': periodoActual,
+      if (huboAlargue != null) 'huboAlargue': huboAlargue,
     });
     final response = await _client.patch(
       uri,

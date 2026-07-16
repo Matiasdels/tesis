@@ -11,6 +11,7 @@ public class EventoPartido
     public decimal? PitchY { get; set; }
     public int? JugadorRelacionadoId { get; set; }
     public string? Observacion { get; set; }
+    public string? Periodo { get; set; }
     public DateTime FechaRegistro { get; set; } = DateTime.UtcNow;
 
     public Jugador? Jugador { get; set; }

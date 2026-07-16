@@ -31,6 +31,7 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
 
   String _tipoCompeticion = TiposCompeticion.all.first;
   String _estado = EstadosPartido.all.first;
+  String _definicionEmpate = DefinicionEmpate.terminaEnEmpate;
   int? _categoriaId;
   bool _esLocal = true;
   DateTime? _fecha;
@@ -70,6 +71,7 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
           _categoriaId = match.categoriaId;
           _esLocal = match.esLocal;
           _fecha = match.fecha;
+          _definicionEmpate = match.definicionEmpate;
         } else {
           _categoriaId = categories.isEmpty ? null : categories.first.id;
         }
@@ -141,6 +143,7 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
           ? null
           : _lugarController.text.trim(),
       estado: _estado,
+      definicionEmpate: _definicionEmpate,
     );
 
     final token = context.read<AuthState>().session!.accessToken;
@@ -228,6 +231,27 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                       onChanged: _saving
                           ? null
                           : (v) => setState(() => _tipoCompeticion = v!),
+                    ),
+                    const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _definicionEmpate,
+                      decoration: const InputDecoration(
+                          labelText: 'Definición en caso de empate'),
+                      items: [
+                        DefinicionEmpate.terminaEnEmpate,
+                        DefinicionEmpate.alargueYPenales,
+                        DefinicionEmpate.penalesDirectos,
+                      ]
+                          .map((v) => DropdownMenuItem(
+                                value: v,
+                                child: Text(DefinicionEmpate.label(v)),
+                              ))
+                          .toList(),
+                      onChanged: _saving
+                          ? null
+                          : (v) =>
+                              setState(() => _definicionEmpate = v!),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
