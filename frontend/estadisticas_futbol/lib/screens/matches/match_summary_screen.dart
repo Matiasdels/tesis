@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/local/database_helper.dart';
 import '../../data/remote/auth_state.dart';
 import '../../data/remote/event_api.dart';
 import '../../data/remote/match_api.dart';
@@ -31,6 +32,8 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
   bool _exportingPdf = false;
   bool _generatingAnalysis = false;
   AnalisisPartidoModel? _analysis;
+  // Penales guardados offline (cuando huboPenales=false en el servidor)
+  Map<String, dynamic>? _penalesOffline;
 
   @override
   void initState() {
@@ -49,10 +52,20 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
         _matchApi.getMatch(widget.matchId, token),
         _eventApi.getEventos(widget.matchId, token),
       ]);
+      final match = results[0] as PartidoModel;
+
+      // Fallback offline para penales guardados sin conexión
+      Map<String, dynamic>? penalesOffline;
+      if (!match.huboPenales) {
+        penalesOffline = await DatabaseHelper.instance
+            .readJsonMap('match:${widget.matchId}:penal_result');
+      }
+
       if (!mounted) return;
       setState(() {
-        _match = results[0] as PartidoModel;
+        _match = match;
         _events = results[1] as List<EventoPartidoModel>;
+        _penalesOffline = penalesOffline;
         _loading = false;
       });
     } catch (_) {
@@ -133,6 +146,11 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
 
               _InfoCard(match: match),
               const SizedBox(height: AppConstants.sectionSpacing),
+
+              if (match.huboPenales || _penalesOffline != null) ...[
+                _PenalesCard(match: match, offline: _penalesOffline),
+                const SizedBox(height: AppConstants.sectionSpacing),
+              ],
 
               if (countByType.isNotEmpty) ...[
                 _StatsCard(countByType: countByType),
@@ -1135,6 +1153,152 @@ class _AnalysisListSection extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Penales card ──────────────────────────────────────────────────────────────
+
+class _PenalesCard extends StatelessWidget {
+  final PartidoModel match;
+  final Map<String, dynamic>? offline;
+
+  const _PenalesCard({required this.match, this.offline});
+
+  @override
+  Widget build(BuildContext context) {
+    final equipoScore = match.huboPenales
+        ? match.resultadoPenalesEquipo
+        : offline?['resultadoPenalesEquipo'] as int?;
+    final rivalScore = match.huboPenales
+        ? match.resultadoPenalesRival
+        : offline?['resultadoPenalesRival'] as int?;
+
+    if (equipoScore == null || rivalScore == null) return const SizedBox.shrink();
+
+    final ganador = equipoScore > rivalScore
+        ? 'Kancha'
+        : equipoScore < rivalScore
+            ? match.rival
+            : null;
+    final isOffline = !match.huboPenales && offline != null;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: SectionHeader(title: 'Definición por penales')),
+              if (isOffline)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningDim,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.4),
+                        width: 0.5),
+                  ),
+                  child: const Text(
+                    'Pendiente de sync',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _PenalesTeam(
+                  name: match.esLocal ? 'Kancha' : match.rival,
+                  score: match.esLocal ? equipoScore : rivalScore,
+                  isWinner: ganador == (match.esLocal ? 'Kancha' : match.rival)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  '—',
+                  style: TextStyle(
+                      fontSize: 24,
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w300),
+                ),
+              ),
+              _PenalesTeam(
+                  name: match.esLocal ? match.rival : 'Kancha',
+                  score: match.esLocal ? rivalScore : equipoScore,
+                  isWinner: ganador == (match.esLocal ? match.rival : 'Kancha')),
+            ],
+          ),
+          if (ganador != null) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.4),
+                      width: 0.5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.emoji_events_rounded,
+                        size: 14, color: AppColors.accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Ganador en penales: $ganador',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PenalesTeam extends StatelessWidget {
+  final String name;
+  final int score;
+  final bool isWinner;
+
+  const _PenalesTeam(
+      {required this.name, required this.score, required this.isWinner});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          '$score',
+          style: TextStyle(
+            fontSize: 42,
+            fontWeight: FontWeight.w700,
+            color: isWinner ? AppColors.accent : AppColors.textPrimary,
+          ),
+        ),
+        Text(
+          name,
+          style: TextStyle(
+              fontSize: 12,
+              color: isWinner ? AppColors.accent : AppColors.textSecondary,
+              fontWeight: isWinner ? FontWeight.w600 : FontWeight.w400),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }

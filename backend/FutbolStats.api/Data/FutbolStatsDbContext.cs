@@ -14,6 +14,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
     public DbSet<TipoEvento> TiposEvento => Set<TipoEvento>();
     public DbSet<EventoPartido> EventosPartido => Set<EventoPartido>();
     public DbSet<Observacion> Observaciones => Set<Observacion>();
+    public DbSet<PenalDetalle> PenalesDetalle => Set<PenalDetalle>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -120,6 +121,17 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.FechaRegistro).HasDefaultValueSql("SYSDATETIME()");
             entity.HasOne(x => x.Jugador).WithMany().HasForeignKey(x => x.JugadorId).IsRequired(false);
             entity.HasOne(x => x.TipoEvento).WithMany().HasForeignKey(x => x.TipoEventoId);
+        });
+
+        modelBuilder.Entity<PenalDetalle>(entity =>
+        {
+            entity.ToTable("PenalDetalle");
+            entity.HasKey(x => x.PenalDetalleId);
+            entity.Property(x => x.Equipo).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Resultado).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Activo).HasDefaultValue(true);
+            entity.HasOne(x => x.Partido).WithMany().HasForeignKey(x => x.PartidoId);
+            entity.HasOne(x => x.Jugador).WithMany().HasForeignKey(x => x.JugadorId).IsRequired(false);
         });
 
         modelBuilder.Entity<Observacion>(entity =>

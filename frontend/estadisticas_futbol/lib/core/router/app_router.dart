@@ -11,6 +11,7 @@ import 'package:estadisticas_futbol/screens/matches/match_detail_screen.dart';
 import 'package:estadisticas_futbol/models/models.dart';
 import 'package:estadisticas_futbol/screens/matches/lineup_screen.dart';
 import 'package:estadisticas_futbol/screens/live_match/live_match_screen.dart';
+import 'package:estadisticas_futbol/screens/live_match/penales_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/match_summary_screen.dart';
 import 'package:estadisticas_futbol/screens/training/training_screen.dart';
 import 'package:estadisticas_futbol/screens/statistics/statistics_screen.dart';
@@ -160,6 +161,13 @@ GoRouter createRouter(AuthState authState) => GoRouter(
           pageBuilder: (c, s) {
             final id = s.pathParameters['id'] ?? '0';
             return _slide(s, LiveMatchScreen(matchId: id));
+          },
+        ),
+        GoRoute(
+          path: '/matches/:id/penales',
+          pageBuilder: (c, s) {
+            final id = int.tryParse(s.pathParameters['id'] ?? '0') ?? 0;
+            return _slide(s, PenalesScreen(matchId: id));
           },
         ),
       ],

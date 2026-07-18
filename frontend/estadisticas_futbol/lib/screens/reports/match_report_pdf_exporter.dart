@@ -512,6 +512,10 @@ class MatchReportPdfExporter {
             pw.SizedBox(height: 14),
             _buildInsights(stats),
           ],
+          if (match.huboPenales) ...[
+            pw.SizedBox(height: 14),
+            _buildDefinicionPenales(match),
+          ],
         ],
       ),
     );
@@ -1652,6 +1656,87 @@ class MatchReportPdfExporter {
                 ))
             .toList(),
       );
+
+  // ── 15. Definición por penales ───────────────────────────────────────────
+  static pw.Widget _buildDefinicionPenales(PartidoModel match) {
+    const teamName = 'Kancha';
+    final eq = match.resultadoPenalesEquipo ?? 0;
+    final rv = match.resultadoPenalesRival ?? 0;
+    final ganador = eq > rv
+        ? 'Ganador: $teamName'
+        : rv > eq
+            ? 'Ganador: ${match.rival}'
+            : 'Empate en penales';
+    final ganadorColor = eq > rv ? _green : rv > eq ? _red : _muted;
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Definición por penales'),
+        pw.SizedBox(height: 6),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: pw.BoxDecoration(
+            color: _rowAlt,
+            border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+          ),
+          child: pw.Column(
+            children: [
+              // Scoreboard
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Expanded(
+                    child: pw.Text(
+                      teamName,
+                      textAlign: pw.TextAlign.right,
+                      style: pw.TextStyle(
+                          fontSize: 9,
+                          color: _navy,
+                          fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
+                  pw.SizedBox(width: 8),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: const pw.BoxDecoration(color: _navy),
+                    child: pw.Text(
+                      '$eq  –  $rv',
+                      style: pw.TextStyle(
+                          fontSize: 14,
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
+                  pw.SizedBox(width: 8),
+                  pw.Expanded(
+                    child: pw.Text(
+                      'Rival',
+                      textAlign: pw.TextAlign.left,
+                      style: pw.TextStyle(
+                          fontSize: 9,
+                          color: _navy,
+                          fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 8),
+              // Winner label
+              pw.Text(
+                ganador,
+                style: pw.TextStyle(
+                    fontSize: 9,
+                    color: ganadorColor,
+                    fontWeight: pw.FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   static String _pct(int num, int den) {
     if (den == 0) return '-';

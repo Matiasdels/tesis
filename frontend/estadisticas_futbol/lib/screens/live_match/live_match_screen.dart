@@ -231,6 +231,14 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _loading = false;
       });
 
+      // Si el partido está esperando penales, redirigir directamente
+      if (partido.estado == EstadosPartido.esperandoPenales) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.go('/matches/$_matchId/penales');
+        });
+        return;
+      }
+
       if (_isRunning) _startMatchTimer();
       unawaited(_refreshConnectionStatus());
       unawaited(_refreshPendingSyncCount());
@@ -1014,6 +1022,21 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     if (mounted) setState(() => _finishing = false);
   }
 
+  Future<void> _goToPenales() async {
+    setState(() => _finishing = true);
+    final huboAlargue = MatchPeriod.hasExtraTime(_currentPeriod);
+    await _savePeriodState();
+    await _patchPeriodTransition(
+      periodoActual: _currentPeriod,
+      huboAlargue: huboAlargue,
+      estado: EstadosPartido.esperandoPenales,
+    );
+    if (mounted) {
+      setState(() => _finishing = false);
+      context.go('/matches/$_matchId/penales');
+    }
+  }
+
   Future<void> _confirmFinishMatch() async {
     setState(() => _finishing = true);
     final huboAlargue = MatchPeriod.hasExtraTime(_currentPeriod);
@@ -1237,12 +1260,15 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                     definicionEmpate: _definicionEmpate,
                     finishing: _finishing,
                     onStartAlargue: _startAlargue,
+                    onGoToPenales: _goToPenales,
                     onConfirmFinish: _confirmFinishMatch,
                   ),
                 MatchPeriod.alargueFinalizado => _AlargueFinalizadoPanel(
                     homeScore: _homeScore,
                     awayScore: _awayScore,
+                    definicionEmpate: _definicionEmpate,
                     finishing: _finishing,
+                    onGoToPenales: _goToPenales,
                     onConfirmFinish: _confirmFinishMatch,
                   ),
                 _ => Stack(
@@ -3187,6 +3213,7 @@ class _SegundoTiempoFinalizadoPanel extends StatelessWidget {
   final String definicionEmpate;
   final bool finishing;
   final Future<void> Function() onStartAlargue;
+  final Future<void> Function() onGoToPenales;
   final Future<void> Function() onConfirmFinish;
 
   const _SegundoTiempoFinalizadoPanel({
@@ -3195,14 +3222,17 @@ class _SegundoTiempoFinalizadoPanel extends StatelessWidget {
     required this.definicionEmpate,
     required this.finishing,
     required this.onStartAlargue,
+    required this.onGoToPenales,
     required this.onConfirmFinish,
   });
 
   @override
   Widget build(BuildContext context) {
     final isEmpate = homeScore == awayScore;
-    final showAlargueOption =
+    final showAlargue =
         isEmpate && definicionEmpate == DefinicionEmpate.alargueYPenales;
+    final showPenales =
+        isEmpate && definicionEmpate == DefinicionEmpate.penalesDirectos;
 
     return Center(
       child: Padding(
@@ -3246,7 +3276,7 @@ class _SegundoTiempoFinalizadoPanel extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             const SizedBox(height: 36),
-            if (showAlargueOption) ...[
+            if (showAlargue) ...[
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -3254,6 +3284,26 @@ class _SegundoTiempoFinalizadoPanel extends StatelessWidget {
                   onPressed: finishing ? null : onStartAlargue,
                   icon: const Icon(Icons.timer_outlined),
                   label: const Text('Ir al alargue'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.black,
+                    textStyle: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (showPenales) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: finishing ? null : onGoToPenales,
+                  icon: const Icon(Icons.sports_rounded),
+                  label: const Text('Ir a penales'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.black,
@@ -3299,18 +3349,26 @@ class _SegundoTiempoFinalizadoPanel extends StatelessWidget {
 
 class _AlargueFinalizadoPanel extends StatelessWidget {
   final int homeScore, awayScore;
+  final String definicionEmpate;
   final bool finishing;
+  final Future<void> Function() onGoToPenales;
   final Future<void> Function() onConfirmFinish;
 
   const _AlargueFinalizadoPanel({
     required this.homeScore,
     required this.awayScore,
+    required this.definicionEmpate,
     required this.finishing,
+    required this.onGoToPenales,
     required this.onConfirmFinish,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isEmpate = homeScore == awayScore;
+    final showPenales =
+        isEmpate && definicionEmpate == DefinicionEmpate.alargueYPenales;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -3345,7 +3403,35 @@ class _AlargueFinalizadoPanel extends StatelessWidget {
                 letterSpacing: 6,
               ),
             ),
+            if (isEmpate) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Empate — definición por penales',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
             const SizedBox(height: 36),
+            if (showPenales) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: finishing ? null : onGoToPenales,
+                  icon: const Icon(Icons.sports_rounded),
+                  label: const Text('Ir a penales'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.black,
+                    textStyle: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               width: double.infinity,
               height: 50,

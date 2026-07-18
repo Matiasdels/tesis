@@ -15,7 +15,7 @@ public class PartidosController(
     AnalisisPartidoService analisisPartidoService) : ControllerBase
 {
     private static readonly string[] TiposCompeticionValidos = ["Liga", "Copa", "Amistoso", "Torneo"];
-    private static readonly string[] EstadosValidos = ["Programado", "EnJuego", "Finalizado", "Cancelado"];
+    private static readonly string[] EstadosValidos = ["Programado", "EnJuego", "Finalizado", "Cancelado", "EsperandoPenales"];
 
     [HttpGet]
     public async Task<IActionResult> GetPartidos(
@@ -250,6 +250,218 @@ public class PartidosController(
         return null;
     }
 
+    [HttpPost("{id:int}/penales")]
+    public async Task<IActionResult> GuardarPenales(int id, PenalesRequest request)
+    {
+        var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id && p.Activo);
+        if (partido is null) return NotFound();
+
+        // ── Plausibilidad del resultado ──────────────────────────────────────
+        if (request.ResultadoPenalesEquipo < 0 || request.ResultadoPenalesRival < 0)
+            return BadRequest("Los resultados de penales no pueden ser negativos.");
+
+        if (request.ResultadoPenalesEquipo == request.ResultadoPenalesRival)
+            return BadRequest("El resultado de penales debe tener un ganador.");
+
+        var maxGoles = Math.Max(request.ResultadoPenalesEquipo, request.ResultadoPenalesRival);
+        var diff = Math.Abs(request.ResultadoPenalesEquipo - request.ResultadoPenalesRival);
+        if (maxGoles > 5 && diff != 1)
+            return BadRequest(
+                "Resultado imposible: cuando algún equipo supera 5 goles la diferencia debe ser exactamente 1.");
+
+        var minGoles = Math.Min(request.ResultadoPenalesEquipo, request.ResultadoPenalesRival);
+        if (maxGoles == 5 && minGoles < 3)
+            return BadRequest(
+                "Resultado imposible: con 5 goles, el rival debe haber convertido al menos 3.");
+        if (maxGoles == 4 && minGoles == 0)
+            return BadRequest(
+                "Resultado imposible: con 4 goles, el rival debe haber convertido al menos 1.");
+
+        // ── Validación de detalle ────────────────────────────────────────────
+        if (request.Detalle is { Count: > 0 })
+        {
+            var detalle = request.Detalle;
+
+            // Valores de dominio
+            var equiposValidos  = new HashSet<string> { "Propio", "Rival" };
+            var resultadosValidos = new HashSet<string> { "Gol", "Errado" };
+            for (var i = 0; i < detalle.Count; i++)
+            {
+                if (!equiposValidos.Contains(detalle[i].Equipo))
+                    return BadRequest($"Ejecución #{i + 1}: equipo inválido.");
+                if (!resultadosValidos.Contains(detalle[i].Resultado))
+                    return BadRequest($"Ejecución #{i + 1}: resultado inválido.");
+            }
+
+            // Jugadores habilitados del partido
+            var alineacionIds = await context.Alineaciones
+                .Where(a => a.PartidoId == id)
+                .Select(a => a.JugadorId)
+                .ToHashSetAsync();
+
+            var expulsadosIds = await context.EventosPartido
+                .Include(e => e.TipoEvento)
+                .Where(e => e.PartidoId == id &&
+                            e.JugadorId != null &&
+                            e.TipoEvento!.Nombre == "Tarjeta roja")
+                .Select(e => e.JugadorId!.Value)
+                .ToHashSetAsync();
+
+            var habilitados = alineacionIds.Except(expulsadosIds).ToHashSet();
+
+            // Validar jugador solo cuando fue informado
+            for (var i = 0; i < detalle.Count; i++)
+            {
+                var d = detalle[i];
+                if (d.JugadorId is null) continue;
+                if (expulsadosIds.Contains(d.JugadorId.Value))
+                    return BadRequest($"Ejecución #{i + 1}: el jugador fue expulsado y no puede ejecutar.");
+                if (alineacionIds.Count > 0 && !habilitados.Contains(d.JugadorId.Value))
+                    return BadRequest($"Ejecución #{i + 1}: el jugador no pertenece al plantel habilitado.");
+            }
+
+            // Alternancia de equipos
+            for (var i = 1; i < detalle.Count; i++)
+            {
+                if (detalle[i].Equipo == detalle[i - 1].Equipo)
+                    return BadRequest(
+                        $"Los equipos deben alternar sus ejecuciones (error en ejecución #{i + 1}).");
+            }
+
+            // Rotación de ejecutantes propios
+            if (habilitados.Count > 0)
+            {
+                var usadosEnVuelta = new HashSet<int>();
+                for (var i = 0; i < detalle.Count; i++)
+                {
+                    var d = detalle[i];
+                    if (d.Equipo != "Propio" || d.JugadorId is null) continue;
+                    if (usadosEnVuelta.Count == habilitados.Count) usadosEnVuelta.Clear();
+                    if (usadosEnVuelta.Contains(d.JugadorId.Value))
+                        return BadRequest($"Ejecución #{i + 1}: este jugador ya ejecutó en esta vuelta.");
+                    usadosEnVuelta.Add(d.JugadorId.Value);
+                }
+            }
+
+            // Coherencia goles detalle vs resultado
+            var golesEquipo = detalle.Count(d => d.Equipo == "Propio" && d.Resultado == "Gol");
+            var golesRival  = detalle.Count(d => d.Equipo == "Rival"  && d.Resultado == "Gol");
+            if (golesEquipo != request.ResultadoPenalesEquipo)
+                return BadRequest(
+                    $"Los goles del equipo en el detalle ({golesEquipo}) no coinciden con el resultado ({request.ResultadoPenalesEquipo}).");
+            if (golesRival != request.ResultadoPenalesRival)
+                return BadRequest(
+                    $"Los goles del rival en el detalle ({golesRival}) no coinciden con el resultado ({request.ResultadoPenalesRival}).");
+
+            // Progresión reglamentaria de la serie
+            var serieError = ValidarProgresionSerie(detalle);
+            if (serieError is not null) return BadRequest(serieError);
+        }
+
+        // ── Persistencia ─────────────────────────────────────────────────────
+        partido.HuboPenales = true;
+        partido.ResultadoPenalesEquipo = request.ResultadoPenalesEquipo;
+        partido.ResultadoPenalesRival  = request.ResultadoPenalesRival;
+        partido.Estado = "Finalizado";
+
+        if (request.Detalle is { Count: > 0 })
+        {
+            var detalles = request.Detalle.Select((d, i) => new PenalDetalle
+            {
+                PartidoId = id,
+                Equipo    = d.Equipo,
+                JugadorId = d.JugadorId,
+                Resultado = d.Resultado,
+                Orden     = i + 1,
+                Activo    = true,
+            }).ToList();
+            await context.PenalesDetalle.AddRangeAsync(detalles);
+        }
+
+        await context.SaveChangesAsync();
+        await context.Entry(partido).Reference(p => p.Categoria).LoadAsync();
+
+        return Ok(ToResponse(partido));
+    }
+
+    private static string? ValidarProgresionSerie(List<PenalDetalleRequest> detalle)
+    {
+        if (detalle.Count == 0) return null; // L4: 1 entrada cae al chequeo de incompleta
+
+        int gA = 0, gB = 0, sA = 0, sB = 0;
+        var ultimaEjecucionDefineLaTanda = false;
+        var primerEquipo = detalle[0].Equipo; // L3: quién inicia define quién cierra cada pareja
+
+        for (var i = 0; i < detalle.Count; i++)
+        {
+            var esA            = detalle[i].Equipo == "Propio";          // L3: basado en dato, no en paridad
+            var esUltimoDePar  = detalle[i].Equipo != primerEquipo;      // L3: cierra pareja quien no inició
+            var gol            = detalle[i].Resultado == "Gol";
+
+            if (esA) { sA++; if (gol) gA++; }
+            else     { sB++; if (gol) gB++; }
+
+            bool terminada;
+
+            if (sA <= 5 && sB <= 5)
+            {
+                // Serie inicial: detección anticipada
+                var rA = 5 - sA;
+                var rB = 5 - sB;
+                terminada = gA > gB + rB || gB > gA + rA;
+            }
+            else if (sA > 5 && sB > 5 && sA == sB && esUltimoDePar)
+            {
+                // Muerte súbita: termina al completar una pareja con diferencia
+                terminada = gA != gB;
+            }
+            else
+            {
+                terminada = false;
+            }
+
+            if (terminada && i < detalle.Count - 1)
+                return $"La tanda ya estaba definida en la ejecución #{i + 1}. Las posteriores son inválidas."; // L2
+
+            ultimaEjecucionDefineLaTanda = terminada;
+        }
+
+        if (!ultimaEjecucionDefineLaTanda)
+            return "La serie está incompleta: la última ejecución no define al ganador.";
+
+        return null;
+    }
+
+    [HttpGet("{id:int}/penales")]
+    public async Task<IActionResult> GetPenales(int id)
+    {
+        var partido = await context.Partidos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.PartidoId == id && p.Activo);
+
+        if (partido is null) return NotFound();
+        if (!partido.HuboPenales) return NotFound("Este partido no tuvo definición por penales.");
+
+        var detalle = await context.PenalesDetalle
+            .Include(d => d.Jugador)
+            .AsNoTracking()
+            .Where(d => d.PartidoId == id && d.Activo)
+            .OrderBy(d => d.Orden)
+            .ToListAsync();
+
+        return Ok(new PenalesResponse(
+            partido.ResultadoPenalesEquipo!.Value,
+            partido.ResultadoPenalesRival!.Value,
+            detalle.Select(d => new PenalDetalleResponse(
+                d.PenalDetalleId,
+                d.Equipo,
+                d.JugadorId,
+                d.Jugador != null ? $"{d.Jugador.Nombre} {d.Jugador.Apellido}" : null,
+                d.Resultado,
+                d.Orden)).ToList()
+        ));
+    }
+
     private static PartidoResponse ToResponse(Partido p) => new(
         p.PartidoId,
         p.CategoriaId,
@@ -266,7 +478,10 @@ public class PartidosController(
         p.Formacion,
         p.DefinicionEmpate,
         p.PeriodoActual,
-        p.HuboAlargue);
+        p.HuboAlargue,
+        p.HuboPenales,
+        p.ResultadoPenalesEquipo,
+        p.ResultadoPenalesRival);
 
     private static AlineacionEntradaResponse ToAlineacionResponse(Alineacion a) => new(
         a.AlineacionId,
@@ -303,7 +518,30 @@ public record PartidoResponse(
     string? Formacion,
     string DefinicionEmpate,
     string? PeriodoActual,
-    bool HuboAlargue);
+    bool HuboAlargue,
+    bool HuboPenales,
+    int? ResultadoPenalesEquipo,
+    int? ResultadoPenalesRival);
+
+public record PenalesRequest(
+    int ResultadoPenalesEquipo,
+    int ResultadoPenalesRival,
+    List<PenalDetalleRequest>? Detalle);
+
+public record PenalDetalleRequest(string Equipo, int? JugadorId, string Resultado, int Orden);
+
+public record PenalesResponse(
+    int ResultadoPenalesEquipo,
+    int ResultadoPenalesRival,
+    List<PenalDetalleResponse> Detalle);
+
+public record PenalDetalleResponse(
+    int PenalDetalleId,
+    string Equipo,
+    int? JugadorId,
+    string? NombreJugador,
+    string Resultado,
+    int Orden);
 
 public record EstadoRequest(
     string Estado,
