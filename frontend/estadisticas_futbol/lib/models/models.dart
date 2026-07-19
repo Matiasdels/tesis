@@ -221,6 +221,9 @@ class PartidoModel {
   final String definicionEmpate;
   final String? periodoActual;
   final bool huboAlargue;
+  final bool huboPenales;
+  final int? resultadoPenalesEquipo;
+  final int? resultadoPenalesRival;
 
   const PartidoModel({
     required this.id,
@@ -239,11 +242,24 @@ class PartidoModel {
     this.definicionEmpate = 'TerminaEnEmpate',
     this.periodoActual,
     this.huboAlargue = false,
+    this.huboPenales = false,
+    this.resultadoPenalesEquipo,
+    this.resultadoPenalesRival,
   });
 
   bool get isProgramado => estado == 'Programado';
   bool get isEnJuego => estado == 'EnJuego';
   bool get isFinished => estado == 'Finalizado';
+  bool get isEsperandoPenales => estado == 'EsperandoPenales';
+
+  String? get ganadorPenales {
+    if (resultadoPenalesEquipo == null || resultadoPenalesRival == null) {
+      return null;
+    }
+    if (resultadoPenalesEquipo! > resultadoPenalesRival!) return 'Propio';
+    if (resultadoPenalesRival! > resultadoPenalesEquipo!) return 'Rival';
+    return null;
+  }
 
   factory PartidoModel.fromApi(Map<String, dynamic> json) => PartidoModel(
         id: json['partidoId'] as int,
@@ -263,6 +279,9 @@ class PartidoModel {
             json['definicionEmpate'] as String? ?? 'TerminaEnEmpate',
         periodoActual: json['periodoActual'] as String?,
         huboAlargue: json['huboAlargue'] as bool? ?? false,
+        huboPenales: json['huboPenales'] as bool? ?? false,
+        resultadoPenalesEquipo: json['resultadoPenalesEquipo'] as int?,
+        resultadoPenalesRival: json['resultadoPenalesRival'] as int?,
       );
 
   Map<String, dynamic> toApiJson() => {
@@ -274,6 +293,44 @@ class PartidoModel {
         'lugar': lugar,
         'estado': estado,
         'definicionEmpate': definicionEmpate,
+      };
+}
+
+class PenalDetalleModel {
+  final int? penalDetalleId;
+  final int partidoId;
+  final String equipo; // 'Propio' | 'Rival'
+  final int? jugadorId;
+  final String? nombreJugador;
+  final String resultado; // 'Gol' | 'Errado'
+  final int orden;
+
+  const PenalDetalleModel({
+    this.penalDetalleId,
+    required this.partidoId,
+    required this.equipo,
+    this.jugadorId,
+    this.nombreJugador,
+    required this.resultado,
+    required this.orden,
+  });
+
+  factory PenalDetalleModel.fromApi(Map<String, dynamic> json) =>
+      PenalDetalleModel(
+        penalDetalleId: json['penalDetalleId'] as int?,
+        partidoId: json['partidoId'] as int? ?? 0,
+        equipo: json['equipo'] as String,
+        jugadorId: json['jugadorId'] as int?,
+        nombreJugador: json['nombreJugador'] as String?,
+        resultado: json['resultado'] as String,
+        orden: json['orden'] as int,
+      );
+
+  Map<String, dynamic> toApiJson() => {
+        'equipo': equipo,
+        if (jugadorId != null) 'jugadorId': jugadorId,
+        'resultado': resultado,
+        'orden': orden,
       };
 }
 

@@ -13,6 +13,7 @@ abstract class AppConstants {
   static const String routeLineup = '/matches/:id/lineup';
   static const String routeLiveMatch = '/matches/live/:id';
   static const String routeMatchSummary = '/matches/:id/summary';
+  static const String routePenales = '/matches/:id/penales';
   static const String routeTraining = '/training';
   static const String routeStatistics = '/statistics';
   static const String routeReports = '/reports';
@@ -158,11 +159,14 @@ abstract class TiposCompeticion {
 }
 
 abstract class EstadosPartido {
+  static const String esperandoPenales = 'EsperandoPenales';
+
   static const List<String> all = [
     'Programado',
     'EnJuego',
     'Finalizado',
-    'Cancelado'
+    'Cancelado',
+    'EsperandoPenales',
   ];
 }
 
