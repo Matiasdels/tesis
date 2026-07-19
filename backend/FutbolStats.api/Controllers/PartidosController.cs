@@ -257,25 +257,9 @@ public class PartidosController(
         if (partido is null) return NotFound();
 
         // ── Plausibilidad del resultado ──────────────────────────────────────
-        if (request.ResultadoPenalesEquipo < 0 || request.ResultadoPenalesRival < 0)
-            return BadRequest("Los resultados de penales no pueden ser negativos.");
-
-        if (request.ResultadoPenalesEquipo == request.ResultadoPenalesRival)
-            return BadRequest("El resultado de penales debe tener un ganador.");
-
-        var maxGoles = Math.Max(request.ResultadoPenalesEquipo, request.ResultadoPenalesRival);
-        var diff = Math.Abs(request.ResultadoPenalesEquipo - request.ResultadoPenalesRival);
-        if (maxGoles > 5 && diff != 1)
-            return BadRequest(
-                "Resultado imposible: cuando algún equipo supera 5 goles la diferencia debe ser exactamente 1.");
-
-        var minGoles = Math.Min(request.ResultadoPenalesEquipo, request.ResultadoPenalesRival);
-        if (maxGoles == 5 && minGoles < 3)
-            return BadRequest(
-                "Resultado imposible: con 5 goles, el rival debe haber convertido al menos 3.");
-        if (maxGoles == 4 && minGoles == 0)
-            return BadRequest(
-                "Resultado imposible: con 4 goles, el rival debe haber convertido al menos 1.");
+        var resultadoVal = PenalShootoutValidator.ValidarResultado(
+            request.ResultadoPenalesEquipo, request.ResultadoPenalesRival);
+        if (!resultadoVal.EsValido) return BadRequest(resultadoVal.Mensaje);
 
         // ── Validación de detalle ────────────────────────────────────────────
         if (request.Detalle is { Count: > 0 })
@@ -283,7 +267,7 @@ public class PartidosController(
             var detalle = request.Detalle;
 
             // Valores de dominio
-            var equiposValidos  = new HashSet<string> { "Propio", "Rival" };
+            var equiposValidos    = new HashSet<string> { "Propio", "Rival" };
             var resultadosValidos = new HashSet<string> { "Gol", "Errado" };
             for (var i = 0; i < detalle.Count; i++)
             {
@@ -320,14 +304,6 @@ public class PartidosController(
                     return BadRequest($"Ejecución #{i + 1}: el jugador no pertenece al plantel habilitado.");
             }
 
-            // Alternancia de equipos
-            for (var i = 1; i < detalle.Count; i++)
-            {
-                if (detalle[i].Equipo == detalle[i - 1].Equipo)
-                    return BadRequest(
-                        $"Los equipos deben alternar sus ejecuciones (error en ejecución #{i + 1}).");
-            }
-
             // Rotación de ejecutantes propios
             if (habilitados.Count > 0)
             {
@@ -343,19 +319,11 @@ public class PartidosController(
                 }
             }
 
-            // Coherencia goles detalle vs resultado
-            var golesEquipo = detalle.Count(d => d.Equipo == "Propio" && d.Resultado == "Gol");
-            var golesRival  = detalle.Count(d => d.Equipo == "Rival"  && d.Resultado == "Gol");
-            if (golesEquipo != request.ResultadoPenalesEquipo)
-                return BadRequest(
-                    $"Los goles del equipo en el detalle ({golesEquipo}) no coinciden con el resultado ({request.ResultadoPenalesEquipo}).");
-            if (golesRival != request.ResultadoPenalesRival)
-                return BadRequest(
-                    $"Los goles del rival en el detalle ({golesRival}) no coinciden con el resultado ({request.ResultadoPenalesRival}).");
-
-            // Progresión reglamentaria de la serie
-            var serieError = ValidarProgresionSerie(detalle);
-            if (serieError is not null) return BadRequest(serieError);
+            // Alternancia, coherencia de goles y progresión reglamentaria (lógica pura, sin BD)
+            var ejecuciones = detalle.Select(d => new EjecucionPenal(d.Equipo, d.Resultado)).ToList();
+            var detalleVal  = PenalShootoutValidator.ValidarDetalle(
+                ejecuciones, equipo: request.ResultadoPenalesEquipo, rival: request.ResultadoPenalesRival);
+            if (!detalleVal.EsValido) return BadRequest(detalleVal.Mensaje);
         }
 
         // ── Persistencia ─────────────────────────────────────────────────────
@@ -382,54 +350,6 @@ public class PartidosController(
         await context.Entry(partido).Reference(p => p.Categoria).LoadAsync();
 
         return Ok(ToResponse(partido));
-    }
-
-    private static string? ValidarProgresionSerie(List<PenalDetalleRequest> detalle)
-    {
-        if (detalle.Count == 0) return null; // L4: 1 entrada cae al chequeo de incompleta
-
-        int gA = 0, gB = 0, sA = 0, sB = 0;
-        var ultimaEjecucionDefineLaTanda = false;
-        var primerEquipo = detalle[0].Equipo; // L3: quién inicia define quién cierra cada pareja
-
-        for (var i = 0; i < detalle.Count; i++)
-        {
-            var esA            = detalle[i].Equipo == "Propio";          // L3: basado en dato, no en paridad
-            var esUltimoDePar  = detalle[i].Equipo != primerEquipo;      // L3: cierra pareja quien no inició
-            var gol            = detalle[i].Resultado == "Gol";
-
-            if (esA) { sA++; if (gol) gA++; }
-            else     { sB++; if (gol) gB++; }
-
-            bool terminada;
-
-            if (sA <= 5 && sB <= 5)
-            {
-                // Serie inicial: detección anticipada
-                var rA = 5 - sA;
-                var rB = 5 - sB;
-                terminada = gA > gB + rB || gB > gA + rA;
-            }
-            else if (sA > 5 && sB > 5 && sA == sB && esUltimoDePar)
-            {
-                // Muerte súbita: termina al completar una pareja con diferencia
-                terminada = gA != gB;
-            }
-            else
-            {
-                terminada = false;
-            }
-
-            if (terminada && i < detalle.Count - 1)
-                return $"La tanda ya estaba definida en la ejecución #{i + 1}. Las posteriores son inválidas."; // L2
-
-            ultimaEjecucionDefineLaTanda = terminada;
-        }
-
-        if (!ultimaEjecucionDefineLaTanda)
-            return "La serie está incompleta: la última ejecución no define al ganador.";
-
-        return null;
     }
 
     [HttpGet("{id:int}/penales")]

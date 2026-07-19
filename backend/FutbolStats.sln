@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FutbolStats.api", "FutbolStats.api\FutbolStats.api.csproj", "{0AA75941-B297-4832-AEC2-3BBCEFA6C614}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FutbolStats.Tests", "FutbolStats.Tests\FutbolStats.Tests.csproj", "{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,18 @@ Global
 		{0AA75941-B297-4832-AEC2-3BBCEFA6C614}.Release|x64.Build.0 = Release|Any CPU
 		{0AA75941-B297-4832-AEC2-3BBCEFA6C614}.Release|x86.ActiveCfg = Release|Any CPU
 		{0AA75941-B297-4832-AEC2-3BBCEFA6C614}.Release|x86.Build.0 = Release|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Debug|x64.Build.0 = Debug|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Debug|x86.Build.0 = Debug|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Release|x64.ActiveCfg = Release|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Release|x64.Build.0 = Release|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Release|x86.ActiveCfg = Release|Any CPU
+		{5BAFA7B7-288C-4A5F-859A-1C0B58E5F87F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
