@@ -120,6 +120,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.Periodo).HasMaxLength(30);
             entity.Property(x => x.FechaRegistro).HasDefaultValueSql("SYSDATETIME()");
             entity.HasOne(x => x.Jugador).WithMany().HasForeignKey(x => x.JugadorId).IsRequired(false);
+            entity.HasOne(x => x.JugadorRelacionado).WithMany().HasForeignKey(x => x.JugadorRelacionadoId).IsRequired(false);
             entity.HasOne(x => x.TipoEvento).WithMany().HasForeignKey(x => x.TipoEventoId);
         });
 

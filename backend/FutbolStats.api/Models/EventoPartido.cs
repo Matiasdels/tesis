@@ -15,5 +15,6 @@ public class EventoPartido
     public DateTime FechaRegistro { get; set; } = DateTime.UtcNow;
 
     public Jugador? Jugador { get; set; }
+    public Jugador? JugadorRelacionado { get; set; }
     public TipoEvento? TipoEvento { get; set; }
 }
