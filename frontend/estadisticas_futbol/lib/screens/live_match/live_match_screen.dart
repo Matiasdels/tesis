@@ -8,12 +8,14 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/match_time.dart';
 import '../../data/local/database_helper.dart';
 import '../../data/remote/auth_state.dart';
 import '../../data/remote/event_api.dart';
 import '../../data/remote/health_api.dart';
 import '../../data/remote/match_api.dart';
 import '../../models/models.dart';
+import '../../services/match_roster_state.dart';
 import '../../widgets/match/pitch_view.dart';
 
 // =============================================================================
@@ -48,6 +50,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   List<AlineacionEntradaModel> _lineup = [];
   List<TipoEventoModel> _tiposEvento = [];
   List<EventoPartidoModel> _events = [];
+  MatchRosterState _rosterState = MatchRosterState.empty;
   bool _loading = true;
   String? _loadError;
   bool _hasServerConnection = true;
@@ -98,12 +101,14 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   Map<String, int> get _tipoEventoIds =>
       {for (final t in _tiposEvento) t.nombre: t.tipoEventoId};
 
-  // Jugadores con tarjeta roja (directo o por doble amarilla) en este partido
-  Set<int> get _expelledPlayers => _events
-      .where((e) =>
-          e.jugadorId != null && e.tipoEventoNombre == EventTypes.redCard)
-      .map((e) => e.jugadorId!)
-      .toSet();
+  // Reconstruye el estado del plantel desde la alineación + eventos en orden.
+  // Llamar dentro de setState o justo después de modificar _events / _lineup.
+  void _computeRosterState() {
+    _rosterState = MatchRosterState.build(
+      lineup: _lineup,
+      events: _events.reversed.toList(),
+    );
+  }
 
   int _yellowsFor(int jugadorId) => _events
       .where((e) =>
@@ -219,6 +224,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _lineup = lineup;
         _tiposEvento = tipos;
         _events = List.from(events.reversed);
+        _computeRosterState();
         _minute = restoredMinute;
         _currentPeriod = restoredPeriod;
         _firstHalfEndSeconds = restoredFirstHalfEnd;
@@ -286,6 +292,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (!mounted) return;
       setState(() {
         _events = List.from(events.reversed);
+        _computeRosterState();
         _homeScore = homeScore;
         _awayScore = awayScore;
         _pendingSyncCount = pendingCount;
@@ -344,7 +351,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
           _token,
           golesEquipo: _homeScore,
           golesRival: _awayScore,
-          minutoActual: _minute ~/ 60,
+          minutoActual: MatchTime.calcularMinuto(_minute),
           periodoActual: _currentPeriod,
         )
         .ignore();
@@ -486,14 +493,6 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     if (_tapNorm == null || _pendingEvent == null) return;
     if (_savingEvent) return;
 
-    // Jugador expulsado: no permite registrar más eventos
-    if (_expelledPlayers.contains(player.jugadorId)) {
-      _showInfo(
-          'Este jugador fue expulsado y ya no puede registrar eventos.');
-      _dismissPlayerPicker();
-      return;
-    }
-
     // Segunda amarilla → registrar amarilla + roja automática
     if (_pendingEvent == EventTypes.yellowCard &&
         _yellowsFor(player.jugadorId) >= 1) {
@@ -534,7 +533,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         nombreJugador: player.nombreJugador,
         tipoEventoId: tipoId,
         tipoEventoNombre: _pendingEvent,
-        minuto: _minute ~/ 60,
+        minuto: MatchTime.calcularMinuto(_minute),
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
         periodo: _currentPeriod,
@@ -546,6 +545,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         if (_pendingEvent == EventTypes.goal) _homeScore++;
         if (_pendingEvent == EventTypes.goalRival) _awayScore++;
         _events.insert(0, evento);
+        _computeRosterState();
         _lastRegistered = evento;
         _showPlayerPicker = false;
         _pendingEvent = null;
@@ -582,7 +582,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         nombreJugador: _assistPlayer?.nombreJugador,
         tipoEventoId: assistId,
         tipoEventoNombre: EventTypes.assist,
-        minuto: _minute ~/ 60,
+        minuto: MatchTime.calcularMinuto(_minute),
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
         periodo: _currentPeriod,
@@ -595,7 +595,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         nombreJugador: goalscorer?.nombreJugador,
         tipoEventoId: goalId,
         tipoEventoNombre: EventTypes.goal,
-        minuto: _minute ~/ 60,
+        minuto: MatchTime.calcularMinuto(_minute),
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
         periodo: _currentPeriod,
@@ -607,6 +607,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _homeScore++;
         _events.insert(0, goalEvento);
         _events.insert(1, assistEvento);
+        _computeRosterState();
         _showPlayerPicker = false;
         _pendingEvent = null;
         _tapNorm = null;
@@ -648,7 +649,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         nombreJugador: player.nombreJugador,
         tipoEventoId: yellowId,
         tipoEventoNombre: EventTypes.yellowCard,
-        minuto: _minute ~/ 60,
+        minuto: MatchTime.calcularMinuto(_minute),
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
         periodo: _currentPeriod,
@@ -661,7 +662,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         nombreJugador: player.nombreJugador,
         tipoEventoId: redId,
         tipoEventoNombre: EventTypes.redCard,
-        minuto: _minute ~/ 60,
+        minuto: MatchTime.calcularMinuto(_minute),
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
         periodo: _currentPeriod,
@@ -672,6 +673,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       setState(() {
         _events.insert(0, redEvento);
         _events.insert(1, yellowEvento);
+        _computeRosterState();
         _showPlayerPicker = false;
         _pendingEvent = null;
         _tapNorm = null;
@@ -734,7 +736,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         nombreJugador: null,
         tipoEventoId: tipoId,
         tipoEventoNombre: _pendingEvent,
-        minuto: _minute ~/ 60,
+        minuto: MatchTime.calcularMinuto(_minute),
         pitchX: _tapNorm!.dx,
         pitchY: _tapNorm!.dy,
         periodo: _currentPeriod,
@@ -746,6 +748,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         if (_pendingEvent == EventTypes.goal) _homeScore++;
         if (_pendingEvent == EventTypes.goalRival) _awayScore++;
         _events.insert(0, evento);
+        _computeRosterState();
         _lastRegistered = evento;
         _showPlayerPicker = false;
         _pendingEvent = null;
@@ -772,6 +775,75 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _assistPlayer = null;
       _pickingGoalScorer = false;
     });
+  }
+
+  // ==========================================================================
+  //  CAMBIO DE JUGADORES
+  // ==========================================================================
+
+  void _showCambioDialog() {
+    if (_rosterState.suplentesDisponibles.isEmpty) return;
+    showDialog<(AlineacionEntradaModel, AlineacionEntradaModel)?>(
+      context: context,
+      builder: (_) => _CambioDialog(
+        jugadoresEnCancha: _rosterState.jugadoresEnCancha,
+        suplentesDisponibles: _rosterState.suplentesDisponibles,
+        minuto: MatchTime.calcularMinuto(_minute),
+      ),
+    ).then((result) {
+      if (result != null && mounted) {
+        _registrarCambio(result.$1, result.$2);
+      }
+    });
+  }
+
+  Future<void> _registrarCambio(
+    AlineacionEntradaModel sale,
+    AlineacionEntradaModel entra,
+  ) async {
+    final tipoId = _tipoEventoIds[EventTypes.cambio];
+    if (tipoId == null) {
+      _showCatalogUpdateError();
+      return;
+    }
+
+    setState(() => _savingEvent = true);
+
+    try {
+      final evento = await _eventApi.createEvento(
+        partidoId: _matchId,
+        jugadorId: sale.jugadorId,
+        nombreJugador: sale.nombreJugador,
+        jugadorRelacionadoId: entra.jugadorId,
+        nombreJugadorRelacionado: entra.nombreJugador,
+        tipoEventoId: tipoId,
+        tipoEventoNombre: EventTypes.cambio,
+        minuto: MatchTime.calcularMinuto(_minute),
+        pitchX: 0.5,
+        pitchY: 0.5,
+        periodo: _currentPeriod,
+        accessToken: _token,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _events.insert(0, evento);
+        _computeRosterState();
+        _lastRegistered = evento;
+        _savingEvent = false;
+      });
+
+      _beginUndo();
+      if (evento.eventoId < 0) {
+        _showSavedOnDeviceMessage();
+      } else {
+        _showInfo('Cambio: sale ${sale.nombreJugador}, entra ${entra.nombreJugador}');
+      }
+    } on EventApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _savingEvent = false);
+      _showError(e.message);
+    }
   }
 
   // ==========================================================================
@@ -806,6 +878,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     setState(() {
       _events.removeWhere((e) => e.eventoId == evento.eventoId);
+      _computeRosterState();
       if (wasGoal) _homeScore--;
       if (wasGoalRival) _awayScore--;
       _lastRegistered = null;
@@ -825,6 +898,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (mounted) {
         setState(() {
           _events.insert(0, evento);
+          _computeRosterState();
           if (wasGoal) _homeScore++;
           if (wasGoalRival) _awayScore++;
         });
@@ -1047,7 +1121,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _token,
         golesEquipo: _homeScore,
         golesRival: _awayScore,
-        minutoActual: _minute ~/ 60,
+        minutoActual: MatchTime.calcularMinuto(_minute),
         periodoActual: MatchPeriod.finalizado,
         huboAlargue: huboAlargue,
       );
@@ -1071,7 +1145,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       'huboAlargue': huboAlargue,
       'golesEquipo': _homeScore,
       'golesRival': _awayScore,
-      'minutoActual': _minute ~/ 60,
+      'minutoActual': MatchTime.calcularMinuto(_minute),
     };
     try {
       await _matchApi.patchEstado(
@@ -1080,7 +1154,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _token,
         golesEquipo: _homeScore,
         golesRival: _awayScore,
-        minutoActual: _minute ~/ 60,
+        minutoActual: MatchTime.calcularMinuto(_minute),
         periodoActual: periodoActual,
         huboAlargue: huboAlargue,
       );
@@ -1237,6 +1311,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               onUndo: _undo,
               onHistory: _openTimeline,
               onMoreEvents: _openMoreEvents,
+              onCambio: _showCambioDialog,
+              hasCambiosDisponibles:
+                  _rosterState.suplentesDisponibles.isNotEmpty &&
+                  _currentPeriod != MatchPeriod.finalizado,
             ),
 
             // ③ Pitch or break/decision panel
@@ -1323,9 +1401,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                       !MatchPeriod.isBreak(_currentPeriod)
                   ? _PlayerPicker(
                       eventType: _pendingEvent!,
-                      minute: _minute ~/ 60,
-                      lineup: _lineup,
-                      expelledPlayerIds: _expelledPlayers,
+                      minute: MatchTime.calcularMinuto(_minute),
+                      lineup: _rosterState.jugadoresEnCancha,
                       saving: _savingEvent,
                       pickingGoalScorer: _pickingGoalScorer,
                       assisterName: _assistPlayer?.nombreJugador,
@@ -1505,9 +1582,7 @@ class _TopBar extends StatelessWidget {
     final awayAbbr =
         awayTeam.substring(0, math.min(3, awayTeam.length)).toUpperCase();
     final isBreak = MatchPeriod.isBreak(currentPeriod);
-    final displayM = minute ~/ 60;
-    final displayS = minute % 60;
-    final clockText = '$displayM:${displayS.toString().padLeft(2, '0')}';
+    final clockText = MatchTime.reloj(minute);
 
     return [
       IconButton(
@@ -1800,6 +1875,8 @@ class _QuickBar extends StatelessWidget {
   final int undoSeconds;
   final VoidCallback onHistory, onMoreEvents;
   final Future<void> Function() onUndo;
+  final VoidCallback? onCambio;
+  final bool hasCambiosDisponibles;
 
   const _QuickBar({
     required this.lastEvent,
@@ -1807,6 +1884,8 @@ class _QuickBar extends StatelessWidget {
     required this.onUndo,
     required this.onHistory,
     required this.onMoreEvents,
+    this.onCambio,
+    this.hasCambiosDisponibles = false,
   });
 
   @override
@@ -1832,6 +1911,15 @@ class _QuickBar extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Container(width: 0.5, height: 24, color: AppColors.borderDefault),
+              const SizedBox(width: 6),
+            ],
+            if (hasCambiosDisponibles && onCambio != null) ...[
+              _QChip(
+                icon: Icons.swap_horiz_rounded,
+                label: 'Realizar cambio',
+                color: AppColors.accent,
+                onTap: onCambio,
+              ),
               const SizedBox(width: 6),
             ],
             _QChip(
@@ -2631,8 +2719,8 @@ class _MiniEventRow extends StatelessWidget {
 class _PlayerPicker extends StatelessWidget {
   final String eventType;
   final int minute;
+  // Solo jugadores actualmente en cancha (ya filtrados por MatchRosterState).
   final List<AlineacionEntradaModel> lineup;
-  final Set<int> expelledPlayerIds;
   final bool saving;
   final bool pickingGoalScorer;
   final String? assisterName;
@@ -2644,7 +2732,6 @@ class _PlayerPicker extends StatelessWidget {
     required this.eventType,
     required this.minute,
     required this.lineup,
-    required this.expelledPlayerIds,
     required this.saving,
     this.pickingGoalScorer = false,
     this.assisterName,
@@ -2742,12 +2829,9 @@ class _PlayerPicker extends StatelessWidget {
                   onTap: saving ? null : onSelectNone,
                 );
               }
-              final isExpelled =
-                  expelledPlayerIds.contains(lineup[i].jugadorId);
               return _PlayerCell(
                 player: lineup[i],
                 eventColor: eventColor,
-                isExpelled: isExpelled,
                 onTap: saving ? null : () => onSelect(lineup[i]),
               );
             },
@@ -2775,13 +2859,11 @@ Color _positionLineColor(String? pos) {
 class _PlayerCell extends StatelessWidget {
   final AlineacionEntradaModel player;
   final Color eventColor;
-  final bool isExpelled;
   final VoidCallback? onTap;
 
   const _PlayerCell({
     required this.player,
     required this.eventColor,
-    required this.isExpelled,
     required this.onTap,
   });
 
@@ -2799,54 +2881,34 @@ class _PlayerCell extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.all(2),
           decoration: BoxDecoration(
-            color: isExpelled ? AppColors.dangerDim : AppColors.bgMuted,
+            color: AppColors.bgMuted,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isExpelled
-                  ? AppColors.danger.withValues(alpha: 0.45)
-                  : AppColors.borderSubtle,
-              width: 0.5,
-            ),
+            border: Border.all(color: AppColors.borderSubtle, width: 0.5),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: isExpelled
-                    ? AppColors.danger.withValues(alpha: 0.20)
-                    : eventColor.withValues(alpha: 0.15),
-                child: isExpelled
-                    ? const Icon(Icons.square_rounded,
-                        size: 14, color: AppColors.danger)
-                    : Text(
-                        number != null ? '$number' : '?',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: eventColor,
-                            fontWeight: FontWeight.w600),
-                      ),
+                backgroundColor: eventColor.withValues(alpha: 0.15),
+                child: Text(
+                  number != null ? '$number' : '?',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: eventColor,
+                      fontWeight: FontWeight.w600),
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 surname,
                 style: TextStyle(
-                  fontSize: 9,
-                  color: isExpelled
-                      ? AppColors.textMuted
-                      : AppColors.textSecondary,
-                  decoration:
-                      isExpelled ? TextDecoration.lineThrough : null,
-                ),
+                    fontSize: 9, color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (isExpelled)
-                const Text('Expulsado',
-                    style: TextStyle(
-                        fontSize: 7, color: AppColors.danger))
-              else if (player.posicionAsignada != null &&
+              if (player.posicionAsignada != null &&
                   player.posicionAsignada!.isNotEmpty)
                 Container(
                   padding:
@@ -3712,6 +3774,145 @@ class _FullTimeline extends StatelessWidget {
     if (x < 0.33) return 'Zona def.';
     if (x < 0.66) return 'Mediocamp.';
     return 'Zona of.';
+  }
+}
+
+// =============================================================================
+//  CAMBIO DIALOG
+// =============================================================================
+
+class _CambioDialog extends StatefulWidget {
+  final List<AlineacionEntradaModel> jugadoresEnCancha;
+  final List<AlineacionEntradaModel> suplentesDisponibles;
+  final int minuto;
+
+  const _CambioDialog({
+    required this.jugadoresEnCancha,
+    required this.suplentesDisponibles,
+    required this.minuto,
+  });
+
+  @override
+  State<_CambioDialog> createState() => _CambioDialogState();
+}
+
+class _CambioDialogState extends State<_CambioDialog> {
+  AlineacionEntradaModel? _sale;
+  AlineacionEntradaModel? _entra;
+
+  bool get _canConfirm => _sale != null && _entra != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.bgSurface,
+      title: Text(
+        'Realizar cambio',
+        style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Sale del campo', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 6),
+            _PlayerDropdown(
+              hint: 'Seleccionar jugador',
+              players: widget.jugadoresEnCancha,
+              value: _sale,
+              onChanged: (p) => setState(() => _sale = p),
+            ),
+            const SizedBox(height: 14),
+            Text('Entra al campo', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 6),
+            _PlayerDropdown(
+              hint: 'Seleccionar suplente',
+              players: widget.suplentesDisponibles,
+              value: _entra,
+              onChanged: (p) => setState(() => _entra = p),
+            ),
+            if (_canConfirm) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.swap_horiz_rounded, color: AppColors.accent, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Min. ${widget.minuto}: ${_sale!.nombreJugador} → ${_entra!.nombreJugador}',
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+        ),
+        FilledButton(
+          onPressed: _canConfirm
+              ? () => Navigator.of(context).pop((_sale!, _entra!))
+              : null,
+          style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
+          child: const Text('Confirmar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlayerDropdown extends StatelessWidget {
+  final String hint;
+  final List<AlineacionEntradaModel> players;
+  final AlineacionEntradaModel? value;
+  final ValueChanged<AlineacionEntradaModel?> onChanged;
+
+  const _PlayerDropdown({
+    required this.hint,
+    required this.players,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.borderDefault),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: DropdownButton<AlineacionEntradaModel>(
+          value: value,
+          isExpanded: true,
+          underline: const SizedBox.shrink(),
+          dropdownColor: AppColors.bgSurface,
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          hint: Text(hint, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          items: players.map((p) => DropdownMenuItem(
+            value: p,
+            child: Text(p.nombreJugador, overflow: TextOverflow.ellipsis),
+          )).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
   }
 }
 

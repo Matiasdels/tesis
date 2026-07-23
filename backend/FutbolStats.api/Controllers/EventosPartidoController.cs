@@ -65,6 +65,13 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
             if (validacion.result is not null) return validacion.result;
             jugadorRelacionadoId = validacion.jugadorRelacionadoId;
         }
+        else if (jugadorId.HasValue)
+        {
+            var presencia = await ValidarPresenciaEnCanchaAsync(
+                partidoId, jugadorId.Value, tipoEvento.Nombre);
+            if (!presencia.EsValido)
+                return BadRequest(presencia.Mensaje);
+        }
 
         var evento = new EventoPartido
         {
@@ -157,6 +164,45 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
             return (BadRequest(validacion.Mensaje), null);
 
         return (null, jugadorEntraId);
+    }
+
+    // Carga el plantel reconstruido y valida que el jugador esté en cancha.
+    // Solo se llama cuando el tipo de evento NO es Cambio ni Tarjeta roja.
+    private async Task<PresenciaValidationResult> ValidarPresenciaEnCanchaAsync(
+        int partidoId, int jugadorId, string tipoEventoNombre)
+    {
+        // Tarjeta roja puede aplicarse a suplentes o expulsados — exento
+        if (tipoEventoNombre == PlantelPartidoStateBuilder.NombreTarjetaRoja)
+            return PresenciaValidationResult.Ok;
+
+        var alineacion = await context.Alineaciones
+            .Include(a => a.Jugador)
+            .AsNoTracking()
+            .Where(a => a.PartidoId == partidoId)
+            .ToListAsync();
+
+        var eventos = await context.EventosPartido
+            .Include(e => e.TipoEvento)
+            .AsNoTracking()
+            .Where(e => e.PartidoId == partidoId)
+            .OrderBy(e => e.Minuto)
+            .ThenBy(e => e.FechaRegistro)
+            .ToListAsync();
+
+        var infoAlineacion = alineacion.Select(a => new InfoJugador(
+            a.JugadorId,
+            a.Jugador is null ? $"Jugador {a.JugadorId}" : $"{a.Jugador.Nombre} {a.Jugador.Apellido}",
+            a.EsTitular)).ToList();
+
+        var infoEventos = eventos.Select(e => new InfoEvento(
+            e.TipoEvento?.Nombre ?? "",
+            e.JugadorId,
+            e.JugadorRelacionadoId)).ToList();
+
+        var plantel       = PlantelPartidoStateBuilder.Reconstruir(infoAlineacion, infoEventos);
+        var alineacionIds = alineacion.Select(a => a.JugadorId).ToHashSet();
+
+        return PresenciaEnCanchaValidator.Validar(tipoEventoNombre, jugadorId, plantel, alineacionIds);
     }
 
     private static EventoResponse ToResponse(EventoPartido e) => new(
