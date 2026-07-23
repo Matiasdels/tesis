@@ -47,6 +47,7 @@ abstract class AppConstants {
 
 abstract class EventTypes {
   // Activos — se pueden registrar
+  static const String cambio = 'Cambio';
   static const String shot = 'Remate';
   static const String shotOnTarget = 'Remate al arco';
   static const String goal = 'Gol';

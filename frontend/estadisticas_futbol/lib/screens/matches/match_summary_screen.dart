@@ -619,11 +619,14 @@ class _EventRow extends StatelessWidget {
   final EventoPartidoModel event;
   const _EventRow({required this.event});
 
+  bool get _esCambio => event.tipoEventoNombre == EventTypes.cambio;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 32,
@@ -634,18 +637,15 @@ class _EventRow extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            margin: const EdgeInsets.only(right: 10),
+            margin: const EdgeInsets.only(top: 4, right: 10),
             decoration: BoxDecoration(
               color: _color(event.tipoEventoNombre),
               shape: BoxShape.circle,
             ),
           ),
           Expanded(
-            child: Text(event.tipoEventoNombre,
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+            child: _esCambio ? _CambioContent(event: event) : _NormalContent(event: event),
           ),
-          Text(event.nombreJugador ?? 'Sin jugador',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         ],
       ),
     );
@@ -668,6 +668,57 @@ class _EventRow extends StatelessWidget {
         'Pase correcto' || 'Pase clave' => AppColors.accent,
         _ => AppColors.textMuted,
       };
+}
+
+class _NormalContent extends StatelessWidget {
+  final EventoPartidoModel event;
+  const _NormalContent({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(event.tipoEventoNombre,
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+        ),
+        Text(event.nombreJugador ?? 'Sin jugador',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      ],
+    );
+  }
+}
+
+class _CambioContent extends StatelessWidget {
+  final EventoPartidoModel event;
+  const _CambioContent({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final sale = event.nombreJugador ?? 'Jugador desconocido';
+    final entra = event.nombreJugadorRelacionado ?? 'Jugador entrante no disponible';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(EventTypes.cambio,
+            style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.textMuted),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                '$sale → $entra',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 // ── Info banner ───────────────────────────────────────────────────────────────

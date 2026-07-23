@@ -89,6 +89,9 @@ class EventApi {
     required int partidoId,
     int? jugadorId,
     String? nombreJugador,
+    // Para Cambio: jugador que entra.
+    int? jugadorRelacionadoId,
+    String? nombreJugadorRelacionado,
     required int tipoEventoId,
     String? tipoEventoNombre,
     required int minuto,
@@ -103,6 +106,7 @@ class EventApi {
     final body = {
       'localEventoId': localEventoId,
       if (jugadorId != null) 'jugadorId': jugadorId,
+      if (jugadorRelacionadoId != null) 'jugadorRelacionadoId': jugadorRelacionadoId,
       'tipoEventoId': tipoEventoId,
       'minuto': minuto,
       'pitchX': pitchX,
@@ -143,6 +147,8 @@ class EventApi {
         'partidoId': partidoId,
         'jugadorId': jugadorId,
         'nombreJugador': nombreJugador,
+        'jugadorRelacionadoId': jugadorRelacionadoId,
+        'nombreJugadorRelacionado': nombreJugadorRelacionado,
         'tipoEventoId': tipoEventoId,
         'tipoEventoNombre': tipoEventoNombre ?? 'Evento pendiente',
         'minuto': minuto,

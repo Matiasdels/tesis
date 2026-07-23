@@ -1,5 +1,6 @@
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
+using FutbolStats.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
 
         var eventos = await context.EventosPartido
             .Include(e => e.Jugador)
+            .Include(e => e.JugadorRelacionado)
             .Include(e => e.TipoEvento)
             .AsNoTracking()
             .Where(e => e.PartidoId == partidoId)
@@ -45,29 +47,51 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
             if (!jugadorExiste) return BadRequest($"El jugador indicado ({jugadorId}) no existe o está inactivo.");
         }
 
-        var tipoExiste = await context.TiposEvento.AnyAsync(t => t.TipoEventoId == request.TipoEventoId);
-        if (!tipoExiste) return BadRequest("El tipo de evento no existe.");
+        var tipoEvento = await context.TiposEvento
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TipoEventoId == request.TipoEventoId);
+        if (tipoEvento is null) return BadRequest("El tipo de evento no existe.");
 
         if (request.Minuto < 0 || request.Minuto > 200)
             return BadRequest("El minuto debe estar entre 0 y 200.");
 
+        int? jugadorRelacionadoId = null;
+
+        if (tipoEvento.Nombre == PlantelPartidoStateBuilder.NombreCambio)
+        {
+            var validacion = await ValidarCambio(
+                partido, partidoId, jugadorId, request.JugadorRelacionadoId);
+
+            if (validacion.result is not null) return validacion.result;
+            jugadorRelacionadoId = validacion.jugadorRelacionadoId;
+        }
+        else if (jugadorId.HasValue)
+        {
+            var presencia = await ValidarPresenciaEnCanchaAsync(
+                partidoId, jugadorId.Value, tipoEvento.Nombre);
+            if (!presencia.EsValido)
+                return BadRequest(presencia.Mensaje);
+        }
+
         var evento = new EventoPartido
         {
-            PartidoId = partidoId,
-            JugadorId = jugadorId,
-            TipoEventoId = request.TipoEventoId,
-            Minuto = request.Minuto,
-            PitchX = request.PitchX,
-            PitchY = request.PitchY,
-            Observacion = string.IsNullOrWhiteSpace(request.Observacion) ? null : request.Observacion.Trim(),
-            Periodo = string.IsNullOrWhiteSpace(request.Periodo) ? null : request.Periodo.Trim(),
-            FechaRegistro = DateTime.UtcNow,
+            PartidoId            = partidoId,
+            JugadorId            = jugadorId,
+            JugadorRelacionadoId = jugadorRelacionadoId,
+            TipoEventoId         = request.TipoEventoId,
+            Minuto               = request.Minuto,
+            PitchX               = request.PitchX,
+            PitchY               = request.PitchY,
+            Observacion          = string.IsNullOrWhiteSpace(request.Observacion) ? null : request.Observacion.Trim(),
+            Periodo              = string.IsNullOrWhiteSpace(request.Periodo) ? null : request.Periodo.Trim(),
+            FechaRegistro        = DateTime.UtcNow,
         };
 
         context.EventosPartido.Add(evento);
         await context.SaveChangesAsync();
 
         await context.Entry(evento).Reference(e => e.Jugador).LoadAsync();
+        await context.Entry(evento).Reference(e => e.JugadorRelacionado).LoadAsync();
         await context.Entry(evento).Reference(e => e.TipoEvento).LoadAsync();
 
         return CreatedAtAction(nameof(GetEventos), new { partidoId }, ToResponse(evento));
@@ -86,11 +110,108 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
         return NoContent();
     }
 
+    // Retorna (null, jugadorRelacionadoId) si válido; (IActionResult, _) si inválido.
+    private async Task<(IActionResult? result, int? jugadorRelacionadoId)> ValidarCambio(
+        Partido partido, int partidoId, int? jugadorSaleId, int? rawJugadorRelacionadoId)
+    {
+        if (!jugadorSaleId.HasValue)
+            return (BadRequest("Para un Cambio, JugadorId (jugador que sale) es obligatorio."), null);
+
+        var jugadorEntraId = rawJugadorRelacionadoId is > 0 ? rawJugadorRelacionadoId : null;
+        if (!jugadorEntraId.HasValue)
+            return (BadRequest("Para un Cambio, JugadorRelacionadoId (jugador que entra) es obligatorio."), null);
+
+        var jugadorEntraExiste = await context.Jugadores
+            .AnyAsync(j => j.JugadorId == jugadorEntraId && j.Activo);
+        if (!jugadorEntraExiste)
+            return (BadRequest($"El jugador que entra ({jugadorEntraId}) no existe o está inactivo."), null);
+
+        var alineacion = await context.Alineaciones
+            .Include(a => a.Jugador)
+            .AsNoTracking()
+            .Where(a => a.PartidoId == partidoId)
+            .ToListAsync();
+
+        var eventosExistentes = await context.EventosPartido
+            .Include(e => e.TipoEvento)
+            .AsNoTracking()
+            .Where(e => e.PartidoId == partidoId)
+            .OrderBy(e => e.Minuto)
+            .ThenBy(e => e.FechaRegistro)
+            .ToListAsync();
+
+        var infoAlineacion = alineacion.Select(a => new InfoJugador(
+            a.JugadorId,
+            a.Jugador is null ? $"Jugador {a.JugadorId}" : $"{a.Jugador.Nombre} {a.Jugador.Apellido}",
+            a.EsTitular)).ToList();
+
+        var infoEventos = eventosExistentes.Select(e => new InfoEvento(
+            e.TipoEvento?.Nombre ?? "",
+            e.JugadorId,
+            e.JugadorRelacionadoId)).ToList();
+
+        var plantel       = PlantelPartidoStateBuilder.Reconstruir(infoAlineacion, infoEventos);
+        var alineacionIds = alineacion.Select(a => a.JugadorId).ToHashSet();
+
+        var validacion = CambioValidator.Validar(
+            partido.Estado,
+            plantel,
+            jugadorSaleId:  jugadorSaleId.Value,
+            jugadorEntraId: jugadorEntraId.Value,
+            alineacionIds);
+
+        if (!validacion.EsValido)
+            return (BadRequest(validacion.Mensaje), null);
+
+        return (null, jugadorEntraId);
+    }
+
+    // Carga el plantel reconstruido y valida que el jugador esté en cancha.
+    // Solo se llama cuando el tipo de evento NO es Cambio ni Tarjeta roja.
+    private async Task<PresenciaValidationResult> ValidarPresenciaEnCanchaAsync(
+        int partidoId, int jugadorId, string tipoEventoNombre)
+    {
+        // Tarjeta roja puede aplicarse a suplentes o expulsados — exento
+        if (tipoEventoNombre == PlantelPartidoStateBuilder.NombreTarjetaRoja)
+            return PresenciaValidationResult.Ok;
+
+        var alineacion = await context.Alineaciones
+            .Include(a => a.Jugador)
+            .AsNoTracking()
+            .Where(a => a.PartidoId == partidoId)
+            .ToListAsync();
+
+        var eventos = await context.EventosPartido
+            .Include(e => e.TipoEvento)
+            .AsNoTracking()
+            .Where(e => e.PartidoId == partidoId)
+            .OrderBy(e => e.Minuto)
+            .ThenBy(e => e.FechaRegistro)
+            .ToListAsync();
+
+        var infoAlineacion = alineacion.Select(a => new InfoJugador(
+            a.JugadorId,
+            a.Jugador is null ? $"Jugador {a.JugadorId}" : $"{a.Jugador.Nombre} {a.Jugador.Apellido}",
+            a.EsTitular)).ToList();
+
+        var infoEventos = eventos.Select(e => new InfoEvento(
+            e.TipoEvento?.Nombre ?? "",
+            e.JugadorId,
+            e.JugadorRelacionadoId)).ToList();
+
+        var plantel       = PlantelPartidoStateBuilder.Reconstruir(infoAlineacion, infoEventos);
+        var alineacionIds = alineacion.Select(a => a.JugadorId).ToHashSet();
+
+        return PresenciaEnCanchaValidator.Validar(tipoEventoNombre, jugadorId, plantel, alineacionIds);
+    }
+
     private static EventoResponse ToResponse(EventoPartido e) => new(
         e.EventoId,
         e.PartidoId,
         e.JugadorId,
         e.Jugador is null ? null : $"{e.Jugador.Nombre} {e.Jugador.Apellido}",
+        e.JugadorRelacionadoId,
+        e.JugadorRelacionado is null ? null : $"{e.JugadorRelacionado.Nombre} {e.JugadorRelacionado.Apellido}",
         e.TipoEventoId,
         e.TipoEvento?.Nombre ?? "",
         e.Minuto,
@@ -104,6 +225,7 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
 public class EventoRequest
 {
     public int? JugadorId { get; set; }
+    public int? JugadorRelacionadoId { get; set; }
     public int TipoEventoId { get; set; }
     public int Minuto { get; set; }
     public decimal? PitchX { get; set; }
@@ -113,15 +235,17 @@ public class EventoRequest
 }
 
 public record EventoResponse(
-    int EventoId,
-    int PartidoId,
-    int? JugadorId,
-    string? NombreJugador,
-    int TipoEventoId,
-    string TipoEventoNombre,
-    int Minuto,
-    decimal? PitchX,
-    decimal? PitchY,
-    string? Observacion,
-    DateTime FechaRegistro,
-    string? Periodo);
+    int       EventoId,
+    int       PartidoId,
+    int?      JugadorId,
+    string?   NombreJugador,
+    int?      JugadorRelacionadoId,
+    string?   NombreJugadorRelacionado,
+    int       TipoEventoId,
+    string    TipoEventoNombre,
+    int       Minuto,
+    decimal?  PitchX,
+    decimal?  PitchY,
+    string?   Observacion,
+    DateTime  FechaRegistro,
+    string?   Periodo);
