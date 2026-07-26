@@ -55,6 +55,7 @@ builder.Services.AddDbContext<FutbolStatsDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddScoped<PasswordHasher>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<EstadisticasGlobalesService>();
 builder.Services.Configure<GeminiOptions>(geminiSection);
 builder.Services.AddHttpClient<AnalisisPartidoService>();
 builder.Services
