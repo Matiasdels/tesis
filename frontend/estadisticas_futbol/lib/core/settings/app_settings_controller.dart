@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../constants/app_constants.dart';
 import '../../data/local/database_helper.dart';
 
 class AppSettingsController extends ChangeNotifier {
@@ -51,6 +52,7 @@ class AppSettings {
   final bool rememberLastFormation;
   final bool automaticSync;
   final bool showPendingSync;
+  final List<String> radialMenuActions;
 
   const AppSettings({
     required this.showDashboardGreeting,
@@ -59,6 +61,7 @@ class AppSettings {
     required this.rememberLastFormation,
     required this.automaticSync,
     required this.showPendingSync,
+    required this.radialMenuActions,
   });
 
   factory AppSettings.defaults() {
@@ -69,6 +72,7 @@ class AppSettings {
       rememberLastFormation: true,
       automaticSync: true,
       showPendingSync: true,
+      radialMenuActions: EventTypes.radialPrimary,
     );
   }
 
@@ -87,7 +91,24 @@ class AppSettings {
           json['rememberLastFormation'] as bool? ?? defaults.rememberLastFormation,
       automaticSync: json['automaticSync'] as bool? ?? defaults.automaticSync,
       showPendingSync: json['showPendingSync'] as bool? ?? defaults.showPendingSync,
+      radialMenuActions: _sanitizeRadialActions(json['radialMenuActions']),
     );
+  }
+
+  static List<String> _sanitizeRadialActions(Object? value) {
+    if (value is! List) return EventTypes.radialPrimary;
+
+    final actions = <String>[];
+    for (final item in value) {
+      if (item is String &&
+          EventTypes.registrable.contains(item) &&
+          !actions.contains(item)) {
+        actions.add(item);
+      }
+    }
+
+    if (actions.isEmpty) return EventTypes.radialPrimary;
+    return actions.take(AppConstants.radialSegments).toList();
   }
 
   Map<String, dynamic> toJson() {
@@ -98,6 +119,7 @@ class AppSettings {
       'rememberLastFormation': rememberLastFormation,
       'automaticSync': automaticSync,
       'showPendingSync': showPendingSync,
+      'radialMenuActions': radialMenuActions,
     };
   }
 
@@ -108,6 +130,7 @@ class AppSettings {
     bool? rememberLastFormation,
     bool? automaticSync,
     bool? showPendingSync,
+    List<String>? radialMenuActions,
   }) {
     return AppSettings(
       showDashboardGreeting:
@@ -119,6 +142,7 @@ class AppSettings {
           rememberLastFormation ?? this.rememberLastFormation,
       automaticSync: automaticSync ?? this.automaticSync,
       showPendingSync: showPendingSync ?? this.showPendingSync,
+      radialMenuActions: radialMenuActions ?? this.radialMenuActions,
     );
   }
 }
