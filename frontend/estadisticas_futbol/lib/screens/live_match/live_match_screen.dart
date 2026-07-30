@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/match_time.dart';
 import '../../data/local/database_helper.dart';
@@ -407,6 +408,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
   void _handleRadialDragUpdate(DragUpdateDetails details) {
     if (_tapLocal == null) return;
+    final sectors = _activeRadialSectors();
+    if (sectors.isEmpty) return;
+
     final dx = details.localPosition.dx - _tapLocal!.dx;
     final dy = details.localPosition.dy - _tapLocal!.dy;
     final dist = math.sqrt(dx * dx + dy * dy);
@@ -421,7 +425,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
     var angle = math.atan2(dy, dx) + math.pi / 2;
     if (angle < 0) angle += 2 * math.pi;
-    final sector = (angle / (2 * math.pi / 8)).floor() % 8;
+    final sector =
+        (angle / (2 * math.pi / sectors.length)).floor() % sectors.length;
 
     if (sector != _dragSector) {
       HapticFeedback.selectionClick();
@@ -443,7 +448,13 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
   void _selectSector(int index) {
     HapticFeedback.mediumImpact();
-    final eventName = _sectors[index].eventType;
+    final sectors = _activeRadialSectors();
+    if (index < 0 || index >= sectors.length) {
+      _closeRadial();
+      return;
+    }
+
+    final eventName = sectors[index].eventType;
     setState(() {
       _pendingEvent = eventName;
       _showRadial = false;
@@ -452,6 +463,13 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     });
     _radialAnimCtrl.reverse();
     if (eventName == EventTypes.goalRival) _onNoPlayerSelected();
+  }
+
+  List<_SectorData> _activeRadialSectors() {
+    final actions =
+        context.read<AppSettingsController>().settings.radialMenuActions;
+    final sectors = _sectorDataForActions(actions);
+    return sectors.isEmpty ? _sectorDataForActions(EventTypes.radialPrimary) : sectors;
   }
 
   void _closeRadial() {
@@ -1372,6 +1390,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                       if (_showRadial && _tapLocal != null)
                         _RadialOverlay(
                           center: _tapLocal!,
+                          sectors: _activeRadialSectors(),
                           scaleAnim: _radialScaleAnim,
                           fadeAnim: _radialFadeAnim,
                           hoveredSector: _dragSector,
@@ -2277,19 +2296,42 @@ class _SectorData {
   const _SectorData(this.label, this.eventType, this.icon, this.color);
 }
 
-const _sectors = [
-  _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded, AppColors.warning),
-  _SectorData('Al arco', EventTypes.shotOnTarget, Icons.gps_fixed_rounded, Color(0xFFFF9800)),
-  _SectorData('Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
-  _SectorData('Gol rival', EventTypes.goalRival, Icons.sports_soccer_rounded, AppColors.danger),
-  _SectorData('Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
-  _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded, AppColors.warning),
-  _SectorData('Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
-  _SectorData('Pérdida', EventTypes.loss, Icons.remove_circle_outline_rounded, AppColors.purple),
+final _allSectorData = [
+  const _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded, AppColors.warning),
+  const _SectorData('Al arco', EventTypes.shotOnTarget, Icons.gps_fixed_rounded, Color(0xFFFF9800)),
+  const _SectorData('Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
+  const _SectorData('Gol rival', EventTypes.goalRival, Icons.sports_soccer_rounded, AppColors.danger),
+  const _SectorData('Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
+  const _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded, AppColors.warning),
+  const _SectorData('Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
+  const _SectorData('Perdida', EventTypes.loss, Icons.remove_circle_outline_rounded, AppColors.purple),
+  const _SectorData('Intercep.', EventTypes.interception, Icons.compare_arrows_rounded, AppColors.info),
+  _SectorData('Centro', EventTypes.cross, Icons.open_in_full_rounded, AppColors.textSecondary),
+  const _SectorData('Asist.', EventTypes.assist, Icons.handshake_rounded, Color(0xFF67E8F9)),
+  const _SectorData('Atajada', EventTypes.save, Icons.back_hand_rounded, AppColors.purple),
+  const _SectorData('Corner', EventTypes.corner, Icons.flag_rounded, AppColors.warning),
+  _SectorData('Offside', EventTypes.offside, Icons.outlined_flag_rounded, AppColors.textSecondary),
+  const _SectorData('Penal +', EventTypes.penaltyFor, Icons.add_circle_outline_rounded, AppColors.accent),
+  const _SectorData('Penal -', EventTypes.penaltyAgainst, Icons.remove_circle_outline_rounded, AppColors.danger),
 ];
+
+List<_SectorData> _sectorDataForActions(List<String> actions) {
+  final data = <_SectorData>[];
+  for (final action in actions) {
+    for (final sector in _allSectorData) {
+      if (sector.eventType == action &&
+          !data.any((item) => item.eventType == action)) {
+        data.add(sector);
+        break;
+      }
+    }
+  }
+  return data;
+}
 
 class _RadialOverlay extends StatelessWidget {
   final Offset center;
+  final List<_SectorData> sectors;
   final Animation<double> scaleAnim;
   final Animation<double> fadeAnim;
   final int hoveredSector;
@@ -2298,6 +2340,7 @@ class _RadialOverlay extends StatelessWidget {
 
   const _RadialOverlay({
     required this.center,
+    required this.sectors,
     required this.scaleAnim,
     required this.fadeAnim,
     required this.hoveredSector,
@@ -2329,6 +2372,7 @@ class _RadialOverlay extends StatelessWidget {
               child: FadeTransition(
                 opacity: fadeAnim,
                 child: _RadialMenu(
+                  sectors: sectors,
                   hoveredSector: hoveredSector,
                   onSectorTap: onSectorTap,
                   onMoreTap: onMoreTap,
@@ -2343,11 +2387,13 @@ class _RadialOverlay extends StatelessWidget {
 }
 
 class _RadialMenu extends StatelessWidget {
+  final List<_SectorData> sectors;
   final int hoveredSector;
   final ValueChanged<int> onSectorTap;
   final VoidCallback onMoreTap;
 
   const _RadialMenu({
+    required this.sectors,
     required this.hoveredSector,
     required this.onSectorTap,
     required this.onMoreTap,
@@ -2366,13 +2412,15 @@ class _RadialMenu extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            child: CustomPaint(painter: _RadialRingPainter(hoveredSector)),
+            child: CustomPaint(
+              painter: _RadialRingPainter(hoveredSector, sectors),
+            ),
           ),
-          ...List.generate(_sectors.length, (i) {
-            final angle = (i / _sectors.length) * 2 * math.pi - math.pi / 2;
+          ...List.generate(sectors.length, (i) {
+            final angle = (i / sectors.length) * 2 * math.pi - math.pi / 2;
             final dx = r + sectorOrbitR * math.cos(angle);
             final dy = r + sectorOrbitR * math.sin(angle);
-            final s = _sectors[i];
+            final s = sectors[i];
             final isHovered = hoveredSector == i;
 
             return Positioned(
@@ -2457,7 +2505,9 @@ class _RadialMenu extends StatelessWidget {
 
 class _RadialRingPainter extends CustomPainter {
   final int hoveredSector;
-  const _RadialRingPainter(this.hoveredSector);
+  final List<_SectorData> sectors;
+
+  const _RadialRingPainter(this.hoveredSector, this.sectors);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2468,11 +2518,11 @@ class _RadialRingPainter extends CustomPainter {
     canvas.drawCircle(
         center, outerR, Paint()..color = Colors.black.withValues(alpha: 0.45));
 
-    if (hoveredSector >= 0) {
-      const n = 8;
-      const segAngle = 2 * math.pi / n;
+    if (hoveredSector >= 0 && hoveredSector < sectors.length) {
+      final n = sectors.length;
+      final segAngle = 2 * math.pi / n;
       final startAngle = hoveredSector * segAngle - math.pi / 2 - segAngle / 2;
-      final color = _sectors[hoveredSector].color;
+      final color = sectors[hoveredSector].color;
 
       final path = Path()
         ..moveTo(center.dx, center.dy)
@@ -2507,7 +2557,7 @@ class _RadialRingPainter extends CustomPainter {
     final divPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.08)
       ..strokeWidth = 0.5;
-    const n = 8;
+    final n = sectors.length;
     for (var i = 0; i < n; i++) {
       final a = i * 2 * math.pi / n - math.pi / 2 - math.pi / n;
       canvas.drawLine(
@@ -2520,7 +2570,7 @@ class _RadialRingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RadialRingPainter old) =>
-      old.hoveredSector != hoveredSector;
+      old.hoveredSector != hoveredSector || old.sectors != sectors;
 }
 
 // =============================================================================

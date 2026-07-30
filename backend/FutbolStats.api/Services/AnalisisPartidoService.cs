@@ -16,8 +16,12 @@ public class AnalisisPartidoService(
     ILogger<AnalisisPartidoService> logger)
 {
     private const int MinEventosParaZonas = 3;
+    private const int MinEventosParaAnalisis = 3;
+    private const int MaxItemsPorSeccion = 4;
     private const string MensajeSinDatos =
-        "Todavia no hay suficientes eventos registrados para generar un analisis del partido.";
+        "Todavia no hay eventos registrados para generar un analisis del partido.";
+    private const string MensajeDatosInsuficientes =
+        "Todavia no hay datos suficientes para generar un analisis util. Registra al menos 3 eventos del partido.";
     private const string MensajeRequiereIa =
         "Para generar el analisis inteligente se necesita conexion a internet y una clave de IA configurada en el backend.";
     private const string MensajeErrorIa =
@@ -55,6 +59,11 @@ public class AnalisisPartidoService(
             return EmptyResponse(MensajeSinDatos);
         }
 
+        if (eventos.Count < MinEventosParaAnalisis)
+        {
+            return EmptyResponse(MensajeDatosInsuficientes);
+        }
+
         var options = geminiOptions.Value;
         if (string.IsNullOrWhiteSpace(options.ApiKey))
         {
@@ -62,6 +71,7 @@ public class AnalisisPartidoService(
         }
 
         var datosPartido = BuildInputData(partido, eventos);
+        var puedeAnalizarZonas = eventos.Count(HasValidLocation) >= MinEventosParaZonas;
 
         try
         {
@@ -69,6 +79,7 @@ public class AnalisisPartidoService(
                 datosPartido,
                 options,
                 cancellationToken);
+            aiPayload.Normalize(puedeAnalizarZonas);
 
             return new AnalisisPartidoResponse(
                 aiPayload.ResumenGeneral,
@@ -97,6 +108,11 @@ public class AnalisisPartidoService(
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             logger.LogWarning(ex, "No se pudo generar el analisis inteligente para el partido {PartidoId}.", partidoId);
+            return EmptyResponse(MensajeErrorIa);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error inesperado al generar el analisis inteligente para el partido {PartidoId}.", partidoId);
             return EmptyResponse(MensajeErrorIa);
         }
     }
@@ -158,7 +174,7 @@ public class AnalisisPartidoService(
             throw new InvalidOperationException("No se pudo interpretar la respuesta de Gemini.");
         }
 
-        return payload.Normalize();
+        return payload;
     }
 
     private static object AnalysisSchema()
@@ -260,6 +276,7 @@ public class AnalisisPartidoService(
         var eventosConUbicacion = eventos
             .Where(e => HasValidLocation(e))
             .ToList();
+        var puedeAnalizarZonas = eventosConUbicacion.Count >= MinEventosParaZonas;
 
         var countByType = eventos
             .GroupBy(EventName)
@@ -297,6 +314,21 @@ public class AnalisisPartidoService(
                 minutoActual = partido.MinutoActual,
                 fecha = partido.Fecha
             },
+            reglas = new
+            {
+                usarSoloEventosReales = true,
+                totalEventosRegistrados = eventos.Count,
+                eventosSinJugador = eventos.Count(e => e.Jugador is null),
+                eventosConUbicacion = eventosConUbicacion.Count,
+                minimoEventosParaAnalisis = MinEventosParaAnalisis,
+                minimoEventosParaAnalisisPorZonas = MinEventosParaZonas,
+                puedeAnalizarZonas,
+                datosLimitados = eventos.Count < 8,
+                eventosSinUbicacion = eventos.Count - eventosConUbicacion.Count,
+                indicacionDatosLimitados = eventos.Count < 8
+                    ? "Hay pocos eventos registrados. El analisis debe ser prudente y no sacar conclusiones fuertes."
+                    : null
+            },
             metricas = new
             {
                 totalEventos = eventos.Count,
@@ -318,7 +350,7 @@ public class AnalisisPartidoService(
                 segundoTiempo = eventos.Count(e => e.Minuto > 45)
             },
             jugadores,
-            zonas = eventosConUbicacion.Count >= MinEventosParaZonas
+            zonas = puedeAnalizarZonas
                 ? BuildZoneSummary(eventosConUbicacion)
                 : null,
             eventos = eventos.Select(e => new
@@ -408,15 +440,28 @@ public class AnalisisPartidoService(
     private static string BuildInstructions()
     {
         return """
-        Sos un asistente de analisis deportivo para el cuerpo tecnico de un club de futbol amateur.
-        Usa unicamente los datos del partido enviados en JSON.
-        No inventes informacion, jugadores, metricas ni zonas.
-        No menciones datos que no existan.
-        No hagas predicciones, no calcules xG, no elijas titulares y no des recomendaciones medicas.
-        No exageres conclusiones tacticas.
-        Responde en espanol claro, practico y orientado al cuerpo tecnico.
-        Si el campo zonas viene null, deja analisisZonas como string vacio.
-        Si existen zonas, usalas solo como apoyo explicativo.
+        Sos un asistente de analisis deportivo para el cuerpo tecnico de Colon FC.
+        Tu tarea es leer datos reales de un partido y devolver una lectura breve, prudente y util.
+
+        Reglas obligatorias:
+        - Usa unicamente el JSON recibido. No inventes jugadores, eventos, marcadores, metricas, zonas ni contexto externo.
+        - No menciones posesion, xG, distancia recorrida, intensidad fisica, cambios, formaciones tacticas ni datos que no esten en el JSON.
+        - Si hay pocos eventos, aclara que la lectura es preliminar y evita conclusiones fuertes.
+        - Si un evento no tiene jugador, podes mencionarlo como accion sin jugador asociado, pero no atribuirlo a nadie.
+        - No hagas predicciones, no elijas titulares, no des recomendaciones medicas y no uses lenguaje tecnico innecesario.
+        - Escribi en espanol rioplatense claro, profesional y orientado al cuerpo tecnico.
+
+        Estructura de respuesta:
+        - resumenGeneral: 2 o 3 frases. Debe explicar que se observa del partido sin exagerar.
+        - puntosPositivos: maximo 4 puntos concretos respaldados por eventos.
+        - aspectosAMejorar: maximo 4 puntos concretos respaldados por eventos.
+        - sugerenciasEntrenamiento: maximo 4 sugerencias entrenables y realistas, conectadas con lo observado.
+        - analisisZonas: solo escribir si reglas.puedeAnalizarZonas es true y zonas no es null. Si no, devolver string vacio.
+
+        Para el analisis por zonas:
+        - Usalo solo como apoyo, no como verdad absoluta.
+        - No digas que el equipo domina una zona si hay pocos eventos.
+        - Si reglas.puedeAnalizarZonas es false, analisisZonas debe ser exactamente "".
         """;
     }
 
@@ -472,14 +517,30 @@ public class AnalisisPartidoService(
         public List<string> SugerenciasEntrenamiento { get; set; } = [];
         public string AnalisisZonas { get; set; } = string.Empty;
 
-        public AiAnalysisPayload Normalize()
+        public void Normalize(bool puedeAnalizarZonas)
         {
-            ResumenGeneral ??= string.Empty;
-            PuntosPositivos ??= [];
-            AspectosAMejorar ??= [];
-            SugerenciasEntrenamiento ??= [];
-            AnalisisZonas ??= string.Empty;
-            return this;
+            ResumenGeneral = CleanText(ResumenGeneral);
+            PuntosPositivos = CleanList(PuntosPositivos);
+            AspectosAMejorar = CleanList(AspectosAMejorar);
+            SugerenciasEntrenamiento = CleanList(SugerenciasEntrenamiento);
+            AnalisisZonas = puedeAnalizarZonas ? CleanText(AnalisisZonas) : string.Empty;
+        }
+
+        private static string CleanText(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+        }
+
+        private static List<string> CleanList(List<string>? values)
+        {
+            if (values is null) return [];
+
+            return values
+                .Select(CleanText)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(MaxItemsPorSeccion)
+                .ToList();
         }
     }
 }

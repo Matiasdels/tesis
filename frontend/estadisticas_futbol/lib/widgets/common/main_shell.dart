@@ -315,6 +315,27 @@ void _showSettingsPanel(BuildContext context) {
                     ),
                     const SizedBox(height: 14),
                     _SettingsSection(
+                      title: 'Partido en vivo',
+                      children: [
+                        Consumer<AppSettingsController>(
+                          builder: (context, settingsController, _) {
+                            final settings = settingsController.settings;
+                            final count = settings.radialMenuActions.length;
+                            return _SettingsActionTile(
+                              icon: Icons.adjust_rounded,
+                              title: 'Menu radial',
+                              subtitle: '$count acciones rapidas visibles',
+                              onTap: () => _selectRadialMenuActions(
+                                context,
+                                settingsController,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _SettingsSection(
                       title: 'Cuenta y datos',
                       children: [
                         _SettingsActionTile(
@@ -422,6 +443,152 @@ Future<void> _selectDefaultFormation(
   if (selected == null) return;
   await settingsController.save(
     settingsController.settings.copyWith(defaultFormation: selected),
+  );
+}
+
+Future<void> _selectRadialMenuActions(
+  BuildContext context,
+  AppSettingsController settingsController,
+) async {
+  final current = List<String>.from(
+    settingsController.settings.radialMenuActions,
+  );
+  final sheetBackground =
+      AppColors.isDarkMode ? AppColors.bgCard : AppColors.bgDeep;
+
+  final selected = await showModalBottomSheet<List<String>>(
+    context: context,
+    backgroundColor: sheetBackground,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      var draft = List<String>.from(current);
+
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.82,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Menu radial',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Elegi hasta ${AppConstants.radialSegments} acciones para tener a mano durante el partido.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: AppColors.borderSubtle),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: EventTypes.registrable.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(height: 1, color: AppColors.borderSubtle),
+                      itemBuilder: (context, index) {
+                        final action = EventTypes.registrable[index];
+                        final isSelected = draft.contains(action);
+                        final canAdd =
+                            isSelected || draft.length < AppConstants.radialSegments;
+                        final canRemove = !isSelected || draft.length > 1;
+
+                        return CheckboxListTile(
+                          value: isSelected,
+                          activeColor: AppColors.accent,
+                          checkColor: Colors.black,
+                          enabled: canAdd && canRemove,
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 20),
+                          title: Text(
+                            action,
+                            style: TextStyle(
+                              color: canAdd && canRemove
+                                  ? AppColors.textPrimary
+                                  : AppColors.textMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: !canAdd && !isSelected
+                              ? Text(
+                                  'Maximo ${AppConstants.radialSegments} acciones',
+                                  style: TextStyle(
+                                    color: AppColors.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                )
+                              : null,
+                          onChanged: (_) {
+                            setSheetState(() {
+                              if (isSelected) {
+                                if (draft.length > 1) draft.remove(action);
+                              } else if (draft.length <
+                                  AppConstants.radialSegments) {
+                                draft.add(action);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                    child: Row(
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setSheetState(() {
+                              draft = List<String>.from(EventTypes.radialPrimary);
+                            });
+                          },
+                          child: const Text('Restablecer'),
+                        ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: () {
+                            Navigator.of(sheetContext).pop(draft);
+                          },
+                          child: const Text('Guardar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  if (selected == null) return;
+  await settingsController.save(
+    settingsController.settings.copyWith(radialMenuActions: selected),
   );
 }
 
