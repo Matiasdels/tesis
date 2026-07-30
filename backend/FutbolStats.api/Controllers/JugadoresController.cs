@@ -198,6 +198,84 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         return Ok(resultado);
     }
 
+    // GET /api/Jugadores/{id}/actividad
+    // Devuelve resumen de actividad + historial cronológico para la pestaña "Carga física".
+    [HttpGet("{id:int}/actividad")]
+    public async Task<IActionResult> GetActividadJugador(int id)
+    {
+        var jugador = await context.Jugadores.AsNoTracking()
+            .FirstOrDefaultAsync(j => j.JugadorId == id && j.Activo);
+        if (jugador is null) return NotFound();
+
+        // ── Partidos ─────────────────────────────────────────────────────────
+        var alineaciones = await context.Alineaciones
+            .Include(a => a.Partido)
+            .AsNoTracking()
+            .Where(a => a.JugadorId == id && a.Partido!.Activo && a.Partido.Estado == "Finalizado")
+            .OrderByDescending(a => a.Partido!.Fecha)
+            .ToListAsync();
+
+        var partidoIds = alineaciones.Select(a => a.PartidoId).ToHashSet();
+
+        // Todos los cambios del jugador en esos partidos (salida o entrada).
+        var cambios = await context.EventosPartido
+            .AsNoTracking()
+            .Where(e => partidoIds.Contains(e.PartidoId)
+                     && e.TipoEvento!.Nombre == "Cambio"
+                     && (e.JugadorId == id || e.JugadorRelacionadoId == id))
+            .Select(e => new { e.PartidoId, SaleId = e.JugadorId, EntraId = e.JugadorRelacionadoId, e.Minuto })
+            .ToListAsync();
+
+        var minutoSalidaPorPartido = cambios
+            .Where(c => c.SaleId == id)
+            .ToDictionary(c => c.PartidoId, c => c.Minuto);
+        var minutoEntradaPorPartido = cambios
+            .Where(c => c.EntraId == id)
+            .ToDictionary(c => c.PartidoId, c => c.Minuto);
+
+        var cambiosIngreso = minutoEntradaPorPartido.Keys.ToHashSet();
+
+        // ── Entrenamientos ───────────────────────────────────────────────────
+        var asistencias = await context.AsistenciasEntrenamiento
+            .Include(a => a.Entrenamiento)
+            .AsNoTracking()
+            .Where(a => a.JugadorId == id && a.Asistio)
+            .OrderByDescending(a => a.Entrenamiento!.Fecha)
+            .ToListAsync();
+
+        // ── Cálculo puro ─────────────────────────────────────────────────────
+        var infoAlineaciones = alineaciones.Select(a =>
+        {
+            int totalMin = a.Partido!.HuboAlargue ? 120 : 90;
+            int jugados;
+            if (a.EsTitular)
+                jugados = minutoSalidaPorPartido.TryGetValue(a.PartidoId, out var sal) ? sal : totalMin;
+            else
+                jugados = minutoEntradaPorPartido.TryGetValue(a.PartidoId, out var ent) ? totalMin - ent : 0;
+
+            return new InfoAlineacionAct(
+                a.PartidoId, a.Partido.Fecha, a.Partido.Rival, a.EsTitular,
+                a.Partido.GolesEquipo, a.Partido.GolesRival, jugados);
+        }).ToList();
+
+        var infoAsistencias = asistencias
+            .Select(a => new InfoAsistenciaAct(a.Entrenamiento!.Fecha)).ToList();
+
+        var resumen = ActividadCalculator.Calcular(infoAlineaciones, cambiosIngreso, infoAsistencias);
+
+        var historial = resumen.Historial.Select(x => new ActividadItem(
+            x.Tipo, x.Fecha, x.Detalle, x.Rival, x.GolesEquipo, x.GolesRival, x.MinutosJugados)).ToList();
+
+        return Ok(new ActividadJugadorResponse(
+            resumen.EntrenamientosRealizados,
+            resumen.PartidosDisputados,
+            resumen.Titularidades,
+            resumen.IngresosDesdeBanco,
+            resumen.MinutosDisputados,
+            resumen.UltimaActividad,
+            historial));
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeactivateJugador(int id)
     {
@@ -367,3 +445,22 @@ public record JugadorPartidoResponse(
     bool EsTitular,
     string? PosicionAsignada,
     JugadorEstadisticasResponse Estadisticas);
+
+
+public record ActividadItem(
+    string   Tipo,        // "Partido" | "Entrenamiento"
+    DateTime Fecha,
+    string   Detalle,     // "Titular" | "Ingresó desde el banco" | "No ingresó" | "Asistió"
+    string?  Rival,
+    int?     GolesEquipo,
+    int?     GolesRival,
+    int?     MinutosJugados);   // null para entrenamientos
+
+public record ActividadJugadorResponse(
+    int       EntrenamientosRealizados,
+    int       PartidosDisputados,
+    int       Titularidades,
+    int       IngresosDesdeBanco,
+    int       MinutosDisputados,
+    DateTime? UltimaActividad,
+    List<ActividadItem> Historial);

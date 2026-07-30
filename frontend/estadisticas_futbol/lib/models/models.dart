@@ -643,3 +643,69 @@ class PlayerObservacionModel {
         autorNombre: json['autorNombre'] as String? ?? '',
       );
 }
+
+class ActividadItemModel {
+  final String tipo;     // "Partido" | "Entrenamiento"
+  final DateTime fecha;
+  final String detalle;  // "Titular" | "Ingresó desde el banco" | "No ingresó" | "Asistió"
+  final String? rival;
+  final int? golesEquipo;
+  final int? golesRival;
+  final int? minutosJugados;  // null para entrenamientos o cuando no ingresó
+
+  const ActividadItemModel({
+    required this.tipo,
+    required this.fecha,
+    required this.detalle,
+    this.rival,
+    this.golesEquipo,
+    this.golesRival,
+    this.minutosJugados,
+  });
+
+  factory ActividadItemModel.fromApi(Map<String, dynamic> json) =>
+      ActividadItemModel(
+        tipo:          json['tipo']    as String,
+        fecha:         DateTime.parse(json['fecha'] as String),
+        detalle:       json['detalle'] as String,
+        rival:         json['rival']   as String?,
+        golesEquipo:   json['golesEquipo']   as int?,
+        golesRival:    json['golesRival']    as int?,
+        minutosJugados: json['minutosJugados'] as int?,
+      );
+}
+
+class ActividadJugadorModel {
+  final int entrenamientosRealizados;
+  final int partidosDisputados;
+  final int titularidades;
+  final int ingresosDesdeBanco;
+  final int minutosDisputados;
+  final DateTime? ultimaActividad;
+  final List<ActividadItemModel> historial;
+
+  const ActividadJugadorModel({
+    required this.entrenamientosRealizados,
+    required this.partidosDisputados,
+    required this.titularidades,
+    required this.ingresosDesdeBanco,
+    required this.minutosDisputados,
+    this.ultimaActividad,
+    required this.historial,
+  });
+
+  factory ActividadJugadorModel.fromApi(Map<String, dynamic> json) =>
+      ActividadJugadorModel(
+        entrenamientosRealizados: json['entrenamientosRealizados'] as int,
+        partidosDisputados:       json['partidosDisputados']       as int,
+        titularidades:            json['titularidades']            as int,
+        ingresosDesdeBanco:       json['ingresosDesdeBanco']       as int,
+        minutosDisputados:        json['minutosDisputados']        as int,
+        ultimaActividad: json['ultimaActividad'] != null
+            ? DateTime.parse(json['ultimaActividad'] as String)
+            : null,
+        historial: (json['historial'] as List<dynamic>)
+            .map((e) => ActividadItemModel.fromApi(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
