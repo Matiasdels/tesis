@@ -146,6 +146,21 @@ class PlayerApi {
         .toList();
   }
 
+  Future<ActividadJugadorModel> getActividadJugador(
+      String playerId, String accessToken) async {
+    final cacheKey = 'players:$playerId:actividad';
+    try {
+      final response =
+          await _getMap('/api/Jugadores/$playerId/actividad', accessToken);
+      await _databaseHelper.saveJson(cacheKey, response);
+      return ActividadJugadorModel.fromApi(response);
+    } catch (_) {
+      final cached = await _databaseHelper.readJsonMap(cacheKey);
+      if (cached != null) return ActividadJugadorModel.fromApi(cached);
+      rethrow;
+    }
+  }
+
   Future<List<CategoryModel>> getCategories(String accessToken) async {
     try {
       final response = await _getList('/api/Catalogos/categorias', accessToken);

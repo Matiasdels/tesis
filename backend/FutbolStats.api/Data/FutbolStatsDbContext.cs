@@ -15,6 +15,8 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
     public DbSet<EventoPartido> EventosPartido => Set<EventoPartido>();
     public DbSet<Observacion> Observaciones => Set<Observacion>();
     public DbSet<PenalDetalle> PenalesDetalle => Set<PenalDetalle>();
+    public DbSet<Entrenamiento> Entrenamientos => Set<Entrenamiento>();
+    public DbSet<AsistenciaEntrenamiento> AsistenciasEntrenamiento => Set<AsistenciaEntrenamiento>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -143,6 +145,31 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.Contenido).HasMaxLength(1000).IsRequired();
             entity.HasOne(x => x.Jugador).WithMany().HasForeignKey(x => x.JugadorId);
             entity.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.UsuarioId);
+        });
+
+        modelBuilder.Entity<Entrenamiento>(entity =>
+        {
+            entity.ToTable("Entrenamientos");
+            entity.HasKey(x => x.EntrenamientoId);
+            entity.Property(x => x.Fecha).HasColumnType("date").IsRequired();
+            entity.Property(x => x.Titulo).HasMaxLength(200);
+            entity.Property(x => x.Tipo).HasMaxLength(50);
+            entity.Property(x => x.Lugar).HasMaxLength(200);
+            entity.HasOne(x => x.Categoria).WithMany().HasForeignKey(x => x.CategoriaId);
+        });
+
+        modelBuilder.Entity<AsistenciaEntrenamiento>(entity =>
+        {
+            entity.ToTable("AsistenciasEntrenamiento");
+            entity.HasKey(x => x.AsistenciaId);
+            entity.Property(x => x.Asistio).HasDefaultValue(true);
+            entity.Property(x => x.Observacion).HasMaxLength(500);
+            entity.HasOne(x => x.Entrenamiento)
+                .WithMany(e => e.Asistencias)
+                .HasForeignKey(x => x.EntrenamientoId);
+            entity.HasOne(x => x.Jugador)
+                .WithMany()
+                .HasForeignKey(x => x.JugadorId);
         });
     }
 }

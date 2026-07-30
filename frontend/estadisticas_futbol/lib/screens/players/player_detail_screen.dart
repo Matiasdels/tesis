@@ -166,12 +166,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
         controller: _tabs,
         children: [
           _RealDataTab(player: player),
-          const _PendingTab(
-            icon: Icons.fitness_center_outlined,
-            title: 'Sin datos de carga fisica',
-            subtitle:
-                'Todavia no hay registros reales de entrenamientos o carga conectados a este jugador.',
-          ),
+          _CargaFisicaTab(playerId: player.id),
           _MatchesTab(playerId: player.id),
           _ObservationsTab(playerId: player.id),
         ],
@@ -430,20 +425,271 @@ class _DataRow extends StatelessWidget {
   }
 }
 
-class _PendingTab extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
+class _CargaFisicaTab extends StatefulWidget {
+  final String playerId;
 
-  const _PendingTab({
+  const _CargaFisicaTab({required this.playerId});
+
+  @override
+  State<_CargaFisicaTab> createState() => _CargaFisicaTabState();
+}
+
+class _CargaFisicaTabState extends State<_CargaFisicaTab>
+    with AutomaticKeepAliveClientMixin {
+  final _api = PlayerApi();
+  ActividadJugadorModel? _data;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      final data = await _api.getActividadJugador(widget.playerId, token);
+      if (mounted) setState(() { _data = data; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return EmptyState(
+        icon: Icons.signal_wifi_off_rounded,
+        title: 'No se pudo cargar la actividad',
+        subtitle: _error!,
+        actionLabel: 'Reintentar',
+        onAction: _load,
+      );
+    }
+    final data = _data!;
+    final sinActividad =
+        data.partidosDisputados == 0 && data.entrenamientosRealizados == 0;
+    if (sinActividad) {
+      return const EmptyState(
+        icon: Icons.fitness_center_outlined,
+        title: 'Sin actividad registrada',
+        subtitle: 'Acá aparecerán los partidos y entrenamientos del jugador.',
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        _ResumenCarga(data: data),
+        const SizedBox(height: 14),
+        _HistorialCarga(historial: data.historial),
+      ],
+    );
+  }
+}
+
+class _ResumenCarga extends StatelessWidget {
+  final ActividadJugadorModel data;
+  const _ResumenCarga({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'Resumen'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _ResumenStat(
+                  label: 'Partidos',
+                  value: '${data.partidosDisputados}',
+                  icon: Icons.sports_soccer_rounded,
+                ),
+              ),
+              Expanded(
+                child: _ResumenStat(
+                  label: 'Titularidades',
+                  value: '${data.titularidades}',
+                  icon: Icons.star_rounded,
+                  color: AppColors.accent,
+                ),
+              ),
+              Expanded(
+                child: _ResumenStat(
+                  label: 'Ingresos',
+                  value: '${data.ingresosDesdeBanco}',
+                  icon: Icons.swap_horiz_rounded,
+                ),
+              ),
+              Expanded(
+                child: _ResumenStat(
+                  label: 'Entrenamientos',
+                  value: '${data.entrenamientosRealizados}',
+                  icon: Icons.fitness_center_rounded,
+                  color: AppColors.info,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.timer_rounded, size: 15, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Text(
+                '${data.minutosDisputados} minutos disputados',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResumenStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color? color;
+
+  const _ResumenStat({
+    required this.label,
+    required this.value,
     required this.icon,
-    required this.title,
-    required this.subtitle,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return EmptyState(icon: icon, title: title, subtitle: subtitle);
+    final c = color ?? AppColors.textSecondary;
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: c),
+        const SizedBox(height: 4),
+        Text(value,
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w700, color: c)),
+        const SizedBox(height: 2),
+        Text(label,
+            style:
+                TextStyle(fontSize: 10, color: AppColors.textMuted),
+            textAlign: TextAlign.center),
+      ],
+    );
+  }
+}
+
+class _HistorialCarga extends StatelessWidget {
+  final List<ActividadItemModel> historial;
+  const _HistorialCarga({required this.historial});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'Historial de actividad'),
+          const SizedBox(height: 8),
+          ...historial.map((item) => _ActividadRow(item: item)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActividadRow extends StatelessWidget {
+  final ActividadItemModel item;
+  const _ActividadRow({required this.item});
+
+  bool get _esPartido => item.tipo == 'Partido';
+
+  Color get _color => switch (item.detalle) {
+        'Titular'               => AppColors.accent,
+        'Ingresó desde el banco' => AppColors.warning,
+        'Asistió'               => AppColors.info,
+        _                       => AppColors.textMuted,
+      };
+
+  IconData get _icon => switch (item.detalle) {
+        'Titular'               => Icons.star_rounded,
+        'Ingresó desde el banco' => Icons.swap_horiz_rounded,
+        'Asistió'               => Icons.fitness_center_rounded,
+        _                       => Icons.remove_circle_outline_rounded,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final fecha =
+        '${item.fecha.day.toString().padLeft(2, '0')}/${item.fecha.month.toString().padLeft(2, '0')}/${item.fecha.year}';
+    final resultado = (_esPartido &&
+            item.golesEquipo != null &&
+            item.golesRival != null)
+        ? '  ${item.golesEquipo}–${item.golesRival}'
+        : '';
+    final minText = (_esPartido && item.minutosJugados != null && item.minutosJugados! > 0)
+        ? "${item.minutosJugados}'"
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(_icon, size: 16, color: _color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _esPartido
+                      ? 'vs ${item.rival ?? "—"}$resultado'
+                      : 'Entrenamiento',
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                Text(
+                  item.detalle,
+                  style: TextStyle(fontSize: 11, color: _color),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(fecha,
+                  style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              if (minText != null)
+                Text(minText,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary)),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
