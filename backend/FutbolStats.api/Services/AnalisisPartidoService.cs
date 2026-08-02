@@ -65,7 +65,7 @@ public class AnalisisPartidoService(
         }
 
         var options = geminiOptions.Value;
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        if (!options.IsConfigured)
         {
             return EmptyResponse(MensajeRequiereIa);
         }
@@ -126,7 +126,7 @@ public class AnalisisPartidoService(
 
         var requestBody = new
         {
-            model = string.IsNullOrWhiteSpace(options.Model) ? "gemini-3.5-flash" : options.Model,
+            model = options.Model,
             system_instruction = BuildInstructions(),
             input = JsonSerializer.Serialize(datosPartido, JsonOptions),
             generation_config = new

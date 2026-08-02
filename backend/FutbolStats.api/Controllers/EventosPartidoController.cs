@@ -10,7 +10,7 @@ namespace FutbolStats.Api.Controllers;
 [ApiController]
 [Route("api/Partidos/{partidoId:int}/eventos")]
 [Authorize]
-public class EventosPartidoController(FutbolStatsDbContext context) : ControllerBase
+public class EventosPartidoController(FutbolStatsDbContext context, ILogger<EventosPartidoController> logger) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetEventos(int partidoId)
@@ -39,7 +39,7 @@ public class EventosPartidoController(FutbolStatsDbContext context) : Controller
         if (partido is null) return NotFound("Partido no encontrado.");
 
         var jugadorId = request.JugadorId is > 0 ? request.JugadorId : null;
-        Console.WriteLine($"[DEBUG] JugadorId recibido: {request.JugadorId?.ToString() ?? "NULL"}, normalizado: {jugadorId?.ToString() ?? "NULL"}");
+        logger.LogDebug("CreateEvento partido={PartidoId} jugadorId={JugadorId}", partidoId, jugadorId);
 
         if (jugadorId.HasValue)
         {

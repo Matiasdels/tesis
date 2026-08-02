@@ -2,14 +2,16 @@ namespace FutbolStats.Api.Services;
 
 public static class BusinessRules
 {
-    public static string NormalizeRequiredText(string value, string fieldName)
+    /// <summary>
+    /// Normaliza un campo de texto obligatorio y lanza <see cref="DomainValidationException"/>
+    /// (→ HTTP 400) si el valor está vacío o es solo espacios.
+    /// </summary>
+    public static string NormalizeRequiredText(string? value, string fieldName)
     {
-        var normalized = value.Trim();
+        var normalized = value?.Trim();
 
         if (string.IsNullOrWhiteSpace(normalized))
-        {
-            throw new ArgumentException($"{fieldName} es obligatorio.", fieldName);
-        }
+            throw new DomainValidationException($"{fieldName} es obligatorio.", fieldName);
 
         return normalized;
     }

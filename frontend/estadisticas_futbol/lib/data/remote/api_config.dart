@@ -1,6 +1,7 @@
+import '../../core/config/app_environment.dart';
+
 abstract class ApiConfig {
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:5224',
-  );
+  /// URL base de la API, sin barra final.
+  /// Se resuelve desde AppEnvironment (--dart-define=API_BASE_URL=...).
+  static String get baseUrl => AppEnvironment.apiBaseUrl;
 }
