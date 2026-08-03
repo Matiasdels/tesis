@@ -83,7 +83,7 @@ public static class EstadisticasCalculator
         var eventosFiltrados = eventos.Where(e => partidoIds.Contains(e.PartidoId));
 
         var topGoleadores = eventosFiltrados
-            .Where(e => e.TipoNombre == "Gol")
+            .Where(e => e.TipoNombre == EventTypeNames.Gol)
             .GroupBy(e => new { e.JugadorId, e.NombreJugador })
             .Select(g => new TopJugadorItem(g.Key.JugadorId, g.Key.NombreJugador, g.Count()))
             .OrderByDescending(x => x.Cantidad)
@@ -92,7 +92,7 @@ public static class EstadisticasCalculator
             .ToList();
 
         var topAsistidores = eventosFiltrados
-            .Where(e => e.TipoNombre == "Asistencia")
+            .Where(e => e.TipoNombre == EventTypeNames.Asistencia)
             .GroupBy(e => new { e.JugadorId, e.NombreJugador })
             .Select(g => new TopJugadorItem(g.Key.JugadorId, g.Key.NombreJugador, g.Count()))
             .OrderByDescending(x => x.Cantidad)
@@ -111,7 +111,7 @@ public static class EstadisticasCalculator
 
 public class EstadisticasGlobalesService(FutbolStatsDbContext context)
 {
-    private static readonly HashSet<string> TiposRelevantes = ["Gol", "Asistencia"];
+    private static readonly HashSet<string> TiposRelevantes = [EventTypeNames.Gol, EventTypeNames.Asistencia];
 
     public async Task<ResumenGlobalResponse> GetResumenGlobalAsync()
     {
@@ -119,7 +119,7 @@ public class EstadisticasGlobalesService(FutbolStatsDbContext context)
         var partidos = await context.Partidos
             .AsNoTracking()
             .Where(p => p.Activo
-                     && p.Estado == "Finalizado"
+                     && p.Estado == PartidoEstados.Finalizado
                      && p.GolesEquipo != null
                      && p.GolesRival  != null)
             .Select(p => new InfoPartidoEst(

@@ -17,8 +17,8 @@ public record EstadoPlantel(
 
 public static class PlantelPartidoStateBuilder
 {
-    public const string NombreCambio      = "Cambio";
-    public const string NombreTarjetaRoja = "Tarjeta roja";
+    public const string NombreCambio      = EventTypeNames.Cambio;
+    public const string NombreTarjetaRoja = EventTypeNames.TarjetaRoja;
 
     // Reconstruye el estado del plantel aplicando los eventos en el orden recibido.
     // Eventos no reconocidos o con datos incompletos se ignoran silenciosamente.
@@ -49,7 +49,7 @@ public static class PlantelPartidoStateBuilder
             else if (ev.TipoEventoNombre == NombreTarjetaRoja && ev.JugadorId.HasValue)
             {
                 AplicarExpulsion(ev.JugadorId.Value,
-                                 enCancha, suplentesDisponibles, expulsados);
+                                 enCancha, suplentesDisponibles, sustituidos, expulsados);
             }
         }
 
@@ -83,6 +83,7 @@ public static class PlantelPartidoStateBuilder
         int expulsadoId,
         Dictionary<int, InfoJugador> enCancha,
         Dictionary<int, InfoJugador> suplentesDisponibles,
+        List<InfoJugador>            sustituidos,
         List<InfoJugador>            expulsados)
     {
         if (enCancha.TryGetValue(expulsadoId, out var jugador))
@@ -94,6 +95,14 @@ public static class PlantelPartidoStateBuilder
         {
             suplentesDisponibles.Remove(expulsadoId);
             expulsados.Add(suplente);
+        }
+        else
+        {
+            // Tarjeta roja a jugador ya sustituido: se registra en historial disciplinario.
+            // El jugador sigue en Sustituidos y aparece también en Expulsados.
+            var sustituido = sustituidos.FirstOrDefault(j => j.JugadorId == expulsadoId);
+            if (sustituido is not null && !expulsados.Any(j => j.JugadorId == expulsadoId))
+                expulsados.Add(sustituido);
         }
     }
 }

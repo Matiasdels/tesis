@@ -274,8 +274,17 @@ class MatchApi {
   }
 
   String _friendlyError(int statusCode, String responseBody) {
-    final cleanBody = responseBody.replaceAll('"', '').trim();
     if (statusCode == 401) return 'Tu sesion expiro. Volve a iniciar sesion.';
+    try {
+      final json = jsonDecode(responseBody) as Map<String, dynamic>;
+      final detail = json['detail'] as String?;
+      if (detail != null && detail.isNotEmpty) return detail;
+      final title = json['title'] as String?;
+      if (title != null && title.isNotEmpty) return title;
+    } catch (_) {
+      // No es JSON o no tiene el formato ProblemDetails esperado.
+    }
+    final cleanBody = responseBody.replaceAll('"', '').trim();
     if (cleanBody.isNotEmpty) return cleanBody;
     if (statusCode == 404) {
       return 'Recurso no encontrado. Verifica que el servidor este actualizado.';

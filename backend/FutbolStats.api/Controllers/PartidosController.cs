@@ -12,10 +12,10 @@ namespace FutbolStats.Api.Controllers;
 [Authorize]
 public class PartidosController(
     FutbolStatsDbContext context,
-    AnalisisPartidoService analisisPartidoService) : ControllerBase
+    AnalisisPartidoService analisisPartidoService,
+    ILogger<PartidosController> logger) : ControllerBase
 {
     private static readonly string[] TiposCompeticionValidos = ["Liga", "Copa", "Amistoso", "Torneo"];
-    private static readonly string[] EstadosValidos = ["Programado", "EnJuego", "Finalizado", "Cancelado", "EsperandoPenales"];
 
     [HttpGet]
     public async Task<IActionResult> GetPartidos(
@@ -103,8 +103,13 @@ public class PartidosController(
         var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id);
         if (partido is null) return NotFound();
 
-        if (!EstadosValidos.Contains(request.Estado))
-            return BadRequest($"Estado inválido. Valores permitidos: {string.Join(", ", EstadosValidos)}.");
+        if (!PartidoEstados.Todos.Contains(request.Estado))
+            return BadRequest($"Estado inválido. Valores permitidos: {string.Join(", ", PartidoEstados.Todos)}.");
+
+        if (!PartidoEstados.TransicionPermitida(partido.Estado, request.Estado))
+            throw new DomainConflictException(
+                $"La transición de '{partido.Estado}' a '{request.Estado}' no está permitida. " +
+                $"Estado actual: {partido.Estado}.");
 
         partido.Estado = request.Estado;
 
@@ -162,6 +167,11 @@ public class PartidosController(
             .FirstOrDefaultAsync(p => p.PartidoId == id);
 
         if (partido is null) return NotFound();
+
+        if (!PartidoEstados.PermiteModificarAlineacion.Contains(partido.Estado))
+            throw new DomainConflictException(
+                $"La alineación solo puede modificarse cuando el partido está en estado " +
+                $"'{PartidoEstados.Programado}'. Estado actual: {partido.Estado}.");
 
         if (!string.IsNullOrWhiteSpace(request.Formacion))
             partido.Formacion = request.Formacion.Trim();
@@ -234,8 +244,8 @@ public class PartidosController(
         if (!TiposCompeticionValidos.Contains(request.TipoCompeticion))
             return BadRequest($"Tipo de competición inválido. Valores permitidos: {string.Join(", ", TiposCompeticionValidos)}.");
 
-        if (!EstadosValidos.Contains(request.Estado))
-            return BadRequest($"Estado inválido. Valores permitidos: {string.Join(", ", EstadosValidos)}.");
+        if (!PartidoEstados.Todos.Contains(request.Estado))
+            return BadRequest($"Estado inválido. Valores permitidos: {string.Join(", ", PartidoEstados.Todos)}.");
 
         if (request.Fecha == default)
             return BadRequest("La fecha del partido es obligatoria.");
@@ -255,6 +265,11 @@ public class PartidosController(
     {
         var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id && p.Activo);
         if (partido is null) return NotFound();
+
+        if (partido.Estado != PartidoEstados.EsperandoPenales)
+            throw new DomainConflictException(
+                $"La definición por penales solo puede guardarse cuando el partido está en estado " +
+                $"'{PartidoEstados.EsperandoPenales}'. Estado actual: {partido.Estado}.");
 
         // ── Plausibilidad del resultado ──────────────────────────────────────
         var resultadoVal = PenalShootoutValidator.ValidarResultado(
@@ -287,7 +302,7 @@ public class PartidosController(
                 .Include(e => e.TipoEvento)
                 .Where(e => e.PartidoId == id &&
                             e.JugadorId != null &&
-                            e.TipoEvento!.Nombre == "Tarjeta roja")
+                            e.TipoEvento!.Nombre == EventTypeNames.TarjetaRoja)
                 .Select(e => e.JugadorId!.Value)
                 .ToHashSetAsync();
 
@@ -362,6 +377,15 @@ public class PartidosController(
         if (partido is null) return NotFound();
         if (!partido.HuboPenales) return NotFound("Este partido no tuvo definición por penales.");
 
+        if (!partido.ResultadoPenalesEquipo.HasValue || !partido.ResultadoPenalesRival.HasValue)
+        {
+            logger.LogError(
+                "Datos de penales inconsistentes para partido {PartidoId}: " +
+                "HuboPenales=true pero ResultadoPenalesEquipo={E} ResultadoPenalesRival={R}",
+                id, partido.ResultadoPenalesEquipo, partido.ResultadoPenalesRival);
+            return StatusCode(500, "Los datos de penales están incompletos. Contactá al administrador.");
+        }
+
         var detalle = await context.PenalesDetalle
             .Include(d => d.Jugador)
             .AsNoTracking()
@@ -370,8 +394,8 @@ public class PartidosController(
             .ToListAsync();
 
         return Ok(new PenalesResponse(
-            partido.ResultadoPenalesEquipo!.Value,
-            partido.ResultadoPenalesRival!.Value,
+            partido.ResultadoPenalesEquipo.Value,
+            partido.ResultadoPenalesRival.Value,
             detalle.Select(d => new PenalDetalleResponse(
                 d.PenalDetalleId,
                 d.Equipo,

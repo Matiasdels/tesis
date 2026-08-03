@@ -185,14 +185,27 @@ class EventApi {
 
   void _checkStatus(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final body = response.body.replaceAll('"', '').trim();
       if (response.statusCode == 401) {
         throw const EventApiException(
             'Tu sesion expiro. Volve a iniciar sesion.');
       }
       throw EventApiException(
-          body.isNotEmpty ? body : 'Error ${response.statusCode}');
+          _extractMessage(response.statusCode, response.body));
     }
+  }
+
+  String _extractMessage(int statusCode, String body) {
+    try {
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      final detail = json['detail'] as String?;
+      if (detail != null && detail.isNotEmpty) return detail;
+      final title = json['title'] as String?;
+      if (title != null && title.isNotEmpty) return title;
+    } catch (_) {
+      // No es JSON o no tiene el formato ProblemDetails esperado.
+    }
+    final clean = body.replaceAll('"', '').trim();
+    return clean.isNotEmpty ? clean : 'Error $statusCode';
   }
 
   String _eventsCacheKey(int partidoId) => 'matches:$partidoId:events';

@@ -24,6 +24,10 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
                 StatusCodes.Status400BadRequest,
                 "Datos inválidos",
                 dve.Message),
+            DomainConflictException dce => (
+                StatusCodes.Status409Conflict,
+                "Conflicto de estado",
+                dce.Message),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "Error interno",
