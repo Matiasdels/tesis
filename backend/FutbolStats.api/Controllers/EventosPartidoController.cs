@@ -38,6 +38,11 @@ public class EventosPartidoController(FutbolStatsDbContext context, ILogger<Even
             .FirstOrDefaultAsync(p => p.PartidoId == partidoId);
         if (partido is null) return NotFound("Partido no encontrado.");
 
+        if (!PartidoEstados.PermiteEventos.Contains(partido.Estado))
+            throw new DomainConflictException(
+                $"No se pueden registrar eventos en un partido con estado '{partido.Estado}'. " +
+                "El partido debe estar en juego o esperando penales.");
+
         var jugadorId = request.JugadorId is > 0 ? request.JugadorId : null;
         logger.LogDebug("CreateEvento partido={PartidoId} jugadorId={JugadorId}", partidoId, jugadorId);
 
@@ -100,6 +105,19 @@ public class EventosPartidoController(FutbolStatsDbContext context, ILogger<Even
     [HttpDelete("{eventoId:int}")]
     public async Task<IActionResult> DeleteEvento(int partidoId, int eventoId)
     {
+        var estadoPartido = await context.Partidos
+            .AsNoTracking()
+            .Where(p => p.PartidoId == partidoId)
+            .Select(p => (string?)p.Estado)
+            .FirstOrDefaultAsync();
+
+        if (estadoPartido is null) return NotFound("Partido no encontrado.");
+
+        if (PartidoEstados.Terminales.Contains(estadoPartido))
+            throw new DomainConflictException(
+                $"No se pueden eliminar eventos de un partido que ya ha concluido " +
+                $"(estado: {estadoPartido}).");
+
         var evento = await context.EventosPartido
             .FirstOrDefaultAsync(e => e.EventoId == eventoId && e.PartidoId == partidoId);
 

@@ -167,4 +167,21 @@ public class EventoValidationTests
 
         Assert.True(r.EsValido);
     }
+
+    // ── Hallazgo 3.7: tarjeta roja exenta a jugador sustituido ───────────────
+
+    // 11. Tarjeta roja a jugador ya sustituido: el validador de presencia la exime.
+    [Fact]
+    public void TarjetaRoja_JugadorSustituido_EsExenta()
+    {
+        var lineup  = new[] { EV.T(1), EV.T(2), EV.S(10) };
+        var plantel = EV.Estado(lineup, EV.Cambio(1, 10));
+        var ids     = new HashSet<int> { 1, 2, 10 };
+
+        // J1 está en Sustituidos; la tarjeta roja es exenta → validador Ok
+        var r = PresenciaEnCanchaValidator.Validar(
+            PlantelPartidoStateBuilder.NombreTarjetaRoja, 1, plantel, ids);
+
+        Assert.True(r.EsValido);
+    }
 }

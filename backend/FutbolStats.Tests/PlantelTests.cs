@@ -173,6 +173,46 @@ public class PlantelStateBuilderTests
         Assert.Equal(estado1.Sustituidos.Select(j => j.JugadorId),
                      estado2.Sustituidos.Select(j => j.JugadorId));
     }
+
+    // ── Hallazgo 3.7: tarjeta roja a jugador ya sustituido ───────────────────
+
+    // 11. Roja a jugador sustituido: aparece en Expulsados.
+    [Fact]
+    public void TarjetaRoja_JugadorYaSustituido_ApareceeEnExpulsados()
+    {
+        // J1 sale, J10 entra; luego J1 recibe roja estando en Sustituidos.
+        var alin = new[] { P.T(1), P.T(2), P.S(10) };
+        var evs  = new[] { P.Cambio(1, 10), P.Roja(1) };
+
+        var estado = PlantelPartidoStateBuilder.Reconstruir(alin, evs);
+
+        Assert.Contains(estado.Expulsados, j => j.JugadorId == 1);
+    }
+
+    // 12. Roja a jugador sustituido: sigue apareciendo también en Sustituidos.
+    [Fact]
+    public void TarjetaRoja_JugadorYaSustituido_SigueSiendoSustituido()
+    {
+        var alin = new[] { P.T(1), P.T(2), P.S(10) };
+        var evs  = new[] { P.Cambio(1, 10), P.Roja(1) };
+
+        var estado = PlantelPartidoStateBuilder.Reconstruir(alin, evs);
+
+        Assert.Contains(estado.Sustituidos, j => j.JugadorId == 1);
+    }
+
+    // 13. Roja a jugador sustituido: no afecta al jugador que entró en su lugar.
+    [Fact]
+    public void TarjetaRoja_JugadorYaSustituido_NoAfectaAlEntrante()
+    {
+        var alin = new[] { P.T(1), P.T(2), P.S(10) };
+        var evs  = new[] { P.Cambio(1, 10), P.Roja(1) };
+
+        var estado = PlantelPartidoStateBuilder.Reconstruir(alin, evs);
+
+        Assert.Contains(estado.EnCancha, j => j.JugadorId == 10);
+        Assert.DoesNotContain(estado.Expulsados, j => j.JugadorId == 10);
+    }
 }
 
 // ── CambioValidator ───────────────────────────────────────────────────────────
@@ -186,14 +226,24 @@ public class CambioValidatorTests
         return (estado, new HashSet<int> { 1, 2, 10 });
     }
 
-    // 11. Partido finalizado: siempre rechazado.
+    // 11a. Partido finalizado: rechazado.
     [Fact]
     public void Validar_PartidoFinalizado_Rechazado()
     {
         var (plantel, ids) = PlantelBase();
         var resultado = CambioValidator.Validar("Finalizado", plantel, 1, 10, ids);
         Assert.False(resultado.EsValido);
-        Assert.Equal("PartidoFinalizado", resultado.CodigoError);
+        Assert.Equal("PartidoTerminado", resultado.CodigoError);
+    }
+
+    // 11b. Partido cancelado: también rechazado (estado terminal).
+    [Fact]
+    public void Validar_PartidoCancelado_Rechazado()
+    {
+        var (plantel, ids) = PlantelBase();
+        var resultado = CambioValidator.Validar("Cancelado", plantel, 1, 10, ids);
+        Assert.False(resultado.EsValido);
+        Assert.Equal("PartidoTerminado", resultado.CodigoError);
     }
 
     // 12. Partido en curso, cambio válido: aceptado.

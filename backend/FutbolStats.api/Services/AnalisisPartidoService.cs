@@ -333,13 +333,13 @@ public class AnalisisPartidoService(
             {
                 totalEventos = eventos.Count,
                 porTipo = countByType,
-                goles = Count(eventos, "Gol"),
+                goles = Count(eventos, EventTypeNames.Gol),
                 golesRivales = Count(eventos, "Gol rival"),
-                asistencias = Count(eventos, "Asistencia"),
-                remates = Count(eventos, "Remate"),
-                faltas = Count(eventos, "Falta"),
-                tarjetasAmarillas = Count(eventos, "Tarjeta amarilla"),
-                tarjetasRojas = Count(eventos, "Tarjeta roja"),
+                asistencias = Count(eventos, EventTypeNames.Asistencia),
+                remates = Count(eventos, EventTypeNames.Remate),
+                faltas = Count(eventos, EventTypeNames.Falta),
+                tarjetasAmarillas = Count(eventos, EventTypeNames.TarjetaAmarilla),
+                tarjetasRojas = Count(eventos, EventTypeNames.TarjetaRoja),
                 recuperaciones = Count(eventos, "Recuperaci\u00f3n", "Recuperacion"),
                 intercepciones = Count(eventos, "Intercepci\u00f3n", "Intercepcion"),
                 perdidas = Count(eventos, "P\u00e9rdida", "Perdida"),
@@ -388,10 +388,10 @@ public class AnalisisPartidoService(
             zonaConMasEventos = $"{tercioPrincipal}, {carrilPrincipal}",
             actividadPorTercio,
             actividadPorCarril,
-            rematesPorZona = CountZonesForTypes(eventos, "Remate"),
-            golesPorZona = CountZonesForTypes(eventos, "Gol"),
+            rematesPorZona = CountZonesForTypes(eventos, EventTypeNames.Remate),
+            golesPorZona = CountZonesForTypes(eventos, EventTypeNames.Gol),
             perdidasPorZona = CountZonesForTypes(eventos, "P\u00e9rdida", "Perdida"),
-            faltasPorZona = CountZonesForTypes(eventos, "Falta")
+            faltasPorZona = CountZonesForTypes(eventos, EventTypeNames.Falta)
         };
     }
 

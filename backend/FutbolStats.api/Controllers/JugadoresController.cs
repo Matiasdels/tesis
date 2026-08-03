@@ -185,12 +185,12 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
                 a.EsTitular,
                 a.PosicionAsignada,
                 new JugadorEstadisticasResponse(
-                    evs.Count(e => e.TipoEvento?.Nombre == "Gol"),
-                    evs.Count(e => e.TipoEvento?.Nombre == "Asistencia"),
-                    evs.Count(e => e.TipoEvento?.Nombre == "Remate" || e.TipoEvento?.Nombre == "Remate al arco"),
-                    evs.Count(e => e.TipoEvento?.Nombre == "Falta"),
-                    evs.Count(e => e.TipoEvento?.Nombre == "Tarjeta amarilla"),
-                    evs.Count(e => e.TipoEvento?.Nombre == "Tarjeta roja")
+                    evs.Count(e => e.TipoEvento?.Nombre == EventTypeNames.Gol),
+                    evs.Count(e => e.TipoEvento?.Nombre == EventTypeNames.Asistencia),
+                    evs.Count(e => e.TipoEvento?.Nombre == EventTypeNames.Remate || e.TipoEvento?.Nombre == EventTypeNames.RemateAlArco),
+                    evs.Count(e => e.TipoEvento?.Nombre == EventTypeNames.Falta),
+                    evs.Count(e => e.TipoEvento?.Nombre == EventTypeNames.TarjetaAmarilla),
+                    evs.Count(e => e.TipoEvento?.Nombre == EventTypeNames.TarjetaRoja)
                 )
             );
         });
@@ -211,7 +211,7 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         var alineaciones = await context.Alineaciones
             .Include(a => a.Partido)
             .AsNoTracking()
-            .Where(a => a.JugadorId == id && a.Partido!.Activo && a.Partido.Estado == "Finalizado")
+            .Where(a => a.JugadorId == id && a.Partido!.Activo && a.Partido.Estado == PartidoEstados.Finalizado)
             .OrderByDescending(a => a.Partido!.Fecha)
             .ToListAsync();
 
@@ -221,7 +221,7 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         var cambios = await context.EventosPartido
             .AsNoTracking()
             .Where(e => partidoIds.Contains(e.PartidoId)
-                     && e.TipoEvento!.Nombre == "Cambio"
+                     && e.TipoEvento!.Nombre == EventTypeNames.Cambio
                      && (e.JugadorId == id || e.JugadorRelacionadoId == id))
             .Select(e => new { e.PartidoId, SaleId = e.JugadorId, EntraId = e.JugadorRelacionadoId, e.Minuto })
             .ToListAsync();

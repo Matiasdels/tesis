@@ -23,10 +23,10 @@ public static class CambioValidator
         int              jugadorEntraId,
         IReadOnlySet<int> alineacionIds)
     {
-        if (estadoPartido == "Finalizado")
+        if (PartidoEstados.Terminales.Contains(estadoPartido))
             return CambioValidationResult.Error(
-                "PartidoFinalizado",
-                "No se pueden registrar cambios en un partido finalizado.");
+                "PartidoTerminado",
+                "No se pueden registrar cambios en un partido que ya ha concluido.");
 
         if (jugadorSaleId == jugadorEntraId)
             return CambioValidationResult.Error(
