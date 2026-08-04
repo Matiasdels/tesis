@@ -1436,11 +1436,36 @@ class _AppBottomNav extends StatelessWidget {
   const _AppBottomNav();
 
   static const _items = [
-    (icon: Icons.dashboard_outlined, label: 'Inicio', route: '/'),
-    (icon: Icons.sports_soccer, label: 'Partidos', route: '/matches'),
-    (icon: Icons.people_outline, label: 'Plantilla', route: '/players'),
-    (icon: Icons.bar_chart_outlined, label: 'Stats', route: '/statistics'),
-    (icon: Icons.description_outlined, label: 'Reportes', route: '/reports'),
+    (
+      icon: Icons.dashboard_outlined,
+      label: 'Inicio',
+      route: AppConstants.routeDashboard
+    ),
+    (
+      icon: Icons.sports_soccer,
+      label: 'Partidos',
+      route: AppConstants.routeMatches
+    ),
+    (
+      icon: Icons.people_outline,
+      label: 'Plantilla',
+      route: AppConstants.routePlayers
+    ),
+    (
+      icon: Icons.fitness_center,
+      label: 'Entrena',
+      route: AppConstants.routeTraining
+    ),
+    (
+      icon: Icons.bar_chart_outlined,
+      label: 'Stats',
+      route: AppConstants.routeStatistics
+    ),
+    (
+      icon: Icons.description_outlined,
+      label: 'Reportes',
+      route: AppConstants.routeReports
+    ),
   ];
 
   @override
@@ -1466,7 +1491,7 @@ class _AppBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 58,
+          height: 60,
           child: Row(
             children: List.generate(_items.length, (i) {
               final item = _items[i];
@@ -1482,7 +1507,7 @@ class _AppBottomNav extends StatelessWidget {
                     children: [
                       Icon(
                         item.icon,
-                        size: 22,
+                        size: 21,
                         color: active ? AppColors.accent : AppColors.textMuted,
                       ),
                       const SizedBox(height: 3),

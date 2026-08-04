@@ -25,7 +25,6 @@ class AuthApi {
     required String password,
     required String nombre,
     required String apellido,
-    required int rolId,
   }) async {
     final response = await _post('/api/Auth/registro', {
       'nombreUsuario': nombreUsuario,
@@ -33,7 +32,6 @@ class AuthApi {
       'password': password,
       'nombre': nombre,
       'apellido': apellido,
-      'rolId': rolId,
     });
 
     return AuthSession.fromJson(response);
@@ -53,7 +51,10 @@ class AuthApi {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw AuthApiException(_friendlyError(response.statusCode, response.body));
+      throw AuthApiException(
+        _friendlyError(response.statusCode, response.body),
+        statusCode: response.statusCode,
+      );
     }
 
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -71,7 +72,10 @@ class AuthApi {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw AuthApiException(_friendlyError(response.statusCode, response.body));
+      throw AuthApiException(
+        _friendlyError(response.statusCode, response.body),
+        statusCode: response.statusCode,
+      );
     }
 
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -101,8 +105,9 @@ class AuthApi {
 
 class AuthApiException implements Exception {
   final String message;
+  final int? statusCode;
 
-  AuthApiException(this.message);
+  AuthApiException(this.message, {this.statusCode});
 
   @override
   String toString() => message.replaceAll('"', '');

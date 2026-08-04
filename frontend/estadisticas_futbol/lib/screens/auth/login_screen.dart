@@ -42,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
     final busy = auth.loading || !auth.initialized;
+    final visibleError = _error ?? auth.authNotice;
 
     return Scaffold(
       backgroundColor: AppColors.bgDeep,
@@ -73,12 +74,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         nombreController: _nombreController,
                         apellidoController: _apellidoController,
                         obscurePassword: _obscurePassword,
-                        error: _error,
+                        error: visibleError,
                         onTogglePassword: () => setState(() {
                           _obscurePassword = !_obscurePassword;
                         }),
                         onSubmit: _submit,
                         onToggleMode: () => setState(() {
+                          context.read<AuthState>().clearAuthNotice();
                           _registerMode = !_registerMode;
                           _error = null;
                         }),
@@ -120,6 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final auth = context.read<AuthState>();
+    auth.clearAuthNotice();
     setState(() => _error = null);
 
     try {
@@ -130,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text,
           nombre: _nombreController.text.trim(),
           apellido: _apellidoController.text.trim(),
-          rolId: 1,
         );
       } else {
         await auth.login(

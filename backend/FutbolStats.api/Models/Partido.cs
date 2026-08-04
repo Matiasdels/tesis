@@ -24,4 +24,5 @@ public class Partido
     public int? ResultadoPenalesRival { get; set; }
 
     public Categoria? Categoria { get; set; }
+    public Usuario? UsuarioCreador { get; set; }
 }

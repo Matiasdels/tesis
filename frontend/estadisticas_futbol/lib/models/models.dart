@@ -7,6 +7,7 @@ class PlayerModel {
   final String shortName;
   final String position;
   final int number;
+  final int? jerseyNumber;
   final int age;
   final String nationality;
   final double heightCm;
@@ -34,6 +35,7 @@ class PlayerModel {
     required this.shortName,
     required this.position,
     required this.number,
+    this.jerseyNumber,
     required this.age,
     required this.nationality,
     required this.heightCm,
@@ -124,6 +126,7 @@ class PlayerModel {
       shortName: '$firstName $lastName'.trim(),
       position: json['posicionPrincipal'] as String? ?? '',
       number: json['numeroCamiseta'] as int? ?? 0,
+      jerseyNumber: json['numeroCamiseta'] as int?,
       age: birthDate != null ? _calculateAge(birthDate) : 0,
       nationality: json['nacionalidad'] as String? ?? '',
       heightCm: (json['alturaCm'] as num?)?.toDouble() ?? 0,
@@ -154,6 +157,7 @@ class PlayerModel {
       shortName: shortName,
       position: position,
       number: number,
+      jerseyNumber: jerseyNumber,
       age: age,
       nationality: nationality,
       heightCm: heightCm,
@@ -187,7 +191,7 @@ class PlayerModel {
       'nacionalidad': nationality.isEmpty ? null : nationality,
       'dni': dni,
       'posicionPrincipal': position.isEmpty ? null : position,
-      'numeroCamiseta': number == 0 ? null : number,
+      'numeroCamiseta': jerseyNumber,
       'alturaCm': heightCm == 0 ? null : heightCm,
       'pesoKg': weightKg == 0 ? null : weightKg,
       'piernaHabil': dominantFoot,
@@ -469,45 +473,92 @@ class TipoEventoModel {
 }
 
 class TrainingSessionModel {
-  final String id;
+  final int id;
+  final int categoriaId;
   final DateTime date;
   final String title;
-  final String type; // 'technical' | 'tactical' | 'physical' | 'recovery'
-  final int durationMin;
-  final double avgRpe;
-  final int attendance;
+  final String type;
+  final int? durationMin;
+  final String? place;
+  final int attended;
+  final int absent;
+  final List<TrainingAttendanceModel> attendance;
 
   const TrainingSessionModel({
     required this.id,
+    required this.categoriaId,
     required this.date,
     required this.title,
     required this.type,
-    required this.durationMin,
-    required this.avgRpe,
-    required this.attendance,
+    this.durationMin,
+    this.place,
+    required this.attended,
+    required this.absent,
+    this.attendance = const [],
   });
+
+  factory TrainingSessionModel.fromApi(Map<String, dynamic> json) =>
+      TrainingSessionModel(
+        id: json['entrenamientoId'] as int,
+        categoriaId: json['categoriaId'] as int,
+        date: DateTime.parse(json['fecha'] as String),
+        title: (json['titulo'] as String?)?.trim().isNotEmpty == true
+            ? (json['titulo'] as String).trim()
+            : 'Entrenamiento',
+        type: (json['tipo'] as String?)?.trim().isNotEmpty == true
+            ? (json['tipo'] as String).trim()
+            : 'General',
+        durationMin: json['duracionMinutos'] as int?,
+        place: (json['lugar'] as String?)?.trim().isNotEmpty == true
+            ? (json['lugar'] as String).trim()
+            : null,
+        attended: json['asistieron'] as int? ?? 0,
+        absent: json['noAsistieron'] as int? ?? 0,
+        attendance: (json['asistencias'] as List<dynamic>? ?? const [])
+            .map((item) =>
+                TrainingAttendanceModel.fromApi(item as Map<String, dynamic>))
+            .toList(),
+      );
+
+  Map<String, dynamic> toApiJson() => {
+        'categoriaId': categoriaId,
+        'fecha': date.toIso8601String(),
+        'titulo': title.trim(),
+        'tipo': type.trim(),
+        'duracionMinutos': durationMin,
+        'lugar': place?.trim(),
+      };
 }
 
-class ObservationModel {
-  final String id;
-  final String playerId;
-  final String playerName;
-  final String authorName;
-  final String authorRole;
-  final String tag; // 'positive' | 'improve' | 'physical' | 'tactical'
-  final String text;
-  final DateTime date;
+class TrainingAttendanceModel {
+  final int playerId;
+  final bool attended;
+  final double? rpe;
+  final String? observation;
 
-  const ObservationModel({
-    required this.id,
+  const TrainingAttendanceModel({
     required this.playerId,
-    required this.playerName,
-    required this.authorName,
-    required this.authorRole,
-    required this.tag,
-    required this.text,
-    required this.date,
+    required this.attended,
+    this.rpe,
+    this.observation,
   });
+
+  factory TrainingAttendanceModel.fromApi(Map<String, dynamic> json) =>
+      TrainingAttendanceModel(
+        playerId: json['jugadorId'] as int,
+        attended: json['asistio'] as bool? ?? false,
+        rpe: (json['rpe'] as num?)?.toDouble(),
+        observation: (json['observacion'] as String?)?.trim().isNotEmpty == true
+            ? (json['observacion'] as String).trim()
+            : null,
+      );
+
+  Map<String, dynamic> toApiJson() => {
+        'jugadorId': playerId,
+        'asistio': attended,
+        'rpe': rpe,
+        'observacion': observation?.trim(),
+      };
 }
 
 class CategoryModel {
@@ -624,12 +675,14 @@ class PlayerMatchModel {
 
 class PlayerObservacionModel {
   final int observacionId;
+  final String tipo;
   final String contenido;
   final DateTime fecha;
   final String autorNombre;
 
   const PlayerObservacionModel({
     required this.observacionId,
+    required this.tipo,
     required this.contenido,
     required this.fecha,
     required this.autorNombre,
@@ -638,6 +691,7 @@ class PlayerObservacionModel {
   factory PlayerObservacionModel.fromApi(Map<String, dynamic> json) =>
       PlayerObservacionModel(
         observacionId: json['observacionId'] as int,
+        tipo: json['tipo'] as String? ?? 'General',
         contenido: json['contenido'] as String,
         fecha: DateTime.parse(json['fecha'] as String),
         autorNombre: json['autorNombre'] as String? ?? '',

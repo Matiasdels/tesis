@@ -1,6 +1,7 @@
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using FutbolStats.Api.Services;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +65,7 @@ public class PartidosController(
             Lugar = string.IsNullOrWhiteSpace(request.Lugar) ? null : request.Lugar.Trim(),
             Estado = request.Estado,
             DefinicionEmpate = request.DefinicionEmpate ?? "TerminaEnEmpate",
+            UsuarioCreadorId = GetCurrentUserId(),
         };
 
         context.Partidos.Add(partido);
@@ -258,6 +260,12 @@ public class PartidosController(
             return BadRequest("El lugar no puede superar los 150 caracteres.");
 
         return null;
+    }
+
+    private int? GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 
     [HttpPost("{id:int}/penales")]
