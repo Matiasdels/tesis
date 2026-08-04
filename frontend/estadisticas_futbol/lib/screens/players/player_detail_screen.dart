@@ -225,7 +225,7 @@ class _PlayerHeader extends StatelessWidget {
                   children: [
                     StatusBadge(status: player.status),
                     _InfoChip(
-                      '${player.position.isEmpty ? '-' : player.position} / #${player.number == 0 ? '-' : player.number}',
+                      '${player.position.isEmpty ? '-' : player.position} / #${player.jerseyNumber ?? '-'}',
                     ),
                     if (!player.active) const _InfoChip('Inactivo'),
                   ],
@@ -342,7 +342,8 @@ class _RealDataTab extends StatelessWidget {
               ),
               _DataRow('Nacionalidad', player.nationality),
               _DataRow('Posicion', player.position),
-              _DataRow('Numero', player.number == 0 ? '-' : '${player.number}'),
+              _DataRow('Numero',
+                  player.jerseyNumber == null ? '-' : '${player.jerseyNumber}'),
               _DataRow(
                 'Altura',
                 player.heightCm == 0 ? '-' : '${player.heightCm.toInt()} cm',
@@ -966,9 +967,13 @@ class _ObservationsTabState extends State<_ObservationsTab>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetCtx) => _AddObservationSheet(
-        onSave: (texto) async {
+        onSave: (texto, tipo) async {
           final nueva = await _api.createPlayerObservation(
-              widget.playerId, texto, token);
+            widget.playerId,
+            texto,
+            token,
+            tipo: tipo,
+          );
           if (!mounted) return;
           setState(() => _observations.insert(0, nueva));
           if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
@@ -1039,7 +1044,7 @@ class _ObservationsTabState extends State<_ObservationsTab>
 }
 
 class _AddObservationSheet extends StatefulWidget {
-  final Future<void> Function(String texto) onSave;
+  final Future<void> Function(String texto, String tipo) onSave;
 
   const _AddObservationSheet({required this.onSave});
 
@@ -1048,7 +1053,10 @@ class _AddObservationSheet extends StatefulWidget {
 }
 
 class _AddObservationSheetState extends State<_AddObservationSheet> {
+  static const _types = ['General', 'Tecnica', 'Tactica', 'Fisica'];
+
   final _controller = TextEditingController();
+  String _selectedType = _types.first;
   bool _saving = false;
 
   @override
@@ -1062,7 +1070,7 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
     if (texto.isEmpty) return;
     setState(() => _saving = true);
     try {
-      await widget.onSave(texto);
+      await widget.onSave(texto, _selectedType);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1091,6 +1099,34 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
             ),
           ),
           const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final type in _types)
+                ChoiceChip(
+                  label: Text(type),
+                  selected: _selectedType == type,
+                  onSelected: _saving
+                      ? null
+                      : (_) => setState(() => _selectedType = type),
+                  selectedColor: AppColors.accent.withValues(alpha: 0.2),
+                  labelStyle: TextStyle(
+                    color: _selectedType == type
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  side: BorderSide(
+                    color: _selectedType == type
+                        ? AppColors.accent
+                        : AppColors.borderSubtle,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
           ValueListenableBuilder(
             valueListenable: _controller,
             builder: (_, value, __) => TextField(
@@ -1181,6 +1217,23 @@ class _ObservationCard extends StatelessWidget {
                   ),
                 ),
               ],
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  observation.tipo,
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),

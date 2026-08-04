@@ -86,6 +86,10 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.DefinicionEmpate).HasMaxLength(20).IsRequired().HasDefaultValue("TerminaEnEmpate");
             entity.Property(x => x.PeriodoActual).HasMaxLength(30);
             entity.HasOne(x => x.Categoria).WithMany().HasForeignKey(x => x.CategoriaId);
+            entity.HasOne(x => x.UsuarioCreador)
+                .WithMany()
+                .HasForeignKey(x => x.UsuarioCreadorId)
+                .IsRequired(false);
         });
 
         modelBuilder.Entity<Alineacion>(entity =>

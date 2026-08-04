@@ -285,6 +285,23 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
             return NotFound();
         }
 
+        var partidoActivo = await context.Alineaciones
+            .Include(a => a.Partido)
+            .AsNoTracking()
+            .Where(a => a.JugadorId == id
+                     && a.Partido!.Activo
+                     && !PartidoEstados.Terminales.Contains(a.Partido.Estado))
+            .OrderBy(a => a.Partido!.Fecha)
+            .Select(a => new { a.Partido!.Rival, a.Partido.Fecha, a.Partido.Estado })
+            .FirstOrDefaultAsync();
+
+        if (partidoActivo is not null)
+        {
+            throw new DomainConflictException(
+                $"No se puede dar de baja al jugador porque esta en la alineacion " +
+                $"del partido contra {partidoActivo.Rival}.");
+        }
+
         jugador.Activo = false;
         await context.SaveChangesAsync();
         return NoContent();
@@ -315,8 +332,8 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
             return BadRequest("La categoría indicada no existe.");
 
         // Opcionales con restricciones
-        if (request.NumeroCamiseta is not null && (request.NumeroCamiseta < 1 || request.NumeroCamiseta > 99))
-            return BadRequest("El número de camiseta debe estar entre 1 y 99.");
+        if (request.NumeroCamiseta is not null && (request.NumeroCamiseta < 0 || request.NumeroCamiseta > 99))
+            return BadRequest("El numero de camiseta debe estar entre 0 y 99.");
 
         if (request.AlturaCm is not null && (request.AlturaCm < 140 || request.AlturaCm > 220))
             return BadRequest("La altura debe estar entre 140 y 220 cm.");

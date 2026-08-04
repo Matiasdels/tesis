@@ -117,7 +117,11 @@ class PlayerApi {
   }
 
   Future<PlayerObservacionModel> createPlayerObservation(
-      String playerId, String contenido, String accessToken) async {
+    String playerId,
+    String contenido,
+    String accessToken, {
+    String tipo = 'General',
+  }) async {
     final uri = Uri.parse(
         '${ApiConfig.baseUrl}/api/Jugadores/$playerId/observaciones');
     final response = await _client.post(
@@ -126,7 +130,7 @@ class PlayerApi {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode({'contenido': contenido}),
+      body: jsonEncode({'contenido': contenido, 'tipo': tipo}),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw PlayerApiException(

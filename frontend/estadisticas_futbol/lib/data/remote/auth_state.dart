@@ -10,6 +10,7 @@ class AuthState extends ChangeNotifier {
   final AuthApi _authApi;
 
   AuthSession? _session;
+  String? _authNotice;
   bool _loading = false;
   bool _initialized = false;
 
@@ -17,6 +18,7 @@ class AuthState extends ChangeNotifier {
 
   AuthSession? get session => _session;
   AuthUser? get user => _session?.user;
+  String? get authNotice => _authNotice;
   bool get isAuthenticated => _session != null;
   bool get loading => _loading;
   bool get initialized => _initialized;
@@ -27,6 +29,9 @@ class AuthState extends ChangeNotifier {
     if (storedSession == null ||
         storedSession.expiresAt.isBefore(DateTime.now())) {
       await _clearStoredSession();
+      if (storedSession != null) {
+        _authNotice = 'Tu sesion expiro. Volve a iniciar sesion.';
+      }
       _initialized = true;
       notifyListeners();
       return;
@@ -36,9 +41,12 @@ class AuthState extends ChangeNotifier {
       final user = await _authApi.me(storedSession.accessToken);
       _session = storedSession.copyWith(user: user);
       await _saveSession(_session!);
-    } catch (_) {
+    } on AuthApiException catch (error) {
       await _clearStoredSession();
       _session = null;
+      _authNotice = error.statusCode == 401
+          ? 'Tu sesion expiro. Volve a iniciar sesion.'
+          : 'No pudimos validar tu sesion. Volve a iniciar sesion.';
     } finally {
       _initialized = true;
       notifyListeners();
@@ -50,6 +58,7 @@ class AuthState extends ChangeNotifier {
     required String password,
   }) async {
     await _run(() async {
+      _authNotice = null;
       _session = await _authApi.login(
         usuarioOEmail: usuarioOEmail,
         password: password,
@@ -64,16 +73,15 @@ class AuthState extends ChangeNotifier {
     required String password,
     required String nombre,
     required String apellido,
-    required int rolId,
   }) async {
     await _run(() async {
+      _authNotice = null;
       _session = await _authApi.register(
         nombreUsuario: nombreUsuario,
         email: email,
         password: password,
         nombre: nombre,
         apellido: apellido,
-        rolId: rolId,
       );
       await _saveSession(_session!);
     });
@@ -81,7 +89,14 @@ class AuthState extends ChangeNotifier {
 
   Future<void> logout() async {
     _session = null;
+    _authNotice = null;
     await _clearStoredSession();
+    notifyListeners();
+  }
+
+  void clearAuthNotice() {
+    if (_authNotice == null) return;
+    _authNotice = null;
     notifyListeners();
   }
 
@@ -97,21 +112,10 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  Future<Database> _database() async {
-    final db = await DatabaseHelper.instance.database;
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS auth_session (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        data TEXT NOT NULL
-      )
-    ''');
-    return db;
-  }
-
   Future<void> _saveSession(AuthSession session) async {
     if (kIsWeb) return;
 
-    final db = await _database();
+    final db = await DatabaseHelper.instance.database;
     await db.insert(
       'auth_session',
       {'id': 1, 'data': jsonEncode(session.toJson())},
@@ -122,7 +126,7 @@ class AuthState extends ChangeNotifier {
   Future<AuthSession?> _readStoredSession() async {
     if (kIsWeb) return null;
 
-    final db = await _database();
+    final db = await DatabaseHelper.instance.database;
     final rows = await db.query(
       'auth_session',
       where: 'id = ?',
@@ -139,7 +143,7 @@ class AuthState extends ChangeNotifier {
   Future<void> _clearStoredSession() async {
     if (kIsWeb) return;
 
-    final db = await _database();
+    final db = await DatabaseHelper.instance.database;
     await db.delete('auth_session', where: 'id = ?', whereArgs: [1]);
   }
 }

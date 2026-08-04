@@ -14,6 +14,8 @@ public class AuthController(
     PasswordHasher passwordHasher,
     TokenService tokenService) : ControllerBase
 {
+    private const string PublicRegistrationRole = "Entrenador";
+
     [HttpPost("registro")]
     [AllowAnonymous]
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
@@ -36,10 +38,11 @@ public class AuthController(
             return Conflict("Ya existe un usuario con ese nombre de usuario o email.");
         }
 
-        var rol = await context.Roles.FindAsync(request.RolId);
+        var rol = await context.Roles
+            .FirstOrDefaultAsync(r => r.Nombre == PublicRegistrationRole);
         if (rol is null)
         {
-            return BadRequest("El rol indicado no existe.");
+            return Problem("No hay un rol predeterminado configurado para nuevos usuarios.");
         }
 
         var usuario = new Usuario
@@ -48,7 +51,7 @@ public class AuthController(
             Email = email,
             Nombre = nombre,
             Apellido = apellido,
-            RolId = request.RolId,
+            RolId = rol.RolId,
             Rol = rol,
             PasswordHash = passwordHasher.Hash(request.Password),
             Activo = true
@@ -126,8 +129,7 @@ public record RegisterRequest(
     string Email,
     string Password,
     string Nombre,
-    string Apellido,
-    int RolId);
+    string Apellido);
 
 public record LoginRequest(string UsuarioOEmail, string Password);
 

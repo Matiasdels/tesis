@@ -30,11 +30,13 @@ class DatabaseHelper {
   Future<void> _createDB(Database db, int version) async {
     await _createLegacyTables(db);
     await _createCacheAndSyncTables(db);
+    await _createAuthTables(db);
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     await _createLegacyTables(db);
     await _createCacheAndSyncTables(db);
+    await _createAuthTables(db);
   }
 
   Future<void> _createLegacyTables(Database db) async {
@@ -81,6 +83,15 @@ class DatabaseHelper {
         created_at TEXT NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0,
         last_error TEXT
+      )
+    ''');
+  }
+
+  Future<void> _createAuthTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_session (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        data TEXT NOT NULL
       )
     ''');
   }
@@ -175,15 +186,33 @@ class DatabaseHelper {
 
   Future<void> deletePendingEventByLocalId(int localEventoId) async {
     final db = await database;
-    await db.delete(
+    final rows = await db.query(
       'sync_queue',
-      where: "entity = ? AND action = ? AND payload LIKE ?",
+      columns: ['id', 'payload'],
+      where: 'entity = ? AND action = ?',
       whereArgs: [
         'evento_partido',
         'create',
-        '%"localEventoId":$localEventoId%',
       ],
     );
+
+    for (final row in rows) {
+      final payloadText = row['payload'] as String?;
+      if (payloadText == null) continue;
+
+      try {
+        final payload = jsonDecode(payloadText) as Map<String, dynamic>;
+        if (payload['localEventoId'] == localEventoId) {
+          await db.delete(
+            'sync_queue',
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        }
+      } catch (_) {
+        // Si el payload esta corrupto, no se elimina automaticamente.
+      }
+    }
   }
 
   Future<void> deletePendingMatchEstado(int partidoId) async {

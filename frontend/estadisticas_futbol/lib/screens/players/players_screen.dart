@@ -278,16 +278,20 @@ class _PlayerCard extends StatelessWidget {
                       children: [
                         Text(player.name,
                             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgMuted,
-                            borderRadius: BorderRadius.circular(4),
+                        if (player.jerseyNumber != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgMuted,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text('#${player.jerseyNumber}',
+                                style: TextStyle(
+                                    fontSize: 10, color: AppColors.textMuted)),
                           ),
-                          child: Text('#${player.number}',
-                              style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 3),

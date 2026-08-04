@@ -775,9 +775,9 @@ class _PositionSlot extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (player!.number > 0)
+              if (player!.jerseyNumber != null)
                 Text(
-                  '${player!.number}',
+                  '${player!.jerseyNumber}',
                   style: const TextStyle(
                       color: Colors.black54, fontSize: 7, height: 1.0),
                 ),
@@ -914,9 +914,9 @@ class _SuplenteTile extends StatelessWidget {
               ],
             ),
           ),
-          if (player.number > 0)
+          if (player.jerseyNumber != null)
             Text(
-              '#${player.number}',
+              '#${player.jerseyNumber}',
               style: TextStyle(
                   color: AppColors.textMuted, fontSize: 11),
             ),
@@ -1275,9 +1275,9 @@ class _PlayerPickerTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (player.number > 0)
+              if (player.jerseyNumber != null)
                 Text(
-                  '#${player.number}',
+                  '#${player.jerseyNumber}',
                   style: TextStyle(
                       fontSize: 11, color: AppColors.textMuted),
                 ),

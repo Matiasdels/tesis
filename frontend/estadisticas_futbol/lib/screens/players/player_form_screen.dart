@@ -78,7 +78,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
           _firstNameController.text = player.firstName;
           _lastNameController.text = player.lastName;
           _numberController.text =
-              player.number == 0 ? '' : player.number.toString();
+              player.jerseyNumber == null ? '' : player.jerseyNumber.toString();
           _heightController.text =
               player.heightCm == 0 ? '' : player.heightCm.toString();
           _weightController.text =
@@ -168,13 +168,17 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
 
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
+    final jerseyNumberText = _numberController.text.trim();
+    final jerseyNumber =
+        jerseyNumberText.isEmpty ? null : int.tryParse(jerseyNumberText);
 
     final player = PlayerModel(
       id: widget.playerId ?? '0',
       name: '$firstName $lastName'.trim(),
       shortName: '$firstName $lastName'.trim(),
       position: _position,
-      number: int.tryParse(_numberController.text.trim()) ?? 0,
+      number: jerseyNumber ?? 0,
+      jerseyNumber: jerseyNumber,
       age: 0,
       nationality: _nationality,
       heightCm: double.tryParse(_heightController.text.trim()) ?? 0,
@@ -234,7 +238,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
   String? _validateNumero(String? value) {
     if (value == null || value.trim().isEmpty) return null;
     final n = int.tryParse(value.trim());
-    if (n == null || n < 1 || n > 99) return 'Debe ser entre 1 y 99';
+    if (n == null || n < 0 || n > 99) return 'Debe ser entre 0 y 99';
     return null;
   }
 
