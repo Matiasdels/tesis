@@ -399,7 +399,7 @@ class _PenalesScreenState extends State<PenalesScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, color: AppColors.danger, size: 48),
+              const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
               const SizedBox(height: 16),
               Text(
                 _loadError ?? 'Partido no encontrado',
@@ -493,7 +493,7 @@ class _PenalesScreenState extends State<PenalesScreen> {
                         color: AppColors.warning.withValues(alpha: 0.4),
                         width: 0.5),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Empate — definición por penales',
                     style: TextStyle(
                         fontSize: 11,
@@ -687,11 +687,11 @@ class _PenalesScreenState extends State<PenalesScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Row(
                     children: [
                       Icon(Icons.error_outline_rounded,
                           color: AppColors.danger, size: 16),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         'Correcciones necesarias',
                         style: TextStyle(
@@ -707,7 +707,7 @@ class _PenalesScreenState extends State<PenalesScreen> {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         '• $e',
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 12, color: AppColors.danger),
                       ),
                     ),
@@ -856,7 +856,7 @@ class _CounterRow extends StatelessWidget {
               ),
               if (!equipoOk || !rivalOk) ...[
                 const SizedBox(width: 4),
-                Icon(Icons.warning_amber_rounded,
+                const Icon(Icons.warning_amber_rounded,
                     size: 13, color: AppColors.warning),
               ],
             ],
@@ -953,7 +953,7 @@ class _ScoreInput extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  BorderSide(color: AppColors.accent, width: 1.5),
+                  const BorderSide(color: AppColors.accent, width: 1.5),
             ),
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
           ),
@@ -1124,7 +1124,7 @@ class _DetalleRow extends StatelessWidget {
                   if (esExpulsado)
                     DropdownMenuItem<int?>(
                       value: entry.jugadorId,
-                      child: Text(
+                      child: const Text(
                         'Jugador expulsado',
                         style: TextStyle(color: AppColors.danger),
                       ),
@@ -1137,7 +1137,7 @@ class _DetalleRow extends StatelessWidget {
               ),
               if (esExpulsado) ...[
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   'Este jugador fue expulsado y no puede ejecutar.',
                   style: TextStyle(fontSize: 11, color: AppColors.danger),
                 ),
