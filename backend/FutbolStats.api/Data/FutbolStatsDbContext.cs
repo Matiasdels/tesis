@@ -159,6 +159,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.Property(x => x.Titulo).HasMaxLength(200);
             entity.Property(x => x.Tipo).HasMaxLength(50);
             entity.Property(x => x.Lugar).HasMaxLength(200);
+            entity.Property(x => x.Activo).HasDefaultValue(true);
             entity.HasOne(x => x.Categoria).WithMany().HasForeignKey(x => x.CategoriaId);
         });
 

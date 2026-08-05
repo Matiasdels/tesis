@@ -161,6 +161,7 @@ CREATE TABLE Entrenamientos (
     Tipo                NVARCHAR(20)        NOT NULL,
     DuracionMinutos     INT                 NULL,
     Lugar               NVARCHAR(150)       NULL,
+    Activo              BIT                 NOT NULL DEFAULT 1,
     CONSTRAINT PK_Entrenamientos PRIMARY KEY (EntrenamientoId),
     CONSTRAINT FK_Entrenamientos_Categorias FOREIGN KEY (CategoriaId) REFERENCES Categorias (CategoriaId)
 );

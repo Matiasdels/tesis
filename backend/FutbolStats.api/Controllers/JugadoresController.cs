@@ -239,7 +239,9 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         var asistencias = await context.AsistenciasEntrenamiento
             .Include(a => a.Entrenamiento)
             .AsNoTracking()
-            .Where(a => a.JugadorId == id && a.Asistio)
+            .Where(a => a.JugadorId == id
+                     && a.Asistio
+                     && a.Entrenamiento!.Activo)
             .OrderByDescending(a => a.Entrenamiento!.Fecha)
             .ToListAsync();
 
