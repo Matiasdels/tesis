@@ -21,46 +21,28 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
-    await _createLegacyTables(db);
     await _createCacheAndSyncTables(db);
     await _createAuthTables(db);
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    await _createLegacyTables(db);
+    if (oldVersion < 3) {
+      await _dropLegacyTables(db);
+    }
     await _createCacheAndSyncTables(db);
     await _createAuthTables(db);
   }
 
-  Future<void> _createLegacyTables(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS matches (
-        id TEXT PRIMARY KEY,
-        opponent_name TEXT NOT NULL,
-        match_date TEXT NOT NULL,
-        is_live INTEGER NOT NULL DEFAULT 1,
-        is_synced INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS match_events (
-        id TEXT PRIMARY KEY,
-        match_id TEXT NOT NULL,
-        player_name TEXT NOT NULL,
-        event_type TEXT NOT NULL,
-        minute INTEGER NOT NULL,
-        is_synced INTEGER NOT NULL DEFAULT 0,
-        FOREIGN KEY (match_id) REFERENCES matches (id) ON DELETE CASCADE
-      )
-    ''');
+  Future<void> _dropLegacyTables(Database db) async {
+    await db.execute('DROP TABLE IF EXISTS match_events');
+    await db.execute('DROP TABLE IF EXISTS matches');
   }
 
   Future<void> _createCacheAndSyncTables(Database db) async {
@@ -233,38 +215,6 @@ class DatabaseHelper {
     final result =
         await db.rawQuery('SELECT COUNT(*) AS count FROM sync_queue');
     return Sqflite.firstIntValue(result) ?? 0;
-  }
-
-  Future<int> insertMatch(Map<String, dynamic> row) async {
-    final db = await database;
-    return db.insert(
-      'matches',
-      row,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<int> insertEvent(Map<String, dynamic> row) async {
-    final db = await database;
-    return db.insert(
-      'match_events',
-      row,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getMatches() async {
-    final db = await database;
-    return db.query('matches', orderBy: 'match_date DESC');
-  }
-
-  Future<List<Map<String, dynamic>>> getEventsForMatch(String matchId) async {
-    final db = await database;
-    return db.query(
-      'match_events',
-      where: 'match_id = ?',
-      whereArgs: [matchId],
-    );
   }
 
   Future<void> close() async {
