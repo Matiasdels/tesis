@@ -60,7 +60,6 @@ class _KanchaAppState extends State<KanchaApp> {
       child: Consumer<ThemeController>(
         builder: (context, themeController, _) {
           return MaterialApp.router(
-            key: ValueKey(themeController.isDarkMode),
             title: 'Kancha',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light,
