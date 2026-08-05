@@ -18,6 +18,7 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
         var query = context.Entrenamientos
             .Include(e => e.Asistencias)
             .AsNoTracking()
+            .Where(e => e.Activo)
             .AsQueryable();
 
         if (categoriaId.HasValue)
@@ -34,7 +35,7 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
         var e = await context.Entrenamientos
             .Include(e => e.Asistencias)
             .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.EntrenamientoId == id);
+            .FirstOrDefaultAsync(e => e.EntrenamientoId == id && e.Activo);
         return e is null ? NotFound() : Ok(ToResponse(e));
     }
 
@@ -59,6 +60,7 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
             Tipo        = request.Tipo.Trim(),
             DuracionMinutos = request.DuracionMinutos,
             Lugar       = string.IsNullOrWhiteSpace(request.Lugar)  ? null : request.Lugar.Trim(),
+            Activo      = true,
         };
         context.Entrenamientos.Add(entrenamiento);
         await context.SaveChangesAsync();
@@ -73,7 +75,7 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
     {
         var entrenamiento = await context.Entrenamientos
             .Include(e => e.Asistencias)
-            .FirstOrDefaultAsync(e => e.EntrenamientoId == id);
+            .FirstOrDefaultAsync(e => e.EntrenamientoId == id && e.Activo);
         if (entrenamiento is null) return NotFound();
 
         await using var transaction = await context.Database.BeginTransactionAsync();
@@ -107,9 +109,10 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteEntrenamiento(int id)
     {
-        var entrenamiento = await context.Entrenamientos.FirstOrDefaultAsync(e => e.EntrenamientoId == id);
+        var entrenamiento = await context.Entrenamientos
+            .FirstOrDefaultAsync(e => e.EntrenamientoId == id && e.Activo);
         if (entrenamiento is null) return NotFound();
-        context.Entrenamientos.Remove(entrenamiento);
+        entrenamiento.Activo = false;
         await context.SaveChangesAsync();
         return NoContent();
     }

@@ -13,6 +13,7 @@ BEGIN
         Tipo                NVARCHAR(20)        NOT NULL,
         DuracionMinutos     INT                 NULL,
         Lugar               NVARCHAR(150)       NULL,
+        Activo              BIT                 NOT NULL DEFAULT 1,
         CONSTRAINT PK_Entrenamientos PRIMARY KEY (EntrenamientoId),
         CONSTRAINT FK_Entrenamientos_Categorias FOREIGN KEY (CategoriaId) REFERENCES dbo.Categorias (CategoriaId)
     );
@@ -46,6 +47,14 @@ IF COL_LENGTH('dbo.Entrenamientos', 'Lugar') IS NULL
 BEGIN
     ALTER TABLE dbo.Entrenamientos
     ADD Lugar NVARCHAR(150) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Entrenamientos', 'Activo') IS NULL
+BEGIN
+    ALTER TABLE dbo.Entrenamientos
+    ADD Activo BIT NOT NULL
+        CONSTRAINT DF_Entrenamientos_Activo DEFAULT 1;
 END
 GO
 

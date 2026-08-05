@@ -9,6 +9,7 @@ public class Entrenamiento
     public string   Tipo            { get; set; } = string.Empty;
     public int?     DuracionMinutos { get; set; }
     public string?  Lugar           { get; set; }
+    public bool     Activo          { get; set; } = true;
 
     public Categoria?                           Categoria   { get; set; }
     public ICollection<AsistenciaEntrenamiento> Asistencias { get; set; } = [];
