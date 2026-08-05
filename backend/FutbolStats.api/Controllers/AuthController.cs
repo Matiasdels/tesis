@@ -3,6 +3,7 @@ using FutbolStats.Api.Models;
 using FutbolStats.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace FutbolStats.Api.Controllers;
@@ -66,6 +67,7 @@ public class AuthController(
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
     {
         var usuarioOEmail = BusinessRules.NormalizeRequiredText(
