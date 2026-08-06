@@ -245,6 +245,10 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
             .OrderByDescending(a => a.Entrenamiento!.Fecha)
             .ToListAsync();
 
+        var totalEntrenamientos = await context.Entrenamientos
+            .AsNoTracking()
+            .CountAsync(e => e.CategoriaId == jugador.CategoriaId && e.Activo);
+
         // ── Cálculo puro ─────────────────────────────────────────────────────
         var infoAlineaciones = alineaciones.Select(a =>
         {
@@ -263,13 +267,14 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
         var infoAsistencias = asistencias
             .Select(a => new InfoAsistenciaAct(a.Entrenamiento!.Fecha)).ToList();
 
-        var resumen = ActividadCalculator.Calcular(infoAlineaciones, cambiosIngreso, infoAsistencias);
+        var resumen = ActividadCalculator.Calcular(infoAlineaciones, cambiosIngreso, infoAsistencias, totalEntrenamientos);
 
         var historial = resumen.Historial.Select(x => new ActividadItem(
             x.Tipo, x.Fecha, x.Detalle, x.Rival, x.GolesEquipo, x.GolesRival, x.MinutosJugados)).ToList();
 
         return Ok(new ActividadJugadorResponse(
             resumen.EntrenamientosRealizados,
+            resumen.EntrenamientosConvocado,
             resumen.PartidosDisputados,
             resumen.Titularidades,
             resumen.IngresosDesdeBanco,
@@ -477,6 +482,7 @@ public record ActividadItem(
 
 public record ActividadJugadorResponse(
     int       EntrenamientosRealizados,
+    int       EntrenamientosConvocado,
     int       PartidosDisputados,
     int       Titularidades,
     int       IngresosDesdeBanco,

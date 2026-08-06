@@ -731,6 +731,7 @@ class ActividadItemModel {
 
 class ActividadJugadorModel {
   final int entrenamientosRealizados;
+  final int entrenamientosConvocado;
   final int partidosDisputados;
   final int titularidades;
   final int ingresosDesdeBanco;
@@ -740,6 +741,7 @@ class ActividadJugadorModel {
 
   const ActividadJugadorModel({
     required this.entrenamientosRealizados,
+    required this.entrenamientosConvocado,
     required this.partidosDisputados,
     required this.titularidades,
     required this.ingresosDesdeBanco,
@@ -751,6 +753,7 @@ class ActividadJugadorModel {
   factory ActividadJugadorModel.fromApi(Map<String, dynamic> json) =>
       ActividadJugadorModel(
         entrenamientosRealizados: json['entrenamientosRealizados'] as int,
+        entrenamientosConvocado:  json['entrenamientosConvocado']  as int? ?? json['entrenamientosRealizados'] as int,
         partidosDisputados:       json['partidosDisputados']       as int,
         titularidades:            json['titularidades']            as int,
         ingresosDesdeBanco:       json['ingresosDesdeBanco']       as int,

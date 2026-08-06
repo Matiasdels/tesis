@@ -26,6 +26,7 @@ public record ActividadItemAct(
 
 public record ActividadResumenAct(
     int       EntrenamientosRealizados,
+    int       EntrenamientosConvocado,
     int       PartidosDisputados,
     int       Titularidades,
     int       IngresosDesdeBanco,
@@ -40,7 +41,8 @@ public static class ActividadCalculator
     public static ActividadResumenAct Calcular(
         IReadOnlyList<InfoAlineacionAct> alineaciones,
         IReadOnlySet<int>                cambiosIngreso,
-        IReadOnlyList<InfoAsistenciaAct> asistencias)
+        IReadOnlyList<InfoAsistenciaAct> asistencias,
+        int                              totalEntrenamientos = 0)
     {
         int titularidades = alineaciones.Count(a => a.EsTitular);
         int ingresos      = alineaciones.Count(a => !a.EsTitular && cambiosIngreso.Contains(a.PartidoId));
@@ -75,6 +77,7 @@ public static class ActividadCalculator
 
         return new ActividadResumenAct(
             asistencias.Count,
+            Math.Max(totalEntrenamientos, asistencias.Count),
             alineaciones.Count,
             titularidades,
             ingresos,

@@ -21,13 +21,15 @@ file static class AC
     public static InfoAsistenciaAct Entrena(int dias = 0) => new(Base.AddDays(dias));
 
     public static ActividadResumenAct Calcular(
-        IReadOnlyList<InfoAlineacionAct>?  alineaciones  = null,
-        IReadOnlySet<int>?                cambiosIngreso = null,
-        IReadOnlyList<InfoAsistenciaAct>? asistencias   = null)
+        IReadOnlyList<InfoAlineacionAct>?  alineaciones        = null,
+        IReadOnlySet<int>?                 cambiosIngreso      = null,
+        IReadOnlyList<InfoAsistenciaAct>?  asistencias         = null,
+        int                                totalEntrenamientos = 0)
         => ActividadCalculator.Calcular(
-            alineaciones  ?? [],
-            cambiosIngreso ?? new HashSet<int>(),
-            asistencias   ?? []);
+            alineaciones        ?? [],
+            cambiosIngreso      ?? new HashSet<int>(),
+            asistencias         ?? [],
+            totalEntrenamientos);
 }
 
 public class ActividadJugadorTests
@@ -170,5 +172,40 @@ public class ActividadJugadorTests
         ]);
 
         Assert.Equal(165, r.MinutosDisputados);
+    }
+
+    // 11. Tasa de asistencia: EntrenamientosConvocado refleja el total de la categoría.
+    [Fact]
+    public void TasaAsistencia_ConvocadoEsTotalCategoria()
+    {
+        var r = AC.Calcular(
+            asistencias:         [AC.Entrena(), AC.Entrena(dias: 1), AC.Entrena(dias: 2)],
+            totalEntrenamientos: 5);
+
+        Assert.Equal(3, r.EntrenamientosRealizados);
+        Assert.Equal(5, r.EntrenamientosConvocado);
+    }
+
+    // 12. Si el jugador asistió a más entrenamientos que el total de la categoría
+    //     (caso de datos inconsistentes), ConvocadoNunca cae por debajo de Realizados.
+    [Fact]
+    public void TasaAsistencia_ConvocadoNuncaMenorQueRealizado()
+    {
+        var r = AC.Calcular(
+            asistencias:         [AC.Entrena(), AC.Entrena(dias: 1)],
+            totalEntrenamientos: 1);
+
+        Assert.Equal(2, r.EntrenamientosRealizados);
+        Assert.Equal(2, r.EntrenamientosConvocado);
+    }
+
+    // 13. Sin entrenamientos en la categoría: ambos contadores en 0.
+    [Fact]
+    public void TasaAsistencia_SinEntrenamientosEnCategoria()
+    {
+        var r = AC.Calcular(totalEntrenamientos: 0);
+
+        Assert.Equal(0, r.EntrenamientosRealizados);
+        Assert.Equal(0, r.EntrenamientosConvocado);
     }
 }
