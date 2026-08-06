@@ -535,7 +535,7 @@ class _ResumenCarga extends StatelessWidget {
               Expanded(
                 child: _ResumenStat(
                   label: 'Entrenamientos',
-                  value: '${data.entrenamientosRealizados}',
+                  value: '${data.entrenamientosRealizados}/${data.entrenamientosConvocado}',
                   icon: Icons.fitness_center_rounded,
                   color: AppColors.info,
                 ),
