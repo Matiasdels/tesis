@@ -450,14 +450,14 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
     final attendance = widget.players
         .map(
           (player) => TrainingAttendanceModel(
-            playerId: int.parse(player.id),
-            attended: _attendedIds.contains(int.parse(player.id)),
+            playerId: player.id,
+            attended: _attendedIds.contains(player.id),
             rpe: widget.session.attendance
-                .where((item) => item.playerId == int.parse(player.id))
+                .where((item) => item.playerId == player.id)
                 .firstOrNull
                 ?.rpe,
             observation: widget.session.attendance
-                .where((item) => item.playerId == int.parse(player.id))
+                .where((item) => item.playerId == player.id)
                 .firstOrNull
                 ?.observation,
           ),
@@ -544,8 +544,7 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
                   ),
                   itemBuilder: (context, index) {
                     final player = widget.players[index];
-                    final playerId = int.parse(player.id);
-                    final attended = _attendedIds.contains(playerId);
+                    final attended = _attendedIds.contains(player.id);
 
                     return SwitchListTile(
                       value: attended,
@@ -554,9 +553,9 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
                           : (value) {
                               setState(() {
                                 if (value) {
-                                  _attendedIds.add(playerId);
+                                  _attendedIds.add(player.id);
                                 } else {
-                                  _attendedIds.remove(playerId);
+                                  _attendedIds.remove(player.id);
                                 }
                               });
                             },

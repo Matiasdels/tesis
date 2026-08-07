@@ -2,7 +2,7 @@
 library;
 
 class PlayerModel {
-  final String id;
+  final int id;
   final String name;
   final String shortName;
   final String position;
@@ -13,9 +13,6 @@ class PlayerModel {
   final double heightCm;
   final double weightKg;
   final String status; // 'available' | 'injured' | 'suspended'
-  final double rating;
-  final int matchesPlayed;
-  final Map<String, dynamic> stats;
 
   // Campos adicionales para gestión de jugadores (alta/edición vía API)
   final String firstName;
@@ -41,9 +38,6 @@ class PlayerModel {
     required this.heightCm,
     required this.weightKg,
     required this.status,
-    required this.rating,
-    required this.matchesPlayed,
-    required this.stats,
     this.firstName = '',
     this.lastName = '',
     this.birthDate,
@@ -75,9 +69,6 @@ class PlayerModel {
     }
     return false;
   }
-
-  /// Indica si el jugador cuenta con datos de rendimiento registrados.
-  bool get hasPerformanceData => stats.isNotEmpty;
 
   /// 'Disponible'|'Lesionado'|'Suspendido' (backend) -> 'available'|'injured'|'suspended' (UI)
   static String statusFromApi(String estado) {
@@ -121,7 +112,7 @@ class PlayerModel {
         : null;
 
     return PlayerModel(
-      id: (json['jugadorId'] as num).toString(),
+      id: json['jugadorId'] as int,
       name: '$firstName $lastName'.trim(),
       shortName: '$firstName $lastName'.trim(),
       position: json['posicionPrincipal'] as String? ?? '',
@@ -132,9 +123,6 @@ class PlayerModel {
       heightCm: (json['alturaCm'] as num?)?.toDouble() ?? 0,
       weightKg: (json['pesoKg'] as num?)?.toDouble() ?? 0,
       status: statusFromApi(json['estado'] as String? ?? 'Disponible'),
-      rating: 0,
-      matchesPlayed: 0,
-      stats: const {},
       firstName: firstName,
       lastName: lastName,
       birthDate: birthDate,
@@ -163,9 +151,6 @@ class PlayerModel {
       heightCm: heightCm,
       weightKg: weightKg,
       status: status ?? this.status,
-      rating: rating,
-      matchesPlayed: matchesPlayed,
-      stats: stats,
       firstName: firstName,
       lastName: lastName,
       birthDate: birthDate,

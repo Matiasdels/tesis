@@ -10,7 +10,7 @@ import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
 
 class PlayerFormScreen extends StatefulWidget {
-  final String? playerId;
+  final int? playerId;
 
   const PlayerFormScreen({super.key, this.playerId});
 
@@ -173,7 +173,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
         jerseyNumberText.isEmpty ? null : int.tryParse(jerseyNumberText);
 
     final player = PlayerModel(
-      id: widget.playerId ?? '0',
+      id: widget.playerId ?? 0,
       name: '$firstName $lastName'.trim(),
       shortName: '$firstName $lastName'.trim(),
       position: _position,
@@ -184,9 +184,6 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
       heightCm: double.tryParse(_heightController.text.trim()) ?? 0,
       weightKg: double.tryParse(_weightController.text.trim()) ?? 0,
       status: _status,
-      rating: 0,
-      matchesPlayed: 0,
-      stats: const {},
       firstName: firstName,
       lastName: lastName,
       birthDate: _birthDate,

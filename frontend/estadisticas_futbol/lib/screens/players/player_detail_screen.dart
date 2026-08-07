@@ -10,7 +10,7 @@ import '../../models/models.dart';
 import '../../widgets/common/app_widgets.dart';
 
 class PlayerDetailScreen extends StatefulWidget {
-  final String playerId;
+  final int playerId;
 
   const PlayerDetailScreen({super.key, required this.playerId});
 
@@ -68,6 +68,40 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
     final player = _player;
     if (player == null) return;
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text(
+          player.active ? 'Dar de baja' : 'Reactivar jugador',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          player.active
+              ? '¿Dar de baja a ${player.name}? No aparecerá en la plantilla activa.'
+              : '¿Reactivar a ${player.name}? Volverá a estar disponible en la plantilla.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              player.active ? 'Dar de baja' : 'Reactivar',
+              style: TextStyle(
+                color: player.active ? AppColors.danger : AppColors.accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     final token = context.read<AuthState>().session!.accessToken;
 
     try {
@@ -78,13 +112,23 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
             player.id, player.copyWith(active: true), token);
       }
       _changed = true;
-      await _load();
-    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No pudimos actualizar el estado del jugador.'),
+          SnackBar(
+            content: Text(player.active
+                ? '${player.name} dado de baja.'
+                : '${player.name} reactivado.'),
           ),
+        );
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        final msg = e is PlayerApiException
+            ? e.message
+            : 'No pudimos actualizar el estado del jugador.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
         );
       }
     }
@@ -427,7 +471,7 @@ class _DataRow extends StatelessWidget {
 }
 
 class _CargaFisicaTab extends StatefulWidget {
-  final String playerId;
+  final int playerId;
 
   const _CargaFisicaTab({required this.playerId});
 
@@ -695,7 +739,7 @@ class _ActividadRow extends StatelessWidget {
 }
 
 class _MatchesTab extends StatefulWidget {
-  final String playerId;
+  final int playerId;
 
   const _MatchesTab({required this.playerId});
 
@@ -911,7 +955,7 @@ class _RolBadge extends StatelessWidget {
 // ─── Observaciones ───────────────────────────────────────────────────────────
 
 class _ObservationsTab extends StatefulWidget {
-  final String playerId;
+  final int playerId;
 
   const _ObservationsTab({required this.playerId});
 

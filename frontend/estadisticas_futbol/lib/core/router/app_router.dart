@@ -145,14 +145,14 @@ GoRouter createRouter(AuthState authState) => GoRouter(
         GoRoute(
           path: AppConstants.routePlayerDetail,
           pageBuilder: (c, s) {
-            final id = s.pathParameters['id'] ?? '0';
+            final id = int.tryParse(s.pathParameters['id'] ?? '') ?? 0;
             return _slide<bool>(s, PlayerDetailScreen(playerId: id));
           },
         ),
         GoRoute(
           path: AppConstants.routePlayerEdit,
           pageBuilder: (c, s) {
-            final id = s.pathParameters['id'] ?? '0';
+            final id = int.tryParse(s.pathParameters['id'] ?? '') ?? 0;
             return _slide<bool>(s, PlayerFormScreen(playerId: id));
           },
         ),
