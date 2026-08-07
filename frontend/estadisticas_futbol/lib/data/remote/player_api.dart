@@ -14,44 +14,45 @@ class PlayerApi {
     required String accessToken,
     String? estado,
     String? search,
+    bool activo = true,
   }) async {
     final query = <String, String>{};
     if (estado != null && estado.isNotEmpty) query['estado'] = estado;
     if (search != null && search.isNotEmpty) query['search'] = search;
+    if (!activo) query['activo'] = 'false';
 
-    final cacheKey = _playersCacheKey(estado: estado, search: search);
+    final cacheKey = _playersCacheKey(estado: estado, search: search, activo: activo);
 
     try {
       final response =
           await _getList('/api/Jugadores', accessToken, query: query);
       await _databaseHelper.saveJson(cacheKey, response);
-      if (query.isEmpty) {
+      if (activo && query.isEmpty) {
         await _databaseHelper.saveJson(_playersCacheKey(), response);
       }
-      for (final item in response) {
-        final map = item as Map<String, dynamic>;
-        await _databaseHelper.saveJson(
-          'players:item:${map['jugadorId']}',
-          map,
-        );
+      if (activo) {
+        for (final item in response) {
+          final map = item as Map<String, dynamic>;
+          await _databaseHelper.saveJson('players:item:${map['jugadorId']}', map);
+        }
       }
       return response
           .map((item) => PlayerModel.fromApi(item as Map<String, dynamic>))
           .toList();
     } catch (_) {
       final cached = await _databaseHelper.readJsonList(cacheKey) ??
-          await _databaseHelper.readJsonList(_playersCacheKey());
+          (activo ? await _databaseHelper.readJsonList(_playersCacheKey()) : null);
       if (cached != null) {
         return cached
             .map((item) => PlayerModel.fromApi(item as Map<String, dynamic>))
-            .where((player) => _matchesLocalFilters(player, estado, search))
+            .where((player) => _matchesLocalFilters(player, estado, search, activo))
             .toList();
       }
       rethrow;
     }
   }
 
-  Future<PlayerModel> getPlayer(String id, String accessToken) async {
+  Future<PlayerModel> getPlayer(int id, String accessToken) async {
     try {
       final response = await _getMap('/api/Jugadores/$id', accessToken);
       await _databaseHelper.saveJson('players:item:$id', response);
@@ -62,7 +63,7 @@ class PlayerApi {
 
       final cachedList = await _databaseHelper.readJsonList(_playersCacheKey());
       final cachedPlayer = cachedList?.whereType<Map<String, dynamic>>().where(
-            (item) => '${item['jugadorId']}' == id,
+            (item) => item['jugadorId'] == id,
           );
       if (cachedPlayer != null && cachedPlayer.isNotEmpty) {
         return PlayerModel.fromApi(cachedPlayer.first);
@@ -83,7 +84,7 @@ class PlayerApi {
   }
 
   Future<PlayerModel> updatePlayer(
-    String id,
+    int id,
     PlayerModel player,
     String accessToken,
   ) async {
@@ -93,7 +94,7 @@ class PlayerApi {
     return PlayerModel.fromApi(response);
   }
 
-  Future<void> deactivatePlayer(String id, String accessToken) async {
+  Future<void> deactivatePlayer(int id, String accessToken) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/Jugadores/$id');
     final response = await _client.delete(
       uri,
@@ -107,7 +108,7 @@ class PlayerApi {
   }
 
   Future<List<PlayerObservacionModel>> getPlayerObservations(
-      String playerId, String accessToken) async {
+      int playerId, String accessToken) async {
     final response = await _getList(
         '/api/Jugadores/$playerId/observaciones', accessToken);
     return response
@@ -117,7 +118,7 @@ class PlayerApi {
   }
 
   Future<PlayerObservacionModel> createPlayerObservation(
-    String playerId,
+    int playerId,
     String contenido,
     String accessToken, {
     String tipo = 'General',
@@ -141,7 +142,7 @@ class PlayerApi {
   }
 
   Future<List<PlayerMatchModel>> getPlayerMatches(
-      String playerId, String accessToken) async {
+      int playerId, String accessToken) async {
     final response = await _getList(
         '/api/Jugadores/$playerId/partidos', accessToken);
     return response
@@ -151,7 +152,7 @@ class PlayerApi {
   }
 
   Future<ActividadJugadorModel> getActividadJugador(
-      String playerId, String accessToken) async {
+      int playerId, String accessToken) async {
     final cacheKey = 'players:$playerId:actividad';
     try {
       final response =
@@ -244,34 +245,47 @@ class PlayerApi {
   }
 
   String _friendlyError(int statusCode, String responseBody) {
-    final cleanBody = responseBody.replaceAll('"', '').trim();
+    if (statusCode == 404) return 'No se encontró el jugador solicitado.';
+    if (statusCode == 401) return 'Tu sesión expiró. Volvé a iniciar sesión.';
+
+    final extracted = _extractMessage(responseBody);
 
     if (statusCode == 400) {
-      return cleanBody.isEmpty
+      return extracted.isEmpty
           ? 'Revisá los datos del jugador e intentá nuevamente.'
-          : cleanBody;
+          : extracted;
     }
 
-    if (statusCode == 404) {
-      return 'No se encontró el jugador solicitado.';
-    }
-
-    if (statusCode == 401) {
-      return 'Tu sesión expiró. Volvé a iniciar sesión.';
-    }
+    if (statusCode == 409) return extracted.isEmpty ? 'Operación no permitida.' : extracted;
 
     return 'No pudimos completar la acción. Intentá nuevamente.';
   }
 
-  String _playersCacheKey({String? estado, String? search}) {
+  String _extractMessage(String body) {
+    try {
+      final json = jsonDecode(body);
+      if (json is Map<String, dynamic>) {
+        final detail = json['detail'] as String?;
+        if (detail != null && detail.isNotEmpty) return detail;
+        final title = json['title'] as String?;
+        if (title != null && title.isNotEmpty) return title;
+      }
+      if (json is String) return json;
+    } catch (_) {}
+    return body.replaceAll('"', '').trim();
+  }
+
+  String _playersCacheKey({String? estado, String? search, bool activo = true}) {
     final status = estado?.trim() ?? '';
     final term = search?.trim().toLowerCase() ?? '';
-    if (status.isEmpty && term.isEmpty) return 'players:list';
-    return 'players:list:estado=$status:search=$term';
+    final prefix = activo ? 'players:list' : 'players:list:inactivo';
+    if (status.isEmpty && term.isEmpty) return prefix;
+    return '$prefix:estado=$status:search=$term';
   }
 
   bool _matchesLocalFilters(
-      PlayerModel player, String? estado, String? search) {
+      PlayerModel player, String? estado, String? search, bool activo) {
+    if (player.active != activo) return false;
     final statusMatches = estado == null ||
         estado.isEmpty ||
         PlayerModel.statusToApi(player.status) == estado;

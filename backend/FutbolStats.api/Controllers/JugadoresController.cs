@@ -16,9 +16,9 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
     private static readonly string[] EstadosValidos = ["Disponible", "Lesionado", "Suspendido"];
 
     [HttpGet]
-    public async Task<IActionResult> GetJugadores([FromQuery] string? estado, [FromQuery] string? search)
+    public async Task<IActionResult> GetJugadores([FromQuery] string? estado, [FromQuery] string? search, [FromQuery] bool activo = true)
     {
-        var query = context.Jugadores.Include(j => j.Categoria).AsNoTracking().Where(j => j.Activo);
+        var query = context.Jugadores.Include(j => j.Categoria).AsNoTracking().Where(j => j.Activo == activo);
 
         if (!string.IsNullOrWhiteSpace(estado))
         {
@@ -292,12 +292,13 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
             return NotFound();
         }
 
+        var estadosTerminales = PartidoEstados.Terminales.ToArray();
         var partidoActivo = await context.Alineaciones
             .Include(a => a.Partido)
             .AsNoTracking()
             .Where(a => a.JugadorId == id
                      && a.Partido!.Activo
-                     && !PartidoEstados.Terminales.Contains(a.Partido.Estado))
+                     && !estadosTerminales.Contains(a.Partido.Estado))
             .OrderBy(a => a.Partido!.Fecha)
             .Select(a => new { a.Partido!.Rival, a.Partido.Fecha, a.Partido.Estado })
             .FirstOrDefaultAsync();

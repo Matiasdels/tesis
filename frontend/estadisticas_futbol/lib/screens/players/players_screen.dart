@@ -15,62 +15,114 @@ class PlayersScreen extends StatefulWidget {
   State<PlayersScreen> createState() => _PlayersScreenState();
 }
 
-class _PlayersScreenState extends State<PlayersScreen> {
+class _PlayersScreenState extends State<PlayersScreen>
+    with SingleTickerProviderStateMixin {
   final _api = PlayerApi();
+  late final TabController _tabController;
 
+  // Activos
   String _query = '';
   String _filterStatus = 'all';
   String _filterPosition = 'all';
+  List<PlayerModel> _activePlayers = [];
+  bool _loadingActive = true;
+  String? _errorActive;
 
-  List<PlayerModel> _players = [];
-  bool _loading = true;
-  String? _error;
+  // Inactivos
+  String _queryInactive = '';
+  List<PlayerModel> _inactivePlayers = [];
+  bool _loadingInactive = true;
+  String? _errorInactive;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
+  Future<void> _load() async {
+    _loadActive();
+    _loadInactive();
+  }
+
+  Future<void> _loadActive() async {
+    setState(() {
+      _loadingActive = true;
+      _errorActive = null;
+    });
     try {
       final token = context.read<AuthState>().session!.accessToken;
       final players = await _api.getPlayers(accessToken: token);
       setState(() {
-        _players = players;
-        _loading = false;
+        _activePlayers = players;
+        _loadingActive = false;
       });
     } catch (_) {
       setState(() {
-        _error = 'No pudimos cargar la plantilla. Intentá nuevamente.';
-        _loading = false;
+        _errorActive = 'No pudimos cargar la plantilla. Intentá nuevamente.';
+        _loadingActive = false;
       });
     }
   }
 
-  List<PlayerModel> get _filtered => _players.where((p) {
-    final matchQuery = p.name.toLowerCase().contains(_query.toLowerCase());
-    final matchStatus = _filterStatus == 'all' || p.status == _filterStatus;
-    final matchPos = _filterPosition == 'all' ||
-        (PlayerPositions.groups[_filterPosition]?.contains(p.position) ?? false);
-    return matchQuery && matchStatus && matchPos;
-  }).toList();
+  Future<void> _loadInactive() async {
+    setState(() {
+      _loadingInactive = true;
+      _errorInactive = null;
+    });
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      final players = await _api.getPlayers(accessToken: token, activo: false);
+      setState(() {
+        _inactivePlayers = players;
+        _loadingInactive = false;
+      });
+    } catch (_) {
+      setState(() {
+        _errorInactive = 'No pudimos cargar los jugadores inactivos.';
+        _loadingInactive = false;
+      });
+    }
+  }
+
+  List<PlayerModel> get _filteredActive => _activePlayers.where((p) {
+        final matchQuery =
+            p.name.toLowerCase().contains(_query.toLowerCase());
+        final matchStatus =
+            _filterStatus == 'all' || p.status == _filterStatus;
+        final matchPos = _filterPosition == 'all' ||
+            (PlayerPositions.groups[_filterPosition]?.contains(p.position) ??
+                false);
+        return matchQuery && matchStatus && matchPos;
+      }).toList();
+
+  List<PlayerModel> get _filteredInactive => _queryInactive.isEmpty
+      ? _inactivePlayers
+      : _inactivePlayers
+          .where((p) =>
+              p.name.toLowerCase().contains(_queryInactive.toLowerCase()))
+          .toList();
 
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
       title: 'Jugadores',
-      subtitle: '${_players.length} en plantilla',
+      subtitle: _loadingActive
+          ? ''
+          : '${_activePlayers.length} activos · ${_inactivePlayers.length} inactivos',
       actions: [
         ElevatedButton.icon(
           onPressed: () async {
-            final created = await context.push<bool>(AppConstants.routePlayerCreate);
-            if (created == true) _load();
+            final created =
+                await context.push<bool>(AppConstants.routePlayerCreate);
+            if (created == true) _loadActive();
           },
           icon: const Icon(Icons.person_add_outlined, size: 16),
           label: const Text('Añadir'),
@@ -78,45 +130,198 @@ class _PlayersScreenState extends State<PlayersScreen> {
       ],
       body: Column(
         children: [
-          _FilterBar(
-            query: _query,
-            filterStatus: _filterStatus,
-            filterPosition: _filterPosition,
-            onQuery: (v) => setState(() => _query = v),
-            onStatus: (v) => setState(() => _filterStatus = v),
-            onPosition: (v) => setState(() => _filterPosition = v),
+          Container(
+            color: AppColors.bgSurface,
+            child: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Activos'),
+                Tab(text: 'Inactivos'),
+              ],
+              labelColor: AppColors.accent,
+              unselectedLabelColor: AppColors.textMuted,
+              indicatorColor: AppColors.accent,
+              dividerColor: AppColors.borderSubtle,
+            ),
           ),
-          if (!_loading && _error == null)
-            _StatusReviewBanner(players: _players),
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? EmptyState(
-                        icon: Icons.error_outline,
-                        title: 'Algo salió mal',
-                        subtitle: _error!,
-                        actionLabel: 'Reintentar',
-                        onAction: _load,
-                      )
-                    : _filtered.isEmpty
-                        ? const EmptyState(
-                            icon: Icons.person_search,
-                            title: 'Sin resultados',
-                            subtitle: 'Prueba con otro filtro o búsqueda',
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.all(AppConstants.pagePadding),
-                            itemCount: _filtered.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 8),
-                            itemBuilder: (_, i) => _PlayerCard(player: _filtered[i]),
-                          ),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _ActiveTab(
+                  players: _activePlayers,
+                  filtered: _filteredActive,
+                  loading: _loadingActive,
+                  error: _errorActive,
+                  query: _query,
+                  filterStatus: _filterStatus,
+                  filterPosition: _filterPosition,
+                  onQuery: (v) => setState(() => _query = v),
+                  onStatus: (v) => setState(() => _filterStatus = v),
+                  onPosition: (v) => setState(() => _filterPosition = v),
+                  onRetry: _loadActive,
+                ),
+                _InactiveTab(
+                  filtered: _filteredInactive,
+                  loading: _loadingInactive,
+                  error: _errorInactive,
+                  query: _queryInactive,
+                  onQuery: (v) => setState(() => _queryInactive = v),
+                  onRetry: _loadInactive,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 }
+
+// ─── Tab Activos ─────────────────────────────────────────────────────────────
+
+class _ActiveTab extends StatelessWidget {
+  final List<PlayerModel> players;
+  final List<PlayerModel> filtered;
+  final bool loading;
+  final String? error;
+  final String query;
+  final String filterStatus;
+  final String filterPosition;
+  final ValueChanged<String> onQuery;
+  final ValueChanged<String> onStatus;
+  final ValueChanged<String> onPosition;
+  final VoidCallback onRetry;
+
+  const _ActiveTab({
+    required this.players,
+    required this.filtered,
+    required this.loading,
+    required this.error,
+    required this.query,
+    required this.filterStatus,
+    required this.filterPosition,
+    required this.onQuery,
+    required this.onStatus,
+    required this.onPosition,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _FilterBar(
+          query: query,
+          filterStatus: filterStatus,
+          filterPosition: filterPosition,
+          onQuery: onQuery,
+          onStatus: onStatus,
+          onPosition: onPosition,
+        ),
+        if (!loading && error == null) _StatusReviewBanner(players: players),
+        Expanded(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : error != null
+                  ? EmptyState(
+                      icon: Icons.error_outline,
+                      title: 'Algo salió mal',
+                      subtitle: error!,
+                      actionLabel: 'Reintentar',
+                      onAction: onRetry,
+                    )
+                  : filtered.isEmpty
+                      ? const EmptyState(
+                          icon: Icons.person_search,
+                          title: 'Sin resultados',
+                          subtitle: 'Prueba con otro filtro o búsqueda',
+                        )
+                      : ListView.separated(
+                          padding:
+                              const EdgeInsets.all(AppConstants.pagePadding),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (_, i) =>
+                              _PlayerCard(player: filtered[i]),
+                        ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Tab Inactivos ────────────────────────────────────────────────────────────
+
+class _InactiveTab extends StatelessWidget {
+  final List<PlayerModel> filtered;
+  final bool loading;
+  final String? error;
+  final String query;
+  final ValueChanged<String> onQuery;
+  final VoidCallback onRetry;
+
+  const _InactiveTab({
+    required this.filtered,
+    required this.loading,
+    required this.error,
+    required this.query,
+    required this.onQuery,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          color: AppColors.bgSurface,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: TextField(
+            onChanged: onQuery,
+            style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Buscar jugador...',
+              prefixIcon:
+                  Icon(Icons.search, size: 18, color: AppColors.textMuted),
+            ),
+          ),
+        ),
+        Expanded(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : error != null
+                  ? EmptyState(
+                      icon: Icons.error_outline,
+                      title: 'Algo salió mal',
+                      subtitle: error!,
+                      actionLabel: 'Reintentar',
+                      onAction: onRetry,
+                    )
+                  : filtered.isEmpty
+                      ? const EmptyState(
+                          icon: Icons.person_off_outlined,
+                          title: 'Sin jugadores inactivos',
+                          subtitle:
+                              'Los jugadores dados de baja aparecerán aquí',
+                        )
+                      : ListView.separated(
+                          padding:
+                              const EdgeInsets.all(AppConstants.pagePadding),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (_, i) =>
+                              _PlayerCard(player: filtered[i]),
+                        ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Shared widgets ───────────────────────────────────────────────────────────
 
 class _StatusReviewBanner extends StatelessWidget {
   final List<PlayerModel> players;
@@ -127,11 +332,10 @@ class _StatusReviewBanner extends StatelessWidget {
     final needsReview = players.where((p) => p.statusNeedsReview).toList();
     if (needsReview.isEmpty) return const SizedBox.shrink();
 
-    final names = needsReview.map((p) => p.name).join(', ');
     final plural = needsReview.length == 1;
     final msg = plural
         ? '${needsReview.first.name} podría haber cumplido su sanción o recuperado su lesión. Revisá su estado.'
-        : '$names podrían haber cumplido su sanción o recuperado su lesión. Revisá sus estados.';
+        : '${needsReview.map((p) => p.name).join(', ')} podrían haber cumplido su sanción o recuperado su lesión. Revisá sus estados.';
 
     return Container(
       width: double.infinity,
@@ -168,8 +372,12 @@ class _FilterBar extends StatelessWidget {
   final ValueChanged<String> onPosition;
 
   const _FilterBar({
-    required this.query, required this.filterStatus, required this.filterPosition,
-    required this.onQuery, required this.onStatus, required this.onPosition,
+    required this.query,
+    required this.filterStatus,
+    required this.filterPosition,
+    required this.onQuery,
+    required this.onStatus,
+    required this.onPosition,
   });
 
   @override
@@ -184,7 +392,8 @@ class _FilterBar extends StatelessWidget {
             style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Buscar jugador...',
-              prefixIcon: Icon(Icons.search, size: 18, color: AppColors.textMuted),
+              prefixIcon:
+                  Icon(Icons.search, size: 18, color: AppColors.textMuted),
             ),
           ),
           const SizedBox(height: 10),
@@ -193,13 +402,17 @@ class _FilterBar extends StatelessWidget {
             child: Row(
               children: [
                 _Chip('Todos', filterStatus == 'all', () => onStatus('all')),
-                _Chip('Disponibles', filterStatus == 'available', () => onStatus('available')),
-                _Chip('Lesionados', filterStatus == 'injured', () => onStatus('injured')),
-                _Chip('Suspendidos', filterStatus == 'suspended', () => onStatus('suspended')),
+                _Chip('Disponibles', filterStatus == 'available',
+                    () => onStatus('available')),
+                _Chip('Lesionados', filterStatus == 'injured',
+                    () => onStatus('injured')),
+                _Chip('Suspendidos', filterStatus == 'suspended',
+                    () => onStatus('suspended')),
                 const SizedBox(width: 10),
                 VerticalDivider(color: AppColors.borderDefault, width: 1),
                 const SizedBox(width: 10),
-                _Chip('Todas', filterPosition == 'all', () => onPosition('all')),
+                _Chip(
+                    'Todas', filterPosition == 'all', () => onPosition('all')),
                 ...PlayerPositions.groups.keys.map((g) =>
                     _Chip(g, filterPosition == g, () => onPosition(g))),
               ],
@@ -229,7 +442,9 @@ class _Chip extends StatelessWidget {
         selectedColor: AppColors.accentDim,
         checkmarkColor: AppColors.accent,
         side: BorderSide(
-          color: active ? AppColors.accent.withValues(alpha: 0.4) : AppColors.borderDefault,
+          color: active
+              ? AppColors.accent.withValues(alpha: 0.4)
+              : AppColors.borderDefault,
           width: 0.5,
         ),
         labelStyle: TextStyle(
@@ -255,9 +470,12 @@ class _PlayerCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
-          final changed = await context.push<bool>('/players/${player.id}');
+          final changed =
+              await context.push<bool>('/players/${player.id}');
           if (changed == true && context.mounted) {
-            (context.findAncestorStateOfType<_PlayersScreenState>())?._load();
+            context
+                .findAncestorStateOfType<_PlayersScreenState>()
+                ?._load();
           }
         },
         child: Container(
@@ -277,7 +495,10 @@ class _PlayerCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(player.name,
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary)),
                         if (player.jerseyNumber != null) ...[
                           const SizedBox(width: 8),
                           Container(
@@ -289,61 +510,39 @@ class _PlayerCard extends StatelessWidget {
                             ),
                             child: Text('#${player.jerseyNumber}',
                                 style: TextStyle(
-                                    fontSize: 10, color: AppColors.textMuted)),
+                                    fontSize: 10,
+                                    color: AppColors.textMuted)),
                           ),
                         ],
                       ],
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                        '${player.position} · '
-                        '${player.hasPerformanceData ? '${player.matchesPlayed} partidos' : '— partidos'}',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(player.position,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary)),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                      player.hasPerformanceData
-                          ? '${player.rating.toInt()}'
-                          : '—',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                        color: player.hasPerformanceData
-                            ? _ratingColor(player.rating)
-                            : AppColors.textMuted,
-                      )),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (player.statusNeedsReview)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 4),
-                          child: Icon(Icons.warning_amber_rounded,
-                              color: AppColors.warning, size: 14),
-                        ),
-                      StatusBadge(status: player.status),
-                    ],
-                  ),
+                  if (player.statusNeedsReview)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 4),
+                      child: Icon(Icons.warning_amber_rounded,
+                          color: AppColors.warning, size: 14),
+                    ),
+                  StatusBadge(status: player.status),
                 ],
               ),
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
+              Icon(Icons.chevron_right,
+                  size: 18, color: AppColors.textMuted),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Color _ratingColor(double r) {
-    if (r >= 85) return AppColors.accent;
-    if (r >= 75) return AppColors.info;
-    if (r >= 65) return AppColors.warning;
-    return AppColors.danger;
   }
 }

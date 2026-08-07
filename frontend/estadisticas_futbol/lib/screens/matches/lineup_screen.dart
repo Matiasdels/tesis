@@ -135,7 +135,7 @@ class _LineupScreenState extends State<LineupScreen> {
   int get _assignedCount => _slots.values.where((p) => p != null).length;
 
   // All players currently taken (titulares + suplentes)
-  Set<String> get _allAssignedIds => {
+  Set<int> get _allAssignedIds => {
         ..._slots.values.whereType<PlayerModel>().map((p) => p.id),
         ..._suplentes.map((p) => p.id),
       };
@@ -183,7 +183,7 @@ class _LineupScreenState extends State<LineupScreen> {
         final slotKey = entry.posicionAsignada;
         if (slotKey != null && slotMap.containsKey(slotKey)) {
           final player = categoryPlayers
-              .where((p) => int.tryParse(p.id) == entry.jugadorId)
+              .where((p) => p.id == entry.jugadorId)
               .firstOrNull;
           if (player != null) slotMap[slotKey] = player;
         }
@@ -193,7 +193,7 @@ class _LineupScreenState extends State<LineupScreen> {
       final loadedSuplentes = <PlayerModel>[];
       for (final entry in existing.where((e) => !e.esTitular)) {
         final player = categoryPlayers
-            .where((p) => int.tryParse(p.id) == entry.jugadorId)
+            .where((p) => p.id == entry.jugadorId)
             .firstOrNull;
         if (player != null) loadedSuplentes.add(player);
       }
@@ -402,7 +402,7 @@ class _LineupScreenState extends State<LineupScreen> {
     final titularEntries = _slots.entries
         .where((e) => e.value != null)
         .map((e) => {
-              'jugadorId': int.tryParse(e.value!.id) ?? 0,
+              'jugadorId': e.value!.id,
               'esTitular': true,
               'posicionAsignada': e.key,
             })
@@ -410,7 +410,7 @@ class _LineupScreenState extends State<LineupScreen> {
 
     final suplenteEntries = _suplentes
         .map((p) => {
-              'jugadorId': int.tryParse(p.id) ?? 0,
+              'jugadorId': p.id,
               'esTitular': false,
               'posicionAsignada': null,
             })
@@ -938,7 +938,7 @@ class _SuplenteTile extends StatelessWidget {
 
 class _SubstitutePickerSheet extends StatefulWidget {
   final List<PlayerModel> players;
-  final Set<String> excludedIds;
+  final Set<int> excludedIds;
   final ValueChanged<PlayerModel> onSelect;
 
   const _SubstitutePickerSheet({
