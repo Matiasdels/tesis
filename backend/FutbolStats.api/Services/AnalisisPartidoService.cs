@@ -334,7 +334,7 @@ public class AnalisisPartidoService(
                 totalEventos = eventos.Count,
                 porTipo = countByType,
                 goles = Count(eventos, EventTypeNames.Gol),
-                golesRivales = Count(eventos, "Gol rival"),
+                golesRivales = Count(eventos, EventTypeNames.GolRival),
                 asistencias = Count(eventos, EventTypeNames.Asistencia),
                 remates = Count(eventos, EventTypeNames.Remate),
                 faltas = Count(eventos, EventTypeNames.Falta),

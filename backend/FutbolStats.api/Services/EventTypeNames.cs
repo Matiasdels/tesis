@@ -8,6 +8,7 @@ namespace FutbolStats.Api.Services;
 public static class EventTypeNames
 {
     public const string Gol             = "Gol";
+    public const string GolRival        = "Gol rival";
     public const string Asistencia      = "Asistencia";
     public const string Remate          = "Remate";
     public const string RemateAlArco    = "Remate al arco";
