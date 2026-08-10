@@ -585,6 +585,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (evento.eventoId < 0) _showSavedOnDeviceMessage();
     } catch (e) {
       if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
       setState(() => _savingEvent = false);
       _showEventRegistrationError();
     }
@@ -649,6 +650,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       }
     } catch (e) {
       if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
       setState(() {
         _assistPlayer = null;
         _pickingGoalScorer = false;
@@ -720,8 +722,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (yellowEvento.eventoId < 0 || redEvento.eventoId < 0) {
         _showSavedOnDeviceMessage();
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
       setState(() => _savingEvent = false);
       _showEventRegistrationError();
     }
@@ -788,6 +791,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (evento.eventoId < 0) _showSavedOnDeviceMessage();
     } catch (e) {
       if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
       setState(() => _savingEvent = false);
       _showEventRegistrationError();
     }
@@ -868,9 +872,18 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       }
     } on EventApiException catch (e) {
       if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
       setState(() => _savingEvent = false);
       _showError(e.message);
     }
+  }
+
+  Future<bool> _handleSessionExpired(Object error) async {
+    if (error is! EventApiException || !error.sessionExpired) return false;
+
+    await context.read<AuthState>().expireSession();
+    if (mounted) context.go(AppConstants.routeLogin);
+    return true;
   }
 
   // ==========================================================================
