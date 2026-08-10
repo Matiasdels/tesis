@@ -69,7 +69,6 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
-builder.Services.AddOpenApi();
 builder.Services.Configure<JwtOptions>(jwtSection);
 builder.Services.AddCors(options =>
 {
@@ -116,7 +115,6 @@ app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
 }
