@@ -22,6 +22,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
 
   List<TrainingSessionModel> _sessions = [];
   List<CategoryModel> _categories = [];
+  List<PlayerModel> _players = [];
   bool _loading = true;
   String? _error;
 
@@ -43,12 +44,14 @@ class _TrainingScreenState extends State<TrainingScreen> {
         _trainingApi.getTrainingSessions(accessToken: token),
         _playerApi.getCategories(token),
       ]);
+      final players = await _loadPlayersSafely(token);
       if (!mounted) return;
       final sessions = results[0] as List<TrainingSessionModel>;
       sessions.sort((a, b) => b.date.compareTo(a.date));
       setState(() {
         _sessions = sessions;
         _categories = results[1] as List<CategoryModel>;
+        _players = players;
         _loading = false;
       });
     } catch (_) {
@@ -91,23 +94,39 @@ class _TrainingScreenState extends State<TrainingScreen> {
     }
   }
 
-  Future<void> _openAttendanceSheet(TrainingSessionModel session) async {
-    List<PlayerModel> players;
+  Future<List<PlayerModel>> _loadPlayersSafely(String token) async {
     try {
-      final token = context.read<AuthState>().session!.accessToken;
-      final allPlayers = await _playerApi.getPlayers(accessToken: token);
-      final sameCategory = allPlayers
-          .where((player) => player.categoryId == session.categoriaId)
-          .toList();
-      players = sameCategory.isEmpty ? allPlayers : sameCategory;
+      return _playerApi.getPlayers(accessToken: token);
     } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos cargar los jugadores.'),
-        ),
-      );
-      return;
+      return const [];
+    }
+  }
+
+  List<PlayerModel> _playersForSession(TrainingSessionModel session) {
+    final sameCategory = _players
+        .where((player) => player.categoryId == session.categoriaId)
+        .toList();
+    return sameCategory.isEmpty ? _players : sameCategory;
+  }
+
+  Future<void> _openAttendanceSheet(TrainingSessionModel session) async {
+    List<PlayerModel> players = _playersForSession(session);
+    if (players.isEmpty) {
+      try {
+        final token = context.read<AuthState>().session!.accessToken;
+        final allPlayers = await _playerApi.getPlayers(accessToken: token);
+        if (!mounted) return;
+        setState(() => _players = allPlayers);
+        players = _playersForSession(session);
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No pudimos cargar los jugadores.'),
+          ),
+        );
+        return;
+      }
     }
 
     if (!mounted) return;
@@ -203,6 +222,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                             padding: const EdgeInsets.only(bottom: 10),
                             child: _TrainingCard(
                               session: session,
+                              players: _playersForSession(session),
                               onAttendance: () =>
                                   _openAttendanceSheet(session),
                             ),
@@ -239,7 +259,7 @@ class _TrainingSummary extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _SummaryCard(
-            label: 'Asistencias',
+            label: 'Presentes',
             value: '$totalAttendance',
             icon: Icons.groups_rounded,
             color: AppColors.info,
@@ -312,10 +332,12 @@ class _SummaryCard extends StatelessWidget {
 
 class _TrainingCard extends StatelessWidget {
   final TrainingSessionModel session;
+  final List<PlayerModel> players;
   final VoidCallback onAttendance;
 
   const _TrainingCard({
     required this.session,
+    required this.players,
     required this.onAttendance,
   });
 
@@ -326,6 +348,23 @@ class _TrainingCard extends StatelessWidget {
     final duration = session.durationMin == null
         ? null
         : '${session.durationMin} min';
+    final playerById = <int, PlayerModel>{};
+    for (final player in players) {
+      playerById[player.id] = player;
+    }
+    final attendedNames = session.attendance
+        .where((attendance) => attendance.attended)
+        .map((attendance) => playerById[attendance.playerId]?.name)
+        .whereType<String>()
+        .where((name) => name.isNotEmpty)
+        .toList();
+    final attendanceText = attendedNames.isEmpty
+        ? session.attended > 0
+            ? '${session.attended} jugadores presentes.'
+            : 'Todavia no hay asistencia cargada.'
+        : attendedNames.length <= 3
+            ? attendedNames.join(', ')
+            : '${attendedNames.take(3).join(', ')} y ${attendedNames.length - 3} mas';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -403,6 +442,14 @@ class _TrainingCard extends StatelessWidget {
                 label: const Text('Asistencia'),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Presentes: $attendanceText',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
