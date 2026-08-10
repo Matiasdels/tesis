@@ -355,4 +355,36 @@ public class CambioValidatorTests
         Assert.Equal("JugadorQueSaleNoEstaEnCancha", resultado.CodigoError);
         Assert.Equal(10, resultado.JugadorId);
     }
+
+    // 21. Cuando se alcanza el maximo configurado de cambios, el siguiente cambio se rechaza.
+    [Fact]
+    public void Validar_MaximoCambiosAlcanzado_Rechazado()
+    {
+        var alin = new[]
+        {
+            P.T(1), P.T(2), P.T(3), P.T(4), P.T(5), P.T(6),
+            P.S(10), P.S(11), P.S(12), P.S(13), P.S(14), P.S(15)
+        };
+        var plantel = PlantelPartidoStateBuilder.Reconstruir(
+            alin,
+            [
+                P.Cambio(1, 10),
+                P.Cambio(2, 11),
+                P.Cambio(3, 12),
+                P.Cambio(4, 13),
+                P.Cambio(5, 14)
+            ]);
+        var ids = alin.Select(j => j.JugadorId).ToHashSet();
+
+        var resultado = CambioValidator.Validar(
+            "EnCurso",
+            plantel,
+            jugadorSaleId: 6,
+            jugadorEntraId: 15,
+            alineacionIds: ids,
+            maxCambiosPorPartido: 5);
+
+        Assert.False(resultado.EsValido);
+        Assert.Equal("MaxCambiosAlcanzado", resultado.CodigoError);
+    }
 }

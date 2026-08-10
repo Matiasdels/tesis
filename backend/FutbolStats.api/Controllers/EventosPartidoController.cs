@@ -1,16 +1,21 @@
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
+using FutbolStats.Api.Options;
 using FutbolStats.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FutbolStats.Api.Controllers;
 
 [ApiController]
 [Route("api/Partidos/{partidoId:int}/eventos")]
 [Authorize]
-public class EventosPartidoController(FutbolStatsDbContext context, ILogger<EventosPartidoController> logger) : ControllerBase
+public class EventosPartidoController(
+    FutbolStatsDbContext context,
+    ILogger<EventosPartidoController> logger,
+    IOptions<MatchRulesOptions> matchRulesOptions) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetEventos(int partidoId)
@@ -176,7 +181,8 @@ public class EventosPartidoController(FutbolStatsDbContext context, ILogger<Even
             plantel,
             jugadorSaleId:  jugadorSaleId.Value,
             jugadorEntraId: jugadorEntraId.Value,
-            alineacionIds);
+            alineacionIds,
+            Math.Max(0, matchRulesOptions.Value.MaxCambiosPorPartido));
 
         if (!validacion.EsValido)
             return (BadRequest(validacion.Mensaje), null);

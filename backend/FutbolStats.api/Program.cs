@@ -19,6 +19,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
 var geminiSection = builder.Configuration.GetSection("Gemini");
+var matchRulesSection = builder.Configuration.GetSection("MatchRules");
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -92,6 +93,7 @@ builder.Services.AddScoped<PasswordHasher>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<EstadisticasGlobalesService>();
 builder.Services.Configure<GeminiOptions>(geminiSection);
+builder.Services.Configure<MatchRulesOptions>(matchRulesSection);
 builder.Services.AddHttpClient<AnalisisPartidoService>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
