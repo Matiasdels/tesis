@@ -17,7 +17,7 @@ public class TokenService(IOptions<JwtOptions> jwtOptions)
         var expiresAt = DateTime.UtcNow.AddMinutes(_jwtOptions.ExpirationMinutes);
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, usuario.UsuarioId.ToString()),
+            new(JwtRegisteredClaimNames.Sub, usuario.NombreUsuario),
             new(ClaimTypes.NameIdentifier, usuario.UsuarioId.ToString()),
             new(JwtRegisteredClaimNames.Email, usuario.Email),
             new(ClaimTypes.Name, usuario.NombreUsuario),
