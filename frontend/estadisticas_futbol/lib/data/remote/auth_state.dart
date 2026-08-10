@@ -94,6 +94,13 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> expireSession() async {
+    _session = null;
+    _authNotice = 'Tu sesion expiro. Volve a iniciar sesion.';
+    await _clearStoredSession();
+    notifyListeners();
+  }
+
   void clearAuthNotice() {
     if (_authNotice == null) return;
     _authNotice = null;

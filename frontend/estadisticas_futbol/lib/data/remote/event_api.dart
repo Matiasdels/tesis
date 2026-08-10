@@ -187,7 +187,9 @@ class EventApi {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 401) {
         throw const EventApiException(
-            'Tu sesion expiro. Volve a iniciar sesion.');
+          'Tu sesion expiro. Volve a iniciar sesion.',
+          sessionExpired: true,
+        );
       }
       throw EventApiException(
           _extractMessage(response.statusCode, response.body));
@@ -236,7 +238,12 @@ class EventApi {
 
 class EventApiException implements Exception {
   final String message;
-  const EventApiException(this.message);
+  final bool sessionExpired;
+
+  const EventApiException(
+    this.message, {
+    this.sessionExpired = false,
+  });
 
   @override
   String toString() => message;
