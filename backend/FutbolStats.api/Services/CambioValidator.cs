@@ -21,12 +21,18 @@ public static class CambioValidator
         EstadoPlantel    plantel,
         int              jugadorSaleId,
         int              jugadorEntraId,
-        IReadOnlySet<int> alineacionIds)
+        IReadOnlySet<int> alineacionIds,
+        int              maxCambiosPorPartido = 5)
     {
         if (PartidoEstados.Terminales.Contains(estadoPartido))
             return CambioValidationResult.Error(
                 "PartidoTerminado",
                 "No se pueden registrar cambios en un partido que ya ha concluido.");
+
+        if (maxCambiosPorPartido >= 0 && plantel.Sustituidos.Count >= maxCambiosPorPartido)
+            return CambioValidationResult.Error(
+                "MaxCambiosAlcanzado",
+                $"No se pueden realizar mas de {maxCambiosPorPartido} cambios en el partido.");
 
         if (jugadorSaleId == jugadorEntraId)
             return CambioValidationResult.Error(
