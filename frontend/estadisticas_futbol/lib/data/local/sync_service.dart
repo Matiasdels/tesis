@@ -10,6 +10,8 @@ class SyncService {
       : _databaseHelper = databaseHelper ?? DatabaseHelper.instance,
         _client = client ?? http.Client();
 
+  static const int _maxServerAttempts = 3;
+
   final DatabaseHelper _databaseHelper;
   final http.Client _client;
 
@@ -19,6 +21,11 @@ class SyncService {
     String? technicalError;
 
     for (final action in pending) {
+      if (action.attempts >= _maxServerAttempts) {
+        technicalError ??= action.lastError;
+        continue;
+      }
+
       try {
         final response = await _send(action, accessToken);
         if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -35,7 +42,7 @@ class SyncService {
         }
       } catch (error) {
         final technicalMessage = _formatException(error);
-        await _databaseHelper.markSyncActionFailed(
+        await _databaseHelper.markSyncActionConnectionFailed(
           action.id,
           technicalMessage,
         );

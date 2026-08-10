@@ -166,6 +166,18 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> markSyncActionConnectionFailed(String id, Object error) async {
+    final db = await database;
+    await db.rawUpdate(
+      '''
+      UPDATE sync_queue
+      SET last_error = ?
+      WHERE id = ?
+      ''',
+      [error.toString(), id],
+    );
+  }
+
   Future<void> deletePendingEventByLocalId(int localEventoId) async {
     final db = await database;
     final rows = await db.query(
