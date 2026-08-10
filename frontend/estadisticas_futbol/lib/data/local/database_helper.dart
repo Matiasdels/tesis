@@ -197,6 +197,29 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> removeCachedEventByLocalId(
+    int partidoId,
+    int localEventoId,
+  ) async {
+    final key = 'matches:$partidoId:events';
+    final cached = await readJsonList(key);
+    if (cached == null) return;
+
+    var changed = false;
+    final filtered = <dynamic>[];
+    for (final item in cached) {
+      if (item is Map<String, dynamic> && item['eventoId'] == localEventoId) {
+        changed = true;
+        continue;
+      }
+      filtered.add(item);
+    }
+
+    if (changed) {
+      await saveJson(key, filtered);
+    }
+  }
+
   Future<void> deletePendingMatchEstado(int partidoId) async {
     final db = await database;
     await db.delete(

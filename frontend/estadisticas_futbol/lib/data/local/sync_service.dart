@@ -22,6 +22,7 @@ class SyncService {
       try {
         final response = await _send(action, accessToken);
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          await _clearSyncedLocalEvent(action);
           await _databaseHelper.markSyncActionCompleted(action.id);
           completed++;
         } else {
@@ -74,6 +75,28 @@ class SyncService {
         return _client.delete(uri, headers: headers, body: body);
       default:
         throw SyncServiceException('Metodo no soportado: ${action.method}');
+    }
+  }
+
+  Future<void> _clearSyncedLocalEvent(PendingSyncAction action) async {
+    if (action.entity != 'evento_partido' || action.action != 'create') return;
+
+    final localEventoId = action.payload['localEventoId'];
+    if (localEventoId is! int) return;
+
+    final match = RegExp(r'^/api/Partidos/(\d+)/eventos$')
+        .firstMatch(action.endpoint);
+    final partidoId = match == null ? null : int.tryParse(match.group(1)!);
+    if (partidoId == null) return;
+
+    try {
+      await _databaseHelper.removeCachedEventByLocalId(
+        partidoId,
+        localEventoId,
+      );
+    } catch (_) {
+      // La sincronizacion ya fue aceptada por el servidor; no se bloquea la cola
+      // si la limpieza local no puede completarse.
     }
   }
 
