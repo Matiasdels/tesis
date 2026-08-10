@@ -57,6 +57,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   bool _hasServerConnection = true;
   int _pendingSyncCount = 0;
   bool _syncingPending = false;
+  bool _pendingSyncError = false;
 
   // ── Live state ─────────────────────────────────────────────────────────────
   int _minute = 0;
@@ -268,13 +269,19 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   Future<void> _refreshPendingSyncCount() async {
     final count = await _eventApi.pendingSyncCount();
     if (!mounted) return;
-    setState(() => _pendingSyncCount = count);
+    setState(() {
+      _pendingSyncCount = count;
+      if (count == 0) _pendingSyncError = false;
+    });
   }
 
   Future<void> _updatePendingNow() async {
     if (_syncingPending || _pendingSyncCount == 0) return;
 
-    setState(() => _syncingPending = true);
+    setState(() {
+      _syncingPending = true;
+      _pendingSyncError = false;
+    });
 
     try {
       final result = await _eventApi.syncPendingActions(_token);
@@ -298,6 +305,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         _awayScore = awayScore;
         _pendingSyncCount = pendingCount;
         _syncingPending = false;
+        _pendingSyncError = pendingCount > 0 && result.hasError;
         _hasServerConnection = pendingCount == 0 || result.completedCount > 0;
       });
 
@@ -313,6 +321,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (!mounted) return;
       setState(() {
         _syncingPending = false;
+        _pendingSyncError = _pendingSyncCount > 0;
         _hasServerConnection = false;
       });
       _showInfo(
@@ -1238,7 +1247,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   }
 
   void _showSavedOnDeviceMessage() {
-    setState(() => _hasServerConnection = false);
+    setState(() {
+      _hasServerConnection = false;
+      _pendingSyncError = false;
+    });
     unawaited(_refreshPendingSyncCount());
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -1315,6 +1327,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               hasServerConnection: _hasServerConnection,
               pendingSyncCount: _pendingSyncCount,
               syncingPending: _syncingPending,
+              pendingSyncError: _pendingSyncError,
               onUpdatePending: _updatePendingNow,
               finishing: _finishing,
               onToggle: _toggleTimer,
@@ -1462,6 +1475,7 @@ class _TopBar extends StatelessWidget {
   final bool hasServerConnection;
   final int pendingSyncCount;
   final bool syncingPending;
+  final bool pendingSyncError;
   final bool finishing;
   final VoidCallback onToggle, onBack;
   final VoidCallback onUpdatePending;
@@ -1478,6 +1492,7 @@ class _TopBar extends StatelessWidget {
     required this.hasServerConnection,
     required this.pendingSyncCount,
     required this.syncingPending,
+    required this.pendingSyncError,
     required this.finishing,
     required this.onToggle,
     required this.onBack,
@@ -1532,6 +1547,7 @@ class _TopBar extends StatelessWidget {
                   _PendingUpdateIndicator(
                     count: pendingSyncCount,
                     syncing: syncingPending,
+                    hasError: pendingSyncError,
                     onUpdate: syncingPending ? null : onUpdatePending,
                   ),
                 _ConnectionIndicator(hasConnection: hasServerConnection),
@@ -1720,18 +1736,29 @@ class _ConnectionIndicator extends StatelessWidget {
 class _PendingUpdateIndicator extends StatelessWidget {
   final int count;
   final bool syncing;
+  final bool hasError;
   final VoidCallback? onUpdate;
 
   const _PendingUpdateIndicator({
     required this.count,
     required this.syncing,
+    required this.hasError,
     required this.onUpdate,
   });
 
   @override
   Widget build(BuildContext context) {
-    final text =
-        count == 1 ? '1 evento pendiente' : '$count eventos pendientes';
+    final color = hasError ? AppColors.warning : AppColors.info;
+    final background = hasError
+        ? AppColors.warning.withValues(alpha: 0.12)
+        : AppColors.infoDim;
+    final text = syncing
+        ? 'Actualizando...'
+        : hasError
+            ? 'No se pudo actualizar'
+            : count == 1
+                ? '1 evento pendiente'
+                : '$count eventos pendientes';
 
     return Material(
       color: Colors.transparent,
@@ -1741,10 +1768,10 @@ class _PendingUpdateIndicator extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.infoDim,
+            color: background,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: AppColors.info.withValues(alpha: 0.35),
+              color: color.withValues(alpha: 0.35),
               width: 0.5,
             ),
           ),
@@ -1752,25 +1779,27 @@ class _PendingUpdateIndicator extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (syncing)
-                const SizedBox(
+                SizedBox(
                   width: 12,
                   height: 12,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: AppColors.info,
+                    color: color,
                   ),
                 )
               else
-                const Icon(
-                  Icons.cloud_upload_rounded,
+                Icon(
+                  hasError
+                      ? Icons.error_outline_rounded
+                      : Icons.cloud_upload_rounded,
                   size: 12,
-                  color: AppColors.info,
+                  color: color,
                 ),
               const SizedBox(width: 6),
               Text(
-                syncing ? 'Actualizando...' : text,
-                style: const TextStyle(
-                  color: AppColors.info,
+                text,
+                style: TextStyle(
+                  color: color,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1778,7 +1807,7 @@ class _PendingUpdateIndicator extends StatelessWidget {
               if (!syncing) ...[
                 const SizedBox(width: 8),
                 Text(
-                  'Actualizar ahora',
+                  hasError ? 'Reintentar' : 'Actualizar ahora',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 11,
