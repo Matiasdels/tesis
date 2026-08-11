@@ -91,9 +91,24 @@ public class UsuariosController(
             usuario.Nombre,
             usuario.Apellido,
             usuario.RolId,
-            usuario.Rol?.Nombre,
+            ToDisplayRoleName(usuario.Rol?.Nombre),
             usuario.Activo,
             usuario.FechaCreacion);
+    }
+
+    private static string? ToDisplayRoleName(string? nombre)
+    {
+        return nombre switch
+        {
+            "Cuerpo tecnico" => "Cuerpo tecnico",
+            "Responsable institucional" => "Responsable institucional",
+            "Entrenador" => "Cuerpo tecnico",
+            "Asistente" => "Cuerpo tecnico",
+            "Analista" => "Cuerpo tecnico",
+            "Preparador fisico" => "Cuerpo tecnico",
+            "Admin" => "Responsable institucional",
+            _ => nombre
+        };
     }
 }
 
