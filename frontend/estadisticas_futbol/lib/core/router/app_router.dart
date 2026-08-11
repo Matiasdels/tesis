@@ -14,6 +14,7 @@ import 'package:estadisticas_futbol/screens/live_match/live_match_screen.dart';
 import 'package:estadisticas_futbol/screens/live_match/penales_screen.dart';
 import 'package:estadisticas_futbol/screens/matches/match_summary_screen.dart';
 import 'package:estadisticas_futbol/screens/training/training_screen.dart';
+import 'package:estadisticas_futbol/screens/users/users_management_screen.dart';
 import 'package:estadisticas_futbol/screens/statistics/statistics_screen.dart';
 import 'package:estadisticas_futbol/screens/auth/login_screen.dart';
 import 'package:estadisticas_futbol/screens/auth/splash_screen.dart';
@@ -120,6 +121,10 @@ GoRouter createRouter(AuthState authState) => GoRouter(
             GoRoute(
               path: AppConstants.routeObservations,
               pageBuilder: (c, s) => _fade(s, const ObservationsScreen()),
+            ),
+            GoRoute(
+              path: AppConstants.routeUsers,
+              pageBuilder: (c, s) => _fade(s, const UsersManagementScreen()),
             ),
           ],
         ),

@@ -18,6 +18,7 @@ abstract class AppConstants {
   static const String routeStatistics = '/statistics';
   static const String routeReports = '/reports';
   static const String routeObservations = '/observations';
+  static const String routeUsers = '/users';
 
   // UI dimensions
   static const double sidebarWidth = 220.0;
