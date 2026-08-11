@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -11,8 +12,11 @@ class AuthState extends ChangeNotifier {
 
   AuthSession? _session;
   String? _authNotice;
+  Timer? _refreshTimer;
   bool _loading = false;
   bool _initialized = false;
+
+  static const _refreshBeforeExpiry = Duration(minutes: 5);
 
   AuthState({AuthApi? authApi}) : _authApi = authApi ?? AuthApi();
 
@@ -26,21 +30,19 @@ class AuthState extends ChangeNotifier {
   Future<void> initialize() async {
     final storedSession = await _readStoredSession();
 
-    if (storedSession == null ||
-        storedSession.expiresAt.isBefore(DateTime.now())) {
+    if (storedSession == null) {
       await _clearStoredSession();
-      if (storedSession != null) {
-        _authNotice = 'Tu sesion expiro. Volve a iniciar sesion.';
-      }
       _initialized = true;
       notifyListeners();
       return;
     }
 
     try {
-      final user = await _authApi.me(storedSession.accessToken);
-      _session = storedSession.copyWith(user: user);
+      final activeSession = await _sessionWithFreshAccess(storedSession);
+      final user = await _authApi.me(activeSession.accessToken);
+      _session = activeSession.copyWith(user: user);
       await _saveSession(_session!);
+      _scheduleRefresh();
     } on AuthApiException catch (error) {
       await _clearStoredSession();
       _session = null;
@@ -64,6 +66,7 @@ class AuthState extends ChangeNotifier {
         password: password,
       );
       await _saveSession(_session!);
+      _scheduleRefresh();
     });
   }
 
@@ -84,10 +87,16 @@ class AuthState extends ChangeNotifier {
         apellido: apellido,
       );
       await _saveSession(_session!);
+      _scheduleRefresh();
     });
   }
 
   Future<void> logout() async {
+    final refreshToken = _session?.refreshToken;
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      unawaited(_authApi.logout(refreshToken));
+    }
+    _refreshTimer?.cancel();
     _session = null;
     _authNotice = null;
     await _clearStoredSession();
@@ -95,10 +104,63 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> expireSession() async {
+    _refreshTimer?.cancel();
     _session = null;
     _authNotice = 'Tu sesion expiro. Volve a iniciar sesion.';
     await _clearStoredSession();
     notifyListeners();
+  }
+
+  Future<AuthSession> _sessionWithFreshAccess(AuthSession session) async {
+    final now = DateTime.now();
+    if (session.expiresAt.isAfter(now.add(_refreshBeforeExpiry))) {
+      return session;
+    }
+
+    if (session.refreshToken.isEmpty ||
+        session.refreshExpiresAt.isBefore(now)) {
+      throw AuthApiException(
+        'Tu sesion expiro. Volve a iniciar sesion.',
+        statusCode: 401,
+      );
+    }
+
+    return _authApi.refresh(session.refreshToken);
+  }
+
+  Future<void> _refreshSession() async {
+    final current = _session;
+    if (current == null || current.refreshToken.isEmpty) return;
+
+    try {
+      final refreshed = await _authApi.refresh(current.refreshToken);
+      _session = refreshed;
+      await _saveSession(refreshed);
+      _scheduleRefresh();
+      notifyListeners();
+    } on AuthApiException catch (error) {
+      if (error.statusCode == 401) {
+        await expireSession();
+      }
+    } catch (_) {
+      _scheduleRefresh(delay: const Duration(minutes: 2));
+    }
+  }
+
+  void _scheduleRefresh({Duration? delay}) {
+    _refreshTimer?.cancel();
+
+    final current = _session;
+    if (current == null || current.refreshToken.isEmpty) return;
+    if (current.refreshExpiresAt.isBefore(DateTime.now())) return;
+
+    final refreshDelay = delay ??
+        current.expiresAt.difference(DateTime.now()) - _refreshBeforeExpiry;
+
+    _refreshTimer = Timer(
+      refreshDelay.isNegative ? Duration.zero : refreshDelay,
+      () => unawaited(_refreshSession()),
+    );
   }
 
   void clearAuthNotice() {
@@ -152,5 +214,11 @@ class AuthState extends ChangeNotifier {
 
     final db = await DatabaseHelper.instance.database;
     await db.delete('auth_session', where: 'id = ?', whereArgs: [1]);
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 }
