@@ -15,7 +15,7 @@ public class AuthController(
     PasswordHasher passwordHasher,
     TokenService tokenService) : ControllerBase
 {
-    private const string PublicRegistrationRole = "Entrenador";
+    private const string PublicRegistrationRole = "Cuerpo tecnico";
 
     [HttpPost("registro")]
     [AllowAnonymous]

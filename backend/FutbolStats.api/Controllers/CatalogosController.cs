@@ -47,13 +47,45 @@ public class CatalogosController(FutbolStatsDbContext context) : ControllerBase
         var roles = await context.Roles
             .AsNoTracking()
             .OrderBy(rol => rol.Nombre)
+            .Select(rol => new RoleCatalogItem(
+                rol.RolId,
+                rol.Nombre,
+                ToDisplayRoleName(rol.Nombre)))
+            .ToListAsync();
+
+        var visibleRoles = roles
+            .Where(rol => rol.Nombre is not null)
+            .Where(rol => rol.DisplayName is not null)
+            .GroupBy(rol => rol.DisplayName!)
+            .Select(group => group
+                .OrderByDescending(rol => rol.Nombre == rol.DisplayName)
+                .ThenBy(rol => rol.RolId)
+                .First())
+            .OrderBy(rol => rol.DisplayName)
             .Select(rol => new
             {
                 rol.RolId,
-                rol.Nombre
+                Nombre = rol.DisplayName
             })
-            .ToListAsync();
+            .ToList();
 
-        return Ok(roles);
+        return Ok(visibleRoles);
     }
+
+    private static string? ToDisplayRoleName(string nombre)
+    {
+        return nombre switch
+        {
+            "Cuerpo tecnico" => "Cuerpo tecnico",
+            "Responsable institucional" => "Responsable institucional",
+            "Entrenador" => "Cuerpo tecnico",
+            "Admin" => "Responsable institucional",
+            "Asistente" => null,
+            "Analista" => null,
+            "Preparador fisico" => null,
+            _ => null
+        };
+    }
+
+    private sealed record RoleCatalogItem(int RolId, string Nombre, string? DisplayName);
 }

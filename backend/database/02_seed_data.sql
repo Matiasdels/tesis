@@ -8,11 +8,8 @@ INSERT INTO Categorias (Nombre, Descripcion) VALUES
 
 -- Roles
 INSERT INTO Roles (Nombre) VALUES
-    (N'Admin'),
-    (N'Entrenador'),
-    (N'Asistente'),
-    (N'Analista'),
-    (N'Preparador fisico');
+    (N'Responsable institucional'),
+    (N'Cuerpo tecnico');
 
 -- TiposEvento (basado en EventTypes del frontend)
 INSERT INTO TiposEvento (Nombre) VALUES

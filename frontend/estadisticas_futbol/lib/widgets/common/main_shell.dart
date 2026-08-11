@@ -339,6 +339,16 @@ void _showSettingsPanel(BuildContext context) {
                       title: 'Cuenta y datos',
                       children: [
                         _SettingsActionTile(
+                          icon: Icons.manage_accounts_outlined,
+                          title: 'Usuarios y roles',
+                          subtitle: 'Crear usuarios para el cuerpo tecnico',
+                          onTap: () {
+                            Navigator.of(sheetContext).pop();
+                            context.go(AppConstants.routeUsers);
+                          },
+                        ),
+                        Divider(height: 1, color: AppColors.borderSubtle),
+                        _SettingsActionTile(
                           icon: Icons.logout_rounded,
                           title: 'Cerrar sesion',
                           subtitle: 'Salir de la cuenta actual',
