@@ -43,6 +43,23 @@ class AuthApi {
     return AuthUser.fromJson(response);
   }
 
+  Future<AuthSession> refresh(String refreshToken) async {
+    final response = await _post('/api/Auth/refresh', {
+      'refreshToken': refreshToken,
+    });
+
+    return AuthSession.fromJson(response);
+  }
+
+  Future<void> logout(String refreshToken) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/Auth/logout');
+    await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'refreshToken': refreshToken}),
+    );
+  }
+
   Future<Map<String, dynamic>> _get(String path, String accessToken) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
     final response = await _client.get(
@@ -117,11 +134,15 @@ class AuthSession {
   final AuthUser user;
   final String accessToken;
   final DateTime expiresAt;
+  final String refreshToken;
+  final DateTime refreshExpiresAt;
 
   const AuthSession({
     required this.user,
     required this.accessToken,
     required this.expiresAt,
+    required this.refreshToken,
+    required this.refreshExpiresAt,
   });
 
   factory AuthSession.fromJson(Map<String, dynamic> json) {
@@ -129,6 +150,11 @@ class AuthSession {
       user: AuthUser.fromJson(json['usuario'] as Map<String, dynamic>),
       accessToken: json['accessToken'] as String,
       expiresAt: DateTime.parse(json['expiresAt'] as String),
+      refreshToken: json['refreshToken'] as String? ?? '',
+      refreshExpiresAt: DateTime.tryParse(
+            json['refreshExpiresAt'] as String? ?? '',
+          ) ??
+          DateTime.parse(json['expiresAt'] as String),
     );
   }
 
@@ -137,14 +163,24 @@ class AuthSession {
       'usuario': user.toJson(),
       'accessToken': accessToken,
       'expiresAt': expiresAt.toIso8601String(),
+      'refreshToken': refreshToken,
+      'refreshExpiresAt': refreshExpiresAt.toIso8601String(),
     };
   }
 
-  AuthSession copyWith({AuthUser? user}) {
+  AuthSession copyWith({
+    AuthUser? user,
+    String? accessToken,
+    DateTime? expiresAt,
+    String? refreshToken,
+    DateTime? refreshExpiresAt,
+  }) {
     return AuthSession(
       user: user ?? this.user,
-      accessToken: accessToken,
-      expiresAt: expiresAt,
+      accessToken: accessToken ?? this.accessToken,
+      expiresAt: expiresAt ?? this.expiresAt,
+      refreshToken: refreshToken ?? this.refreshToken,
+      refreshExpiresAt: refreshExpiresAt ?? this.refreshExpiresAt,
     );
   }
 }

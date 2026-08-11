@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using FutbolStats.Api.Models;
@@ -37,6 +38,23 @@ public class TokenService(IOptions<JwtOptions> jwtOptions)
 
         return new AuthToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
+
+    public AuthRefreshToken CreateRefreshToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(64);
+        var token = Base64UrlEncoder.Encode(bytes);
+        var tokenHash = HashRefreshToken(token);
+        var expiresAt = DateTime.UtcNow.AddDays(_jwtOptions.RefreshExpirationDays);
+
+        return new AuthRefreshToken(token, tokenHash, expiresAt);
+    }
+
+    public string HashRefreshToken(string refreshToken)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken));
+        return Convert.ToHexString(hash);
+    }
 }
 
 public record AuthToken(string AccessToken, DateTime ExpiresAt);
+public record AuthRefreshToken(string RefreshToken, string TokenHash, DateTime ExpiresAt);

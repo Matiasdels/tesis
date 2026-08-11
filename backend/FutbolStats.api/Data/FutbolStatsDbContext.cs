@@ -7,6 +7,7 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
 {
     public DbSet<Rol> Roles => Set<Rol>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Jugador> Jugadores => Set<Jugador>();
     public DbSet<Partido> Partidos => Set<Partido>();
@@ -44,6 +45,19 @@ public class FutbolStatsDbContext(DbContextOptions<FutbolStatsDbContext> options
             entity.HasOne(x => x.Rol)
                 .WithMany()
                 .HasForeignKey(x => x.RolId);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("RefreshTokens");
+            entity.HasKey(x => x.RefreshTokenId);
+            entity.Property(x => x.TokenHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.ReplacedByTokenHash).HasMaxLength(128);
+            entity.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasOne(x => x.Usuario)
+                .WithMany()
+                .HasForeignKey(x => x.UsuarioId);
         });
 
         modelBuilder.Entity<Categoria>(entity =>

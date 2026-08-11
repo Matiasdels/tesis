@@ -37,6 +37,23 @@ CREATE TABLE Usuarios (
 GO
 
 -- =============================================================================
+-- RefreshTokens
+-- =============================================================================
+CREATE TABLE RefreshTokens (
+    RefreshTokenId      INT IDENTITY(1,1)   NOT NULL,
+    UsuarioId           INT                 NOT NULL,
+    TokenHash           NVARCHAR(128)       NOT NULL,
+    FechaCreacion       DATETIME2           NOT NULL DEFAULT SYSUTCDATETIME(),
+    ExpiresAt           DATETIME2           NOT NULL,
+    RevokedAt           DATETIME2           NULL,
+    ReplacedByTokenHash NVARCHAR(128)       NULL,
+    CONSTRAINT PK_RefreshTokens PRIMARY KEY (RefreshTokenId),
+    CONSTRAINT UQ_RefreshTokens_TokenHash UNIQUE (TokenHash),
+    CONSTRAINT FK_RefreshTokens_Usuarios FOREIGN KEY (UsuarioId) REFERENCES Usuarios (UsuarioId)
+);
+GO
+
+-- =============================================================================
 -- Categorias
 -- =============================================================================
 CREATE TABLE Categorias (
