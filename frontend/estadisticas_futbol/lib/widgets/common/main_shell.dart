@@ -194,6 +194,9 @@ void _showSettingsPanel(BuildContext context) {
     showDragHandle: true,
     builder: (sheetContext) {
       final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.82;
+      final canManageUsers = _canManageUsers(
+        context.read<AuthState>().session?.user.rol,
+      );
       return Consumer<ThemeController>(
         builder: (context, themeController, _) {
           final sheetBackground =
@@ -338,16 +341,18 @@ void _showSettingsPanel(BuildContext context) {
                     _SettingsSection(
                       title: 'Cuenta y datos',
                       children: [
-                        _SettingsActionTile(
-                          icon: Icons.manage_accounts_outlined,
-                          title: 'Usuarios y roles',
-                          subtitle: 'Crear usuarios para el cuerpo tecnico',
-                          onTap: () {
-                            Navigator.of(sheetContext).pop();
-                            context.go(AppConstants.routeUsers);
-                          },
-                        ),
-                        Divider(height: 1, color: AppColors.borderSubtle),
+                        if (canManageUsers) ...[
+                          _SettingsActionTile(
+                            icon: Icons.manage_accounts_outlined,
+                            title: 'Usuarios y roles',
+                            subtitle: 'Crear y administrar usuarios',
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              context.go(AppConstants.routeUsers);
+                            },
+                          ),
+                          Divider(height: 1, color: AppColors.borderSubtle),
+                        ],
                         _SettingsActionTile(
                           icon: Icons.logout_rounded,
                           title: 'Cerrar sesion',
@@ -398,6 +403,11 @@ void _showSettingsPanel(BuildContext context) {
       );
     },
   );
+}
+
+bool _canManageUsers(String? role) {
+  final normalized = role?.trim().toLowerCase();
+  return normalized == 'responsable institucional' || normalized == 'admin';
 }
 
 Future<void> _selectDefaultFormation(

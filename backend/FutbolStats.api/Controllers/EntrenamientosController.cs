@@ -74,21 +74,23 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
     public async Task<IActionResult> SetAsistencia(int id, List<AsistenciaRequest> request)
     {
         var entrenamiento = await context.Entrenamientos
-            .Include(e => e.Asistencias)
             .FirstOrDefaultAsync(e => e.EntrenamientoId == id && e.Activo);
         if (entrenamiento is null) return NotFound();
 
         await using var transaction = await context.Database.BeginTransactionAsync();
 
-        // Reemplazar toda la asistencia del entrenamiento.
-        entrenamiento.Asistencias.Clear();
-        await context.SaveChangesAsync(); // flush deletes antes de insertar
+        var asistenciasAnteriores = await context.AsistenciasEntrenamiento
+            .Where(a => a.EntrenamientoId == id)
+            .ToListAsync();
+        context.AsistenciasEntrenamiento.RemoveRange(asistenciasAnteriores);
+
+        var nuevasAsistencias = new List<AsistenciaEntrenamiento>();
         foreach (var item in request)
         {
             if (item.Rpe is < 0 or > 10)
                 return BadRequest("El RPE debe estar entre 0 y 10.");
 
-            entrenamiento.Asistencias.Add(new AsistenciaEntrenamiento
+            nuevasAsistencias.Add(new AsistenciaEntrenamiento
             {
                 EntrenamientoId = id,
                 JugadorId       = item.JugadorId,
@@ -99,10 +101,17 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
                     : item.Observacion.Trim(),
             });
         }
+
+        context.AsistenciasEntrenamiento.AddRange(nuevasAsistencias);
         await context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        return Ok(ToResponse(entrenamiento));
+        var actualizado = await context.Entrenamientos
+            .Include(e => e.Asistencias)
+            .AsNoTracking()
+            .FirstAsync(e => e.EntrenamientoId == id);
+
+        return Ok(ToResponse(actualizado));
     }
 
     // DELETE /api/Entrenamientos/{id}

@@ -1011,6 +1011,8 @@ class _ObservationsTabState extends State<_ObservationsTab>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetCtx) => _AddObservationSheet(
+        title: 'Nueva observacion',
+        actionLabel: 'Guardar',
         onSave: (texto, tipo) async {
           final nueva = await _api.createPlayerObservation(
             widget.playerId,
@@ -1029,6 +1031,92 @@ class _ObservationsTabState extends State<_ObservationsTab>
         },
       ),
     );
+  }
+
+  Future<void> _openEditSheet(PlayerObservacionModel observation) async {
+    final token = context.read<AuthState>().session!.accessToken;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => _AddObservationSheet(
+        title: 'Editar observacion',
+        actionLabel: 'Guardar cambios',
+        initialText: observation.contenido,
+        initialType: observation.tipo,
+        onSave: (texto, tipo) async {
+          final updated = await _api.updatePlayerObservation(
+            widget.playerId,
+            observation.observacionId,
+            texto,
+            token,
+            tipo: tipo,
+          );
+          if (!mounted) return;
+          setState(() {
+            _observations = _observations
+                .map((item) => item.observacionId == updated.observacionId
+                    ? updated
+                    : item)
+                .toList();
+          });
+          if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Observacion actualizada.')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteObservation(PlayerObservacionModel observation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar observacion'),
+        content: const Text('La observacion se eliminara del historial.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      await _api.deletePlayerObservation(
+        widget.playerId,
+        observation.observacionId,
+        token,
+      );
+      if (!mounted) return;
+      setState(() {
+        _observations = _observations
+            .where((item) => item.observacionId != observation.observacionId)
+            .toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Observacion eliminada.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos eliminar la observacion.')),
+      );
+    }
   }
 
   @override
@@ -1068,8 +1156,11 @@ class _ObservationsTabState extends State<_ObservationsTab>
           ),
           itemCount: _observations.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) =>
-              _ObservationCard(observation: _observations[i]),
+          itemBuilder: (_, i) => _ObservationCard(
+            observation: _observations[i],
+            onEdit: () => _openEditSheet(_observations[i]),
+            onDelete: () => _deleteObservation(_observations[i]),
+          ),
         ),
         Positioned(
           right: AppConstants.pagePadding,
@@ -1088,9 +1179,19 @@ class _ObservationsTabState extends State<_ObservationsTab>
 }
 
 class _AddObservationSheet extends StatefulWidget {
+  final String title;
+  final String actionLabel;
+  final String? initialText;
+  final String? initialType;
   final Future<void> Function(String texto, String tipo) onSave;
 
-  const _AddObservationSheet({required this.onSave});
+  const _AddObservationSheet({
+    required this.title,
+    required this.actionLabel,
+    required this.onSave,
+    this.initialText,
+    this.initialType,
+  });
 
   @override
   State<_AddObservationSheet> createState() => _AddObservationSheetState();
@@ -1102,6 +1203,15 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
   final _controller = TextEditingController();
   String _selectedType = _types.first;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.text = widget.initialText ?? '';
+    if (widget.initialType != null && _types.contains(widget.initialType)) {
+      _selectedType = widget.initialType!;
+    }
+  }
 
   @override
   void dispose() {
@@ -1135,7 +1245,7 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Nueva observacion',
+            widget.title,
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 16,
@@ -1219,8 +1329,8 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.black),
                     )
-                  : const Text('Guardar',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  : Text(widget.actionLabel,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -1231,8 +1341,14 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
 
 class _ObservationCard extends StatelessWidget {
   final PlayerObservacionModel observation;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _ObservationCard({required this.observation});
+  const _ObservationCard({
+    required this.observation,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1277,6 +1393,25 @@ class _ObservationCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+              ),
+              const Spacer(),
+              PopupMenuButton<String>(
+                tooltip: 'Opciones',
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: (value) {
+                  if (value == 'edit') onEdit();
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Editar'),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Eliminar'),
+                  ),
+                ],
               ),
             ],
           ),

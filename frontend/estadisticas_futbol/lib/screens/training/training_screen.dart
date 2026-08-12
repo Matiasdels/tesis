@@ -149,11 +149,12 @@ class _TrainingScreenState extends State<TrainingScreen> {
         players: players,
         onSave: (attendance) async {
           final token = context.read<AuthState>().session!.accessToken;
-          return _trainingApi.updateAttendance(
+          final saved = await _trainingApi.updateAttendance(
             sessionId: session.id,
             attendance: attendance,
             accessToken: token,
           );
+          return _sessionWithAttendance(saved, attendance);
         },
       ),
     );
@@ -166,8 +167,73 @@ class _TrainingScreenState extends State<TrainingScreen> {
         ..sort((a, b) => b.date.compareTo(a.date));
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Asistencia guardada.')),
+      SnackBar(
+        content: Text('Asistencia guardada: ${updated.attended} presentes.'),
+      ),
     );
+  }
+
+  TrainingSessionModel _sessionWithAttendance(
+    TrainingSessionModel session,
+    List<TrainingAttendanceModel> attendance,
+  ) {
+    final attended = attendance.where((item) => item.attended).length;
+    return TrainingSessionModel(
+      id: session.id,
+      categoriaId: session.categoriaId,
+      date: session.date,
+      title: session.title,
+      type: session.type,
+      durationMin: session.durationMin,
+      place: session.place,
+      attended: attended,
+      absent: attendance.length - attended,
+      attendance: List.unmodifiable(attendance),
+    );
+  }
+
+  Future<void> _deleteTraining(TrainingSessionModel session) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar entrenamiento'),
+        content: Text(
+          'Se eliminara "${session.title}" del seguimiento. Esta accion no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final token = context.read<AuthState>().session!.accessToken;
+      await _trainingApi.deleteTrainingSession(
+        sessionId: session.id,
+        accessToken: token,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sessions = _sessions.where((item) => item.id != session.id).toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Entrenamiento eliminado.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos eliminar el entrenamiento.')),
+      );
+    }
   }
 
   @override
@@ -225,6 +291,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                               players: _playersForSession(session),
                               onAttendance: () =>
                                   _openAttendanceSheet(session),
+                              onDelete: () => _deleteTraining(session),
                             ),
                           ),
                         ),
@@ -334,11 +401,13 @@ class _TrainingCard extends StatelessWidget {
   final TrainingSessionModel session;
   final List<PlayerModel> players;
   final VoidCallback onAttendance;
+  final VoidCallback onDelete;
 
   const _TrainingCard({
     required this.session,
     required this.players,
     required this.onAttendance,
+    required this.onDelete,
   });
 
   @override
@@ -419,6 +488,12 @@ class _TrainingCard extends StatelessWidget {
                   ],
                 ),
               ),
+              IconButton(
+                tooltip: 'Eliminar entrenamiento',
+                icon: const Icon(Icons.delete_outline_rounded),
+                color: AppColors.danger,
+                onPressed: onDelete,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -475,20 +550,40 @@ class _AttendanceSheet extends StatefulWidget {
 }
 
 class _AttendanceSheetState extends State<_AttendanceSheet> {
-  late final Set<int> _attendedIds;
+  late Set<int> _attendedIds;
   bool _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _attendedIds = widget.session.attendance
+    final savedAttendedIds = widget.session.attendance
         .where((item) => item.attended)
         .map((item) => item.playerId)
         .toSet();
+    _attendedIds = savedAttendedIds.isEmpty
+        ? widget.players.map((player) => player.id).toSet()
+        : savedAttendedIds;
+  }
+
+  void _markAllPresent() {
+    setState(() {
+      _attendedIds = widget.players.map((player) => player.id).toSet();
+    });
+  }
+
+  void _clearAttendance() {
+    setState(_attendedIds.clear);
   }
 
   Future<void> _save() async {
+    if (_attendedIds.isEmpty) {
+      setState(() {
+        _error = 'Marca al menos un jugador presente antes de guardar.';
+      });
+      return;
+    }
+
     setState(() {
       _saving = true;
       _error = null;
@@ -580,6 +675,23 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _markAllPresent,
+                    icon: const Icon(Icons.done_all_rounded, size: 16),
+                    label: const Text('Todos presentes'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _clearAttendance,
+                    icon: const Icon(Icons.clear_rounded, size: 16),
+                    label: const Text('Limpiar'),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               Expanded(
