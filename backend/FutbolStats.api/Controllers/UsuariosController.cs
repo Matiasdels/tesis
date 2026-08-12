@@ -9,7 +9,7 @@ namespace FutbolStats.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = "Responsable institucional,Admin")]
 public class UsuariosController(
     FutbolStatsDbContext context,
     PasswordHasher passwordHasher) : ControllerBase
@@ -82,6 +82,69 @@ public class UsuariosController(
         return CreatedAtAction(nameof(GetUsuarios), ToResponse(usuario));
     }
 
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<UsuarioGestionResponse>> ActualizarUsuario(
+        int id,
+        ActualizarUsuarioRequest request)
+    {
+        var usuario = await context.Usuarios
+            .Include(u => u.Rol)
+            .FirstOrDefaultAsync(u => u.UsuarioId == id);
+
+        if (usuario is null) return NotFound();
+
+        var nombreUsuario = BusinessRules.NormalizeRequiredText(
+            request.NombreUsuario,
+            nameof(request.NombreUsuario));
+        var email = BusinessRules.NormalizeRequiredText(
+            request.Email,
+            nameof(request.Email)).ToLowerInvariant();
+        var nombre = BusinessRules.NormalizeRequiredText(
+            request.Nombre,
+            nameof(request.Nombre));
+        var apellido = BusinessRules.NormalizeRequiredText(
+            request.Apellido,
+            nameof(request.Apellido));
+
+        var rol = await context.Roles.FirstOrDefaultAsync(
+            r => r.RolId == request.RolId);
+        if (rol is null)
+        {
+            return BadRequest("Selecciona un rol valido.");
+        }
+
+        var exists = await context.Usuarios.AnyAsync(u =>
+            u.UsuarioId != id &&
+            (u.NombreUsuario == nombreUsuario || u.Email == email));
+        if (exists)
+        {
+            return Conflict("Ya existe otro usuario con ese nombre o email.");
+        }
+
+        usuario.NombreUsuario = nombreUsuario;
+        usuario.Email = email;
+        usuario.Nombre = nombre;
+        usuario.Apellido = apellido;
+        usuario.RolId = rol.RolId;
+        usuario.Rol = rol;
+        usuario.Activo = request.Activo;
+
+        await context.SaveChangesAsync();
+
+        return Ok(ToResponse(usuario));
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DesactivarUsuario(int id)
+    {
+        var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.UsuarioId == id);
+        if (usuario is null) return NotFound();
+
+        usuario.Activo = false;
+        await context.SaveChangesAsync();
+        return NoContent();
+    }
+
     private static UsuarioGestionResponse ToResponse(Usuario usuario)
     {
         return new UsuarioGestionResponse(
@@ -119,6 +182,14 @@ public record CrearUsuarioRequest(
     string Nombre,
     string Apellido,
     int RolId);
+
+public record ActualizarUsuarioRequest(
+    string NombreUsuario,
+    string Email,
+    string Nombre,
+    string Apellido,
+    int RolId,
+    bool Activo);
 
 public record UsuarioGestionResponse(
     int UsuarioId,

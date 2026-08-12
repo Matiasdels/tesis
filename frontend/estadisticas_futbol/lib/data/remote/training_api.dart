@@ -71,6 +71,23 @@ class TrainingApi {
     return TrainingSessionModel.fromApi(response);
   }
 
+  Future<void> deleteTrainingSession({
+    required int sessionId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/Entrenamientos/$sessionId');
+    final response = await _client.delete(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw TrainingApiException(
+        _friendlyError(response.statusCode, response.body),
+      );
+    }
+  }
+
   Future<List<dynamic>> _getList(
     String path,
     String accessToken, {

@@ -72,6 +72,48 @@ public class ObservacionesJugadorController(FutbolStatsDbContext context) : Cont
         return CreatedAtAction(nameof(GetObservaciones), new { jugadorId }, ToResponse(observacion));
     }
 
+    [HttpPut("{observacionId:int}")]
+    public async Task<IActionResult> UpdateObservacion(
+        int jugadorId,
+        int observacionId,
+        ObservacionRequest request)
+    {
+        var existeJugador = await context.Jugadores
+            .AnyAsync(j => j.JugadorId == jugadorId && j.Activo);
+        if (!existeJugador) return NotFound();
+
+        var observacion = await context.Observaciones
+            .Include(o => o.Usuario)
+            .FirstOrDefaultAsync(o =>
+                o.ObservacionId == observacionId &&
+                o.JugadorId == jugadorId);
+        if (observacion is null) return NotFound();
+
+        var validation = ValidateRequest(request);
+        if (validation is not null) return validation;
+
+        observacion.Tipo = NormalizeTipo(request.Tipo);
+        observacion.Contenido = request.Contenido.Trim();
+
+        await context.SaveChangesAsync();
+
+        return Ok(ToResponse(observacion));
+    }
+
+    [HttpDelete("{observacionId:int}")]
+    public async Task<IActionResult> DeleteObservacion(int jugadorId, int observacionId)
+    {
+        var observacion = await context.Observaciones
+            .FirstOrDefaultAsync(o =>
+                o.ObservacionId == observacionId &&
+                o.JugadorId == jugadorId);
+        if (observacion is null) return NotFound();
+
+        context.Observaciones.Remove(observacion);
+        await context.SaveChangesAsync();
+        return NoContent();
+    }
+
     private static ObservacionResponse ToResponse(Observacion o) =>
         new(
             o.ObservacionId,
@@ -81,6 +123,23 @@ public class ObservacionesJugadorController(FutbolStatsDbContext context) : Cont
             o.Contenido,
             $"{o.Usuario?.Nombre} {o.Usuario?.Apellido}".Trim()
         );
+
+    private IActionResult? ValidateRequest(ObservacionRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Contenido))
+            return BadRequest("El contenido no puede estar vacio.");
+
+        if (request.Contenido.Trim().Length > 1000)
+            return BadRequest("El contenido no puede superar los 1000 caracteres.");
+
+        if (!TiposValidos.Contains(NormalizeTipo(request.Tipo)))
+            return BadRequest("Tipo de observacion invalido.");
+
+        return null;
+    }
+
+    private static string NormalizeTipo(string? tipo) =>
+        string.IsNullOrWhiteSpace(tipo) ? TipoGeneral : tipo.Trim();
 }
 
 public record ObservacionRequest(string Contenido, string? Tipo);

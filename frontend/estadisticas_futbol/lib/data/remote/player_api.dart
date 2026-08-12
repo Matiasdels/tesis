@@ -141,6 +141,48 @@ class PlayerApi {
         jsonDecode(response.body) as Map<String, dynamic>);
   }
 
+  Future<PlayerObservacionModel> updatePlayerObservation(
+    int playerId,
+    int observationId,
+    String contenido,
+    String accessToken, {
+    String tipo = 'General',
+  }) async {
+    final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/api/Jugadores/$playerId/observaciones/$observationId');
+    final response = await _client.put(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({'contenido': contenido, 'tipo': tipo}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw PlayerApiException(
+          _friendlyError(response.statusCode, response.body));
+    }
+    return PlayerObservacionModel.fromApi(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> deletePlayerObservation(
+    int playerId,
+    int observationId,
+    String accessToken,
+  ) async {
+    final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/api/Jugadores/$playerId/observaciones/$observationId');
+    final response = await _client.delete(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw PlayerApiException(
+          _friendlyError(response.statusCode, response.body));
+    }
+  }
+
   Future<List<PlayerMatchModel>> getPlayerMatches(
       int playerId, String accessToken) async {
     final response = await _getList(

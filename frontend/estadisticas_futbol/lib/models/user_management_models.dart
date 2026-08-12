@@ -80,3 +80,32 @@ class CreateUserDraft {
     };
   }
 }
+
+class UpdateUserDraft {
+  final String username;
+  final String email;
+  final String firstName;
+  final String lastName;
+  final int roleId;
+  final bool active;
+
+  const UpdateUserDraft({
+    required this.username,
+    required this.email,
+    required this.firstName,
+    required this.lastName,
+    required this.roleId,
+    required this.active,
+  });
+
+  Map<String, dynamic> toApiJson() {
+    return {
+      'nombreUsuario': username,
+      'email': email,
+      'nombre': firstName,
+      'apellido': lastName,
+      'rolId': roleId,
+      'activo': active,
+    };
+  }
+}

@@ -26,15 +26,59 @@ class UserManagementApi {
     CreateUserDraft draft,
     String accessToken,
   ) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/Usuarios');
-    final response = await _client.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-      body: jsonEncode(draft.toApiJson()),
+    return _sendUser(
+      method: 'POST',
+      path: '/api/Usuarios',
+      accessToken: accessToken,
+      body: draft.toApiJson(),
     );
+  }
+
+  Future<ManagedUserModel> updateUser(
+    int userId,
+    UpdateUserDraft draft,
+    String accessToken,
+  ) async {
+    return _sendUser(
+      method: 'PUT',
+      path: '/api/Usuarios/$userId',
+      accessToken: accessToken,
+      body: draft.toApiJson(),
+    );
+  }
+
+  Future<void> deactivateUser(int userId, String accessToken) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/Usuarios/$userId');
+    final response = await _client.delete(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw UserManagementApiException(
+        _friendlyError(response.statusCode, response.body),
+      );
+    }
+  }
+
+  Future<ManagedUserModel> _sendUser({
+    required String method,
+    required String path,
+    required String accessToken,
+    required Map<String, dynamic> body,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+    final encoded = jsonEncode(body);
+    final response = switch (method) {
+      'POST' => await _client.post(uri, headers: headers, body: encoded),
+      'PUT' => await _client.put(uri, headers: headers, body: encoded),
+      _ => throw const UserManagementApiException(
+          'No pudimos completar la accion. Intenta nuevamente.'),
+    };
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw UserManagementApiException(
@@ -66,6 +110,9 @@ class UserManagementApi {
   String _friendlyError(int statusCode, String responseBody) {
     final message = _extractMessage(responseBody);
     if (statusCode == 401) return 'Tu sesion expiro. Volve a iniciar sesion.';
+    if (statusCode == 403) {
+      return 'No tenes permiso para gestionar usuarios.';
+    }
     if (statusCode == 409) {
       return message.isEmpty ? 'Ya existe un usuario con esos datos.' : message;
     }
