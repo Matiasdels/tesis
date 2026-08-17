@@ -123,29 +123,90 @@ public class AnalisisPartidoService(
         CancellationToken cancellationToken)
     {
         httpClient.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.TimeoutSeconds));
+        GeminiRequestException? lastModelError = null;
+        Exception? lastInvalidResponse = null;
+
+        foreach (var model in BuildModelCandidates(options))
+        {
+            try
+            {
+                return await GenerateWithGeminiModelAsync(
+                    datosPartido,
+                    options,
+                    model,
+                    cancellationToken);
+            }
+            catch (GeminiRequestException ex) when (CanRetryWithFallbackModel(ex.StatusCode))
+            {
+                lastModelError = ex;
+                logger.LogWarning(
+                    "Gemini rechazo el modelo {Model}. Estado: {StatusCode}. Respuesta: {ResponseBody}",
+                    model,
+                    (int)ex.StatusCode,
+                    ex.ResponseBody);
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+            {
+                lastInvalidResponse = ex;
+                logger.LogWarning(
+                    ex,
+                    "Gemini respondio con un formato no interpretable usando el modelo {Model}.",
+                    model);
+            }
+        }
+
+        if (lastModelError is not null)
+        {
+            throw lastModelError;
+        }
+
+        if (lastInvalidResponse is not null)
+        {
+            throw new InvalidOperationException("No se pudo interpretar la respuesta de Gemini.", lastInvalidResponse);
+        }
+
+        throw new InvalidOperationException("No hay modelos de Gemini configurados.");
+    }
+
+    private async Task<AiAnalysisPayload> GenerateWithGeminiModelAsync(
+        object datosPartido,
+        GeminiOptions options,
+        string model,
+        CancellationToken cancellationToken)
+    {
+        httpClient.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.TimeoutSeconds));
 
         var requestBody = new
         {
-            model = options.Model,
-            system_instruction = BuildInstructions(),
-            input = JsonSerializer.Serialize(datosPartido, JsonOptions),
-            generation_config = new
+            systemInstruction = new
+            {
+                parts = new[]
+                {
+                    new { text = BuildInstructions() }
+                }
+            },
+            contents = new[]
+            {
+                new
+                {
+                    role = "user",
+                    parts = new[]
+                    {
+                        new { text = JsonSerializer.Serialize(datosPartido, JsonOptions) }
+                    }
+                }
+            },
+            generationConfig = new
             {
                 temperature = 0.2,
-                max_output_tokens = 2000,
-                thinking_level = "low"
-            },
-            response_format = new
-            {
-                type = "text",
-                mime_type = "application/json",
-                schema = AnalysisSchema()
+                maxOutputTokens = 2000,
+                responseMimeType = "application/json"
             }
         };
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"{options.BaseUrl.TrimEnd('/')}/interactions");
+            $"{options.BaseUrl.TrimEnd('/')}/models/{Uri.EscapeDataString(model)}:generateContent");
 
         request.Headers.Add("x-goog-api-key", options.ApiKey);
         request.Content = new StringContent(
@@ -168,13 +229,181 @@ public class AnalisisPartidoService(
             throw new InvalidOperationException("La respuesta de Gemini no incluyo texto.");
         }
 
-        var payload = JsonSerializer.Deserialize<AiAnalysisPayload>(outputText, JsonOptions);
-        if (payload is null)
+        return DeserializeAiPayload(outputText);
+    }
+
+    private static IReadOnlyList<string> BuildModelCandidates(GeminiOptions options)
+    {
+        return new[] { options.Model }
+            .Concat(options.FallbackModels)
+            .Where(model => !string.IsNullOrWhiteSpace(model))
+            .Select(model => model.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool CanRetryWithFallbackModel(HttpStatusCode statusCode)
+    {
+        return statusCode is
+            HttpStatusCode.BadRequest or
+            HttpStatusCode.NotFound or
+            HttpStatusCode.RequestTimeout or
+            HttpStatusCode.TooManyRequests or
+            HttpStatusCode.InternalServerError or
+            HttpStatusCode.BadGateway or
+            HttpStatusCode.ServiceUnavailable or
+            HttpStatusCode.GatewayTimeout;
+    }
+
+    private static AiAnalysisPayload DeserializeAiPayload(string outputText)
+    {
+        foreach (var candidate in BuildJsonCandidates(outputText))
         {
-            throw new InvalidOperationException("No se pudo interpretar la respuesta de Gemini.");
+            try
+            {
+                var payload = JsonSerializer.Deserialize<AiAnalysisPayload>(candidate, JsonOptions);
+                if (payload is not null && payload.HasContent)
+                {
+                    return NormalizeNestedJsonPayload(payload);
+                }
+            }
+            catch (JsonException)
+            {
+                // Se intenta con el siguiente candidato limpio.
+            }
+        }
+
+        var cleanText = CleanLooseText(outputText);
+        if (!string.IsNullOrWhiteSpace(cleanText))
+        {
+            return new AiAnalysisPayload
+            {
+                ResumenGeneral = cleanText
+            };
+        }
+
+        throw new InvalidOperationException("No se pudo interpretar la respuesta de Gemini.");
+    }
+
+    private static IEnumerable<string> BuildJsonCandidates(string outputText)
+    {
+        var cleanText = CleanLooseText(outputText);
+        if (string.IsNullOrWhiteSpace(cleanText)) yield break;
+
+        yield return cleanText;
+
+        var withoutFence = RemoveMarkdownFence(cleanText);
+        if (!string.Equals(withoutFence, cleanText, StringComparison.Ordinal))
+        {
+            yield return withoutFence;
+        }
+
+        var jsonObject = ExtractFirstJsonObject(withoutFence);
+        if (!string.IsNullOrWhiteSpace(jsonObject) &&
+            !string.Equals(jsonObject, withoutFence, StringComparison.Ordinal))
+        {
+            yield return jsonObject;
+        }
+    }
+
+    private static AiAnalysisPayload NormalizeNestedJsonPayload(AiAnalysisPayload payload)
+    {
+        var nestedJson = ExtractFirstJsonObject(payload.ResumenGeneral);
+        if (string.IsNullOrWhiteSpace(nestedJson) ||
+            !nestedJson.Contains("resumenGeneral", StringComparison.OrdinalIgnoreCase))
+        {
+            return payload;
+        }
+
+        try
+        {
+            var nestedPayload = JsonSerializer.Deserialize<AiAnalysisPayload>(nestedJson, JsonOptions);
+            if (nestedPayload is not null && nestedPayload.HasContent)
+            {
+                return nestedPayload;
+            }
+        }
+        catch (JsonException)
+        {
+            return payload;
         }
 
         return payload;
+    }
+
+    private static string CleanLooseText(string value)
+    {
+        return value.Trim()
+            .Trim('\uFEFF')
+            .Trim();
+    }
+
+    private static string RemoveMarkdownFence(string value)
+    {
+        var trimmed = value.Trim();
+        if (!trimmed.StartsWith("```", StringComparison.Ordinal)) return trimmed;
+
+        var firstLineBreak = trimmed.IndexOf('\n');
+        if (firstLineBreak < 0) return trimmed.Trim('`').Trim();
+
+        var content = trimmed[(firstLineBreak + 1)..].Trim();
+        if (content.EndsWith("```", StringComparison.Ordinal))
+        {
+            content = content[..^3];
+        }
+
+        return content.Trim();
+    }
+
+    private static string? ExtractFirstJsonObject(string value)
+    {
+        var start = value.IndexOf('{');
+        if (start < 0) return null;
+
+        var depth = 0;
+        var insideString = false;
+        var escaping = false;
+
+        for (var index = start; index < value.Length; index++)
+        {
+            var current = value[index];
+            if (insideString)
+            {
+                if (escaping)
+                {
+                    escaping = false;
+                }
+                else if (current == '\\')
+                {
+                    escaping = true;
+                }
+                else if (current == '"')
+                {
+                    insideString = false;
+                }
+
+                continue;
+            }
+
+            if (current == '"')
+            {
+                insideString = true;
+            }
+            else if (current == '{')
+            {
+                depth++;
+            }
+            else if (current == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return value[start..(index + 1)].Trim();
+                }
+            }
+        }
+
+        return null;
     }
 
     private static object AnalysisSchema()
@@ -217,7 +446,8 @@ public class AnalisisPartidoService(
     private static string ExtractOutputText(JsonElement root)
     {
         if (TryGetStringProperty(root, "output_text", out var outputText) ||
-            TryGetStringProperty(root, "outputText", out outputText))
+            TryGetStringProperty(root, "outputText", out outputText) ||
+            TryGetCandidateText(root, out outputText))
         {
             return outputText;
         }
@@ -235,6 +465,42 @@ public class AnalisisPartidoService(
         }
 
         value = string.Empty;
+        return false;
+    }
+
+    private static bool TryGetCandidateText(JsonElement root, out string value)
+    {
+        value = string.Empty;
+
+        if (!root.TryGetProperty("candidates", out var candidates) ||
+            candidates.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (var candidate in candidates.EnumerateArray())
+        {
+            if (!candidate.TryGetProperty("content", out var content) ||
+                !content.TryGetProperty("parts", out var parts) ||
+                parts.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            var builder = new StringBuilder();
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (TryGetStringProperty(part, "text", out var partText) &&
+                    !string.IsNullOrWhiteSpace(partText))
+                {
+                    builder.Append(partText);
+                }
+            }
+
+            value = builder.ToString();
+            if (!string.IsNullOrWhiteSpace(value)) return true;
+        }
+
         return false;
     }
 
@@ -450,6 +716,7 @@ public class AnalisisPartidoService(
         - Si un evento no tiene jugador, podes mencionarlo como accion sin jugador asociado, pero no atribuirlo a nadie.
         - No hagas predicciones, no elijas titulares, no des recomendaciones medicas y no uses lenguaje tecnico innecesario.
         - Escribi en espanol rioplatense claro, profesional y orientado al cuerpo tecnico.
+        - Devolve exclusivamente un objeto JSON valido, sin markdown, sin ```json y sin texto antes o despues.
 
         Estructura de respuesta:
         - resumenGeneral: 2 o 3 frases. Debe explicar que se observa del partido sin exagerar.
@@ -516,6 +783,13 @@ public class AnalisisPartidoService(
         public List<string> AspectosAMejorar { get; set; } = [];
         public List<string> SugerenciasEntrenamiento { get; set; } = [];
         public string AnalisisZonas { get; set; } = string.Empty;
+
+        public bool HasContent =>
+            !string.IsNullOrWhiteSpace(ResumenGeneral) ||
+            PuntosPositivos.Count > 0 ||
+            AspectosAMejorar.Count > 0 ||
+            SugerenciasEntrenamiento.Count > 0 ||
+            !string.IsNullOrWhiteSpace(AnalisisZonas);
 
         public void Normalize(bool puedeAnalizarZonas)
         {

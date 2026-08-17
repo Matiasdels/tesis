@@ -11,6 +11,7 @@ public class GeminiOptions
     /// Si está vacío, el endpoint de IA responde con un mensaje controlado (sin lanzar excepción).
     /// </summary>
     public string Model { get; set; } = string.Empty;
+    public string[] FallbackModels { get; set; } = [];
 
     public int TimeoutSeconds { get; set; } = 45;
 
