@@ -15,8 +15,13 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = context.watch<ThemeController>();
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= AppConstants.tabletBreakpoint;
+    final themedChild = KeyedSubtree(
+      key: ValueKey(themeController.isDarkMode),
+      child: child,
+    );
 
     if (isWide) {
       return Scaffold(
@@ -24,7 +29,7 @@ class MainShell extends StatelessWidget {
           children: [
             const _AppSidebar(),
             VerticalDivider(width: 0.5, color: AppColors.borderSubtle),
-            Expanded(child: child),
+            Expanded(child: themedChild),
           ],
         ),
       );
@@ -81,7 +86,7 @@ class MainShell extends StatelessWidget {
           ),
         ),
       ),
-      body: child,
+      body: themedChild,
       bottomNavigationBar: const _AppBottomNav(),
     );
   }
