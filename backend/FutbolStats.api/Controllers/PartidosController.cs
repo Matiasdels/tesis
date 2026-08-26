@@ -264,7 +264,9 @@ public class PartidosController(
 
     private int? GetCurrentUserId()
     {
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userIdClaim =
+            User.FindFirstValue("usuarioId") ??
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 

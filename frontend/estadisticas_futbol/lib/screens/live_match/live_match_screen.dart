@@ -65,6 +65,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   int _awayScore = 0;
   bool _isRunning = false;
   Timer? _matchTimer;
+  Timer? _liveRefreshTimer;
+  bool _refreshingLiveState = false;
+  int _lastLiveUpdateNoticeMs = 0;
 
   // ── Pitch area key ─────────────────────────────────────────────────────────
   final _pitchKey = GlobalKey();
@@ -141,6 +144,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     );
     _refreshConnectionStatus();
     _refreshPendingSyncCount();
+    _startLiveRefreshTimer();
   }
 
   @override
@@ -153,6 +157,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   void dispose() {
     _savePeriodState().ignore();
     _matchTimer?.cancel();
+    _liveRefreshTimer?.cancel();
     _undoTimer?.cancel();
     _radialAnimCtrl.dispose();
     super.dispose();
@@ -273,6 +278,186 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _pendingSyncCount = count;
       if (count == 0) _pendingSyncError = false;
     });
+  }
+
+  void _startLiveRefreshTimer() {
+    _liveRefreshTimer?.cancel();
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      unawaited(_refreshLiveStateFromServer());
+    });
+  }
+
+  Future<void> _refreshLiveStateFromServer() async {
+    if (_refreshingLiveState ||
+        _loading ||
+        _savingEvent ||
+        _syncingPending ||
+        _partido == null) {
+      return;
+    }
+
+    final partidoPermiteEventos = _partido!.isEnJuego ||
+        _partido!.estado == EstadosPartido.esperandoPenales;
+    if (!partidoPermiteEventos) return;
+
+    final pendingCount = await _eventApi.pendingSyncCount();
+    if (!mounted) return;
+    if (pendingCount > 0) {
+      setState(() => _pendingSyncCount = pendingCount);
+      return;
+    }
+
+    _refreshingLiveState = true;
+    try {
+      final results = await Future.wait([
+        _matchApi.getMatch(_matchId, _token),
+        _eventApi.getEventos(_matchId, _token, syncPending: false),
+      ]);
+
+      final partido = results[0] as PartidoModel;
+      final remoteEvents = results[1] as List<EventoPartidoModel>;
+      final eventsNewestFirst = List<EventoPartidoModel>.from(
+        remoteEvents.reversed,
+      );
+      final homeScore = remoteEvents
+          .where((e) => e.tipoEventoNombre == EventTypes.goal)
+          .length;
+      final awayScore = remoteEvents
+          .where((e) => e.tipoEventoNombre == EventTypes.goalRival)
+          .length;
+      final eventsChanged = !_sameEventList(_events, eventsNewestFirst);
+      final newServerEvents =
+          _newServerEventsCount(_events, eventsNewestFirst);
+      final statusChanged = partido.estado != _partido?.estado;
+      final periodChanged =
+          partido.periodoActual != null && partido.periodoActual != _currentPeriod;
+
+      if (!mounted) return;
+      if (eventsChanged || statusChanged || periodChanged) {
+        setState(() {
+          _partido = partido;
+          _events = eventsNewestFirst;
+          _computeRosterState();
+          _homeScore = homeScore;
+          _awayScore = awayScore;
+          _hasServerConnection = true;
+          if (statusChanged || periodChanged || !_isRunning) {
+            _currentPeriod = partido.periodoActual ?? _currentPeriod;
+            _minute = partido.minutoActual ?? _minute;
+            _isRunning = partido.isEnJuego &&
+                MatchPeriod.isActive(_currentPeriod);
+            if (_isRunning) {
+              _startMatchTimer();
+            } else {
+              _matchTimer?.cancel();
+            }
+          }
+        });
+        if (newServerEvents > 0) {
+          _showLiveUpdateNotice(newServerEvents);
+        }
+      } else {
+        setState(() => _hasServerConnection = true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
+      setState(() => _hasServerConnection = false);
+    } finally {
+      _refreshingLiveState = false;
+    }
+  }
+
+  bool _sameEventList(
+    List<EventoPartidoModel> current,
+    List<EventoPartidoModel> incoming,
+  ) {
+    if (current.length != incoming.length) return false;
+    for (var i = 0; i < current.length; i++) {
+      if (current[i].eventoId != incoming[i].eventoId) return false;
+    }
+    return true;
+  }
+
+  int _newServerEventsCount(
+    List<EventoPartidoModel> current,
+    List<EventoPartidoModel> incoming,
+  ) {
+    final currentIds = current
+        .where((event) => event.eventoId > 0)
+        .map((event) => event.eventoId)
+        .toSet();
+    return incoming
+        .where((event) => event.eventoId > 0 && !currentIds.contains(event.eventoId))
+        .length;
+  }
+
+  bool _matchAllowsEventRegistration(PartidoModel? partido) {
+    if (partido == null) return false;
+    return partido.isEnJuego ||
+        partido.estado == EstadosPartido.esperandoPenales;
+  }
+
+  Future<bool> _ensureMatchAllowsEventRegistration() async {
+    if (!_matchAllowsEventRegistration(_partido)) {
+      _closeEventRegistrationFlow();
+      _showMatchClosedForEventsMessage();
+      return false;
+    }
+
+    try {
+      final partido = await _matchApi.getMatch(_matchId, _token);
+      if (!mounted) return false;
+
+      final allowsEvents = _matchAllowsEventRegistration(partido);
+      setState(() {
+        _partido = partido;
+        _hasServerConnection = true;
+        if (!allowsEvents) {
+          _isRunning = false;
+          _currentPeriod = partido.periodoActual ?? _currentPeriod;
+          _minute = partido.minutoActual ?? _minute;
+        }
+      });
+
+      if (!allowsEvents) {
+        _matchTimer?.cancel();
+        _closeEventRegistrationFlow();
+        _showMatchClosedForEventsMessage();
+      }
+
+      return allowsEvents;
+    } catch (e) {
+      if (!mounted) return false;
+      if (await _handleSessionExpired(e)) return false;
+      setState(() => _hasServerConnection = false);
+      return true;
+    }
+  }
+
+  void _closeEventRegistrationFlow() {
+    if (!mounted) return;
+    setState(() {
+      _showRadial = false;
+      _showPlayerPicker = false;
+      _savingEvent = false;
+      _pendingEvent = null;
+      _tapNorm = null;
+      _tapLocal = null;
+      _assistPlayer = null;
+      _pickingGoalScorer = false;
+    });
+  }
+
+  bool _isMatchClosedEventError(EventApiException error) {
+    return error.message.contains('No se pueden registrar eventos') ||
+        error.message.contains('partido con estado');
+  }
+
+  void _showMatchClosedForEventsMessage() {
+    _showError(
+      'El partido ya finalizó. No se pueden registrar más eventos.',
+    );
   }
 
   Future<void> _updatePendingNow() async {
@@ -519,6 +704,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   Future<void> _onPlayerSelected(AlineacionEntradaModel player) async {
     if (_tapNorm == null || _pendingEvent == null) return;
     if (_savingEvent) return;
+    if (!await _ensureMatchAllowsEventRegistration()) return;
 
     // Segunda amarilla → registrar amarilla + roja automática
     if (_pendingEvent == EventTypes.yellowCard &&
@@ -583,6 +769,16 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
       _beginUndo();
       if (evento.eventoId < 0) _showSavedOnDeviceMessage();
+    } on EventApiException catch (e) {
+      if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
+      if (_isMatchClosedEventError(e)) {
+        _closeEventRegistrationFlow();
+        _showMatchClosedForEventsMessage();
+        return;
+      }
+      setState(() => _savingEvent = false);
+      _showEventRegistrationError();
     } catch (e) {
       if (!mounted) return;
       if (await _handleSessionExpired(e)) return;
@@ -599,6 +795,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _showCatalogUpdateError();
       return;
     }
+    if (!await _ensureMatchAllowsEventRegistration()) return;
 
     HapticFeedback.heavyImpact();
     setState(() => _savingEvent = true);
@@ -648,6 +845,20 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (assistEvento.eventoId < 0 || goalEvento.eventoId < 0) {
         _showSavedOnDeviceMessage();
       }
+    } on EventApiException catch (e) {
+      if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
+      setState(() {
+        _assistPlayer = null;
+        _pickingGoalScorer = false;
+        _savingEvent = false;
+      });
+      if (_isMatchClosedEventError(e)) {
+        _closeEventRegistrationFlow();
+        _showMatchClosedForEventsMessage();
+        return;
+      }
+      _showEventRegistrationError();
     } catch (e) {
       if (!mounted) return;
       if (await _handleSessionExpired(e)) return;
@@ -667,6 +878,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _showCatalogUpdateError();
       return;
     }
+    if (!await _ensureMatchAllowsEventRegistration()) return;
 
     HapticFeedback.heavyImpact();
     setState(() => _savingEvent = true);
@@ -722,6 +934,16 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (yellowEvento.eventoId < 0 || redEvento.eventoId < 0) {
         _showSavedOnDeviceMessage();
       }
+    } on EventApiException catch (e) {
+      if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
+      if (_isMatchClosedEventError(e)) {
+        _closeEventRegistrationFlow();
+        _showMatchClosedForEventsMessage();
+        return;
+      }
+      setState(() => _savingEvent = false);
+      _showEventRegistrationError();
     } catch (e) {
       if (!mounted) return;
       if (await _handleSessionExpired(e)) return;
@@ -733,6 +955,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
   Future<void> _onNoPlayerSelected() async {
     if (_tapNorm == null || _pendingEvent == null) return;
     if (_savingEvent) return;
+    if (!await _ensureMatchAllowsEventRegistration()) return;
 
     // Assist step 1 with no player: advance to goalscorer selection
     if (_pendingEvent == EventTypes.assist && !_pickingGoalScorer) {
@@ -789,6 +1012,16 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
       _beginUndo();
       if (evento.eventoId < 0) _showSavedOnDeviceMessage();
+    } on EventApiException catch (e) {
+      if (!mounted) return;
+      if (await _handleSessionExpired(e)) return;
+      if (_isMatchClosedEventError(e)) {
+        _closeEventRegistrationFlow();
+        _showMatchClosedForEventsMessage();
+        return;
+      }
+      setState(() => _savingEvent = false);
+      _showEventRegistrationError();
     } catch (e) {
       if (!mounted) return;
       if (await _handleSessionExpired(e)) return;
@@ -837,6 +1070,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _showCatalogUpdateError();
       return;
     }
+    if (!await _ensureMatchAllowsEventRegistration()) return;
 
     setState(() => _savingEvent = true);
 
@@ -874,6 +1108,11 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (!mounted) return;
       if (await _handleSessionExpired(e)) return;
       setState(() => _savingEvent = false);
+      if (_isMatchClosedEventError(e)) {
+        _closeEventRegistrationFlow();
+        _showMatchClosedForEventsMessage();
+        return;
+      }
       _showError(e.message);
     }
   }
@@ -1255,6 +1494,25 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         content: Text(msg),
         backgroundColor: AppColors.info,
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showLiveUpdateNotice(int count) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastLiveUpdateNoticeMs < 4000) return;
+    _lastLiveUpdateNoticeMs = nowMs;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          count == 1
+              ? 'Partido actualizado: 1 evento nuevo.'
+              : 'Partido actualizado: $count eventos nuevos.',
+        ),
+        backgroundColor: AppColors.info,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -2764,9 +3022,15 @@ class _MiniEventRow extends StatelessWidget {
   const _MiniEventRow({required this.event});
 
   Color get _color => PitchEventColors.colorFor(event.tipoEventoNombre);
+  String? get _registeredBy {
+    final name = event.nombreUsuarioRegistro?.trim();
+    return name == null || name.isEmpty ? null : name;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final registeredBy = _registeredBy;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
@@ -2793,6 +3057,12 @@ class _MiniEventRow extends StatelessWidget {
                         TextStyle(fontSize: 9, color: AppColors.textSecondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
+                if (registeredBy != null)
+                  Text('Por $registeredBy',
+                      style:
+                          TextStyle(fontSize: 8, color: AppColors.textMuted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -3773,6 +4043,8 @@ class _FullTimeline extends StatelessWidget {
 
   Widget _buildEventRow(
       EventoPartidoModel ev, Color color, bool isLast) {
+    final registeredBy = _registeredBy(ev);
+
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3836,6 +4108,13 @@ class _FullTimeline extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary)),
+                        if (registeredBy != null) ...[
+                          const SizedBox(height: 2),
+                          Text('Registrado por $registeredBy',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textMuted)),
+                        ],
                       ],
                     ),
                   ),
@@ -3866,6 +4145,11 @@ class _FullTimeline extends StatelessWidget {
     if (x < 0.33) return 'Zona def.';
     if (x < 0.66) return 'Mediocamp.';
     return 'Zona of.';
+  }
+
+  String? _registeredBy(EventoPartidoModel ev) {
+    final name = ev.nombreUsuarioRegistro?.trim();
+    return name == null || name.isEmpty ? null : name;
   }
 }
 

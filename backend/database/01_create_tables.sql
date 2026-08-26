@@ -157,13 +157,15 @@ CREATE TABLE EventosPartido (
     PitchX                  DECIMAL(4,3)        NULL,
     PitchY                  DECIMAL(4,3)        NULL,
     JugadorRelacionadoId    INT                 NULL,
+    UsuarioId               INT                 NULL,
     Observacion             NVARCHAR(255)       NULL,
     FechaRegistro           DATETIME2           NOT NULL DEFAULT SYSDATETIME(),
     CONSTRAINT PK_EventosPartido PRIMARY KEY (EventoId),
     CONSTRAINT FK_EventosPartido_Partidos FOREIGN KEY (PartidoId) REFERENCES Partidos (PartidoId),
     CONSTRAINT FK_EventosPartido_Jugadores FOREIGN KEY (JugadorId) REFERENCES Jugadores (JugadorId),
     CONSTRAINT FK_EventosPartido_TiposEvento FOREIGN KEY (TipoEventoId) REFERENCES TiposEvento (TipoEventoId),
-    CONSTRAINT FK_EventosPartido_JugadorRelacionado FOREIGN KEY (JugadorRelacionadoId) REFERENCES Jugadores (JugadorId)
+    CONSTRAINT FK_EventosPartido_JugadorRelacionado FOREIGN KEY (JugadorRelacionadoId) REFERENCES Jugadores (JugadorId),
+    CONSTRAINT FK_EventosPartido_Usuarios FOREIGN KEY (UsuarioId) REFERENCES Usuarios (UsuarioId)
 );
 GO
 
