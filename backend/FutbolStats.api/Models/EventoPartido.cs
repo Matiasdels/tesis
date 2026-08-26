@@ -10,6 +10,7 @@ public class EventoPartido
     public decimal? PitchX { get; set; }
     public decimal? PitchY { get; set; }
     public int? JugadorRelacionadoId { get; set; }
+    public int? UsuarioId { get; set; }
     public string? Observacion { get; set; }
     public string? Periodo { get; set; }
     public DateTime FechaRegistro { get; set; } = DateTime.UtcNow;
@@ -17,4 +18,5 @@ public class EventoPartido
     public Jugador? Jugador { get; set; }
     public Jugador? JugadorRelacionado { get; set; }
     public TipoEvento? TipoEvento { get; set; }
+    public Usuario? Usuario { get; set; }
 }

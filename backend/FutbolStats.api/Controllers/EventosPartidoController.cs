@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 
 namespace FutbolStats.Api.Controllers;
 
@@ -26,6 +27,7 @@ public class EventosPartidoController(
         var eventos = await context.EventosPartido
             .Include(e => e.Jugador)
             .Include(e => e.JugadorRelacionado)
+            .Include(e => e.Usuario)
             .Include(e => e.TipoEvento)
             .AsNoTracking()
             .Where(e => e.PartidoId == partidoId)
@@ -95,6 +97,7 @@ public class EventosPartidoController(
             Observacion          = string.IsNullOrWhiteSpace(request.Observacion) ? null : request.Observacion.Trim(),
             Periodo              = string.IsNullOrWhiteSpace(request.Periodo) ? null : request.Periodo.Trim(),
             FechaRegistro        = DateTime.UtcNow,
+            UsuarioId            = GetCurrentUserId(),
         };
 
         context.EventosPartido.Add(evento);
@@ -103,6 +106,7 @@ public class EventosPartidoController(
         await context.Entry(evento).Reference(e => e.Jugador).LoadAsync();
         await context.Entry(evento).Reference(e => e.JugadorRelacionado).LoadAsync();
         await context.Entry(evento).Reference(e => e.TipoEvento).LoadAsync();
+        await context.Entry(evento).Reference(e => e.Usuario).LoadAsync();
 
         return CreatedAtAction(nameof(GetEventos), new { partidoId }, ToResponse(evento));
     }
@@ -224,6 +228,8 @@ public class EventosPartidoController(
         e.Jugador is null ? null : $"{e.Jugador.Nombre} {e.Jugador.Apellido}",
         e.JugadorRelacionadoId,
         e.JugadorRelacionado is null ? null : $"{e.JugadorRelacionado.Nombre} {e.JugadorRelacionado.Apellido}",
+        e.UsuarioId,
+        e.Usuario is null ? null : $"{e.Usuario.Nombre} {e.Usuario.Apellido}".Trim(),
         e.TipoEventoId,
         e.TipoEvento?.Nombre ?? "",
         e.Minuto,
@@ -232,6 +238,14 @@ public class EventosPartidoController(
         e.Observacion,
         e.FechaRegistro,
         e.Periodo);
+
+    private int? GetCurrentUserId()
+    {
+        var userIdClaim =
+            User.FindFirstValue("usuarioId") ??
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(userIdClaim, out var userId) ? userId : null;
+    }
 }
 
 public class EventoRequest
@@ -253,6 +267,8 @@ public record EventoResponse(
     string?   NombreJugador,
     int?      JugadorRelacionadoId,
     string?   NombreJugadorRelacionado,
+    int?      UsuarioId,
+    string?   NombreUsuarioRegistro,
     int       TipoEventoId,
     string    TipoEventoNombre,
     int       Minuto,

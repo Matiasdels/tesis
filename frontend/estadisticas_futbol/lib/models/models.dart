@@ -359,6 +359,8 @@ class EventoPartidoModel {
   // Para eventos de tipo Cambio: jugador que entra.
   final int? jugadorRelacionadoId;
   final String? nombreJugadorRelacionado;
+  final int? usuarioId;
+  final String? nombreUsuarioRegistro;
   final int tipoEventoId;
   final String tipoEventoNombre;
   final int minuto;
@@ -374,6 +376,8 @@ class EventoPartidoModel {
     this.nombreJugador,
     this.jugadorRelacionadoId,
     this.nombreJugadorRelacionado,
+    this.usuarioId,
+    this.nombreUsuarioRegistro,
     required this.tipoEventoId,
     required this.tipoEventoNombre,
     required this.minuto,
@@ -391,6 +395,8 @@ class EventoPartidoModel {
         nombreJugador: json['nombreJugador'] as String?,
         jugadorRelacionadoId: json['jugadorRelacionadoId'] as int?,
         nombreJugadorRelacionado: json['nombreJugadorRelacionado'] as String?,
+        usuarioId: json['usuarioId'] as int?,
+        nombreUsuarioRegistro: json['nombreUsuarioRegistro'] as String?,
         tipoEventoId: json['tipoEventoId'] as int,
         tipoEventoNombre: json['tipoEventoNombre'] as String,
         minuto: json['minuto'] as int,
