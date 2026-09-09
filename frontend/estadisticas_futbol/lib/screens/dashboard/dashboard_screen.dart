@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -140,6 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final displayName =
         fullName.isEmpty ? user?.nombreUsuario ?? 'Usuario' : fullName;
     final showWelcome = settings.showDashboardGreeting && _showWelcome;
+    final canWrite = RolePermissions.canWriteSportData(user?.rol);
 
     return PageScaffold(
       title: 'Panel',
@@ -147,7 +149,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       actions: [
         ElevatedButton.icon(
           onPressed: () => context.go(AppConstants.routePlayers),
-          icon: const Icon(Icons.person_add_outlined, size: 16),
+          icon: Icon(
+            canWrite ? Icons.person_add_outlined : Icons.people_outline,
+            size: 16,
+          ),
           label: const Text('Jugadores'),
         ),
       ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
@@ -151,6 +152,9 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
   }
 
   Widget _buildContent(PartidoModel match) {
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
+
     return CustomScrollView(
       slivers: [
         SliverAppBar(
@@ -174,25 +178,27 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Editar partido',
-              onPressed: () async {
-                final updated =
-                    await context.push<bool>('/matches/${match.id}/edit');
-                if (updated == true) {
-                  _changed = true;
-                  _load();
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Eliminar partido',
-              onPressed: _delete,
-            ),
-          ],
+          actions: canWrite
+              ? [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Editar partido',
+                    onPressed: () async {
+                      final updated =
+                          await context.push<bool>('/matches/${match.id}/edit');
+                      if (updated == true) {
+                        _changed = true;
+                        _load();
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Eliminar partido',
+                    onPressed: _delete,
+                  ),
+                ]
+              : const [],
         ),
         SliverPadding(
           padding: const EdgeInsets.all(AppConstants.pagePadding),
@@ -206,20 +212,23 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
               const SizedBox(height: AppConstants.sectionSpacing),
               _LineupCard(
                 lineup: _lineup,
-                onManage: () async {
-                  final updated =
-                      await context.push<bool>('/matches/${match.id}/lineup');
-                  if (updated == true) {
-                    _changed = true;
-                    _load();
-                  }
-                },
+                onManage: canWrite
+                    ? () async {
+                        final updated = await context
+                            .push<bool>('/matches/${match.id}/lineup');
+                        if (updated == true) {
+                          _changed = true;
+                          _load();
+                        }
+                      }
+                    : null,
               ),
               const SizedBox(height: AppConstants.sectionSpacing),
               _MatchActionButton(
                 match: match,
                 loading: _starting,
                 onStart: _startMatch,
+                canWrite: canWrite,
               ),
             ]),
           ),
@@ -283,8 +292,7 @@ class _DataRow extends StatelessWidget {
           SizedBox(
             width: 110,
             child: Text(label,
-                style: TextStyle(
-                    color: AppColors.textSecondary, fontSize: 12)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           ),
           Expanded(
             child: Text(
@@ -304,7 +312,7 @@ class _DataRow extends StatelessWidget {
 
 class _LineupCard extends StatelessWidget {
   final List<AlineacionEntradaModel> lineup;
-  final VoidCallback onManage;
+  final VoidCallback? onManage;
 
   const _LineupCard({required this.lineup, required this.onManage});
 
@@ -319,7 +327,9 @@ class _LineupCard extends StatelessWidget {
         children: [
           SectionHeader(
             title: 'Alineación',
-            action: lineup.isEmpty ? 'Cargar' : 'Editar',
+            action: onManage == null
+                ? null
+                : (lineup.isEmpty ? 'Cargar' : 'Editar'),
             onAction: onManage,
           ),
           const SizedBox(height: 10),
@@ -328,8 +338,7 @@ class _LineupCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'Todavía no se cargó la alineación.',
-                style: TextStyle(
-                    color: AppColors.textSecondary, fontSize: 13),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
             )
           else ...[
@@ -374,11 +383,13 @@ class _MatchActionButton extends StatelessWidget {
   final PartidoModel match;
   final bool loading;
   final VoidCallback onStart;
+  final bool canWrite;
 
   const _MatchActionButton({
     required this.match,
     required this.loading,
     required this.onStart,
+    required this.canWrite,
   });
 
   @override
@@ -394,7 +405,8 @@ class _MatchActionButton extends StatelessWidget {
             backgroundColor: AppColors.accent,
             foregroundColor: Colors.black,
             padding: const EdgeInsets.symmetric(vertical: 14),
-            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            textStyle:
+                const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.cardRadius),
             ),
@@ -403,8 +415,25 @@ class _MatchActionButton extends StatelessWidget {
       );
     }
 
+    if (!canWrite && !match.isEnJuego) {
+      return AppCard(
+        child: Text(
+          'El partido todavia no esta disponible en vivo.',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
     final isEnJuego = match.isEnJuego;
-    final label = isEnJuego ? 'Continuar partido en vivo' : 'Iniciar partido';
+    final label = !canWrite
+        ? 'Ver partido en vivo'
+        : isEnJuego
+            ? 'Continuar partido en vivo'
+            : 'Iniciar partido';
     final icon = isEnJuego ? Icons.sports_soccer : Icons.play_arrow_rounded;
     final color = isEnJuego ? AppColors.accent : AppColors.accent;
 
@@ -479,11 +508,9 @@ class _PlayerParticipationCard extends StatelessWidget {
             )
           else ...[
             if (s.goles > 0)
-              _StatRow(
-                  'Goles', s.goles, Icons.sports_soccer_outlined),
+              _StatRow('Goles', s.goles, Icons.sports_soccer_outlined),
             if (s.asistencias > 0)
-              _StatRow(
-                  'Asistencias', s.asistencias, Icons.assistant_outlined),
+              _StatRow('Asistencias', s.asistencias, Icons.assistant_outlined),
             if (s.remates > 0)
               _StatRow('Remates', s.remates, Icons.gps_fixed_outlined),
             if (s.faltas > 0)
@@ -492,8 +519,7 @@ class _PlayerParticipationCard extends StatelessWidget {
               _StatRow('Tarjetas amarillas', s.amarillas,
                   Icons.crop_square_outlined),
             if (s.rojas > 0)
-              _StatRow(
-                  'Tarjetas rojas', s.rojas, Icons.square_outlined),
+              _StatRow('Tarjetas rojas', s.rojas, Icons.square_outlined),
           ],
         ],
       ),
@@ -548,8 +574,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ),
           Text(
@@ -589,8 +614,7 @@ class _PlayerTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color:
-                      entry.esTitular ? AppColors.accent : AppColors.info,
+                  color: entry.esTitular ? AppColors.accent : AppColors.info,
                 ),
               ),
             ),

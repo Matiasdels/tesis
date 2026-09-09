@@ -1,3 +1,4 @@
+using FutbolStats.Api.Auth;
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using FutbolStats.Api.Options;
@@ -39,6 +40,7 @@ public class EventosPartidoController(
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> CreateEvento(int partidoId, EventoRequest request)
     {
         var partido = await context.Partidos.AsNoTracking()
@@ -112,6 +114,7 @@ public class EventosPartidoController(
     }
 
     [HttpDelete("{eventoId:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> DeleteEvento(int partidoId, int eventoId)
     {
         var estadoPartido = await context.Partidos

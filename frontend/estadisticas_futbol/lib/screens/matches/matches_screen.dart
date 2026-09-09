@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
@@ -118,20 +119,25 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
+
     return PageScaffold(
       title: 'Partidos',
       subtitle: 'Gestión de partidos',
-      actions: [
-        ElevatedButton.icon(
-          onPressed: () async {
-            final created =
-                await context.push<bool>(AppConstants.routeMatchCreate);
-            if (created == true) _load();
-          },
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('Nuevo'),
-        ),
-      ],
+      actions: canWrite
+          ? [
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final created =
+                      await context.push<bool>(AppConstants.routeMatchCreate);
+                  if (created == true) _load();
+                },
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Nuevo'),
+              ),
+            ]
+          : const [],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -159,10 +165,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                   : 'Sin partidos registrados',
                               subtitle: _filterYear != null
                                   ? 'No hay partidos registrados para este año.'
-                                  : 'Todavía no hay partidos. Creá el primero con el botón "Nuevo".',
-                              actionLabel:
-                                  _filterYear != null ? null : 'Nuevo partido',
-                              onAction: _filterYear != null
+                                  : canWrite
+                                      ? 'Todavía no hay partidos. Creá el primero con el botón "Nuevo".'
+                                      : 'Todavía no hay partidos registrados.',
+                              actionLabel: _filterYear != null || !canWrite
+                                  ? null
+                                  : 'Nuevo partido',
+                              onAction: _filterYear != null || !canWrite
                                   ? null
                                   : () async {
                                       final created = await context.push<bool>(
@@ -180,6 +189,18 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                     const SizedBox(height: 10),
                                 itemBuilder: (_, i) {
                                   final match = _filteredMatches[i];
+                                  final tile = _MatchTile(
+                                    match: match,
+                                    onTap: () async {
+                                      final changed = await context.push<bool>(
+                                        '/matches/${match.id}',
+                                      );
+                                      if (changed == true) _load();
+                                    },
+                                  );
+
+                                  if (!canWrite) return tile;
+
                                   return Dismissible(
                                     key: ValueKey(match.id),
                                     direction: DismissDirection.endToStart,
@@ -192,21 +213,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         const SnackBar(
-                                          content:
-                                              Text('Partido eliminado.'),
+                                          content: Text('Partido eliminado.'),
                                         ),
                                       );
                                     },
-                                    child: _MatchTile(
-                                      match: match,
-                                      onTap: () async {
-                                        final changed =
-                                            await context.push<bool>(
-                                          '/matches/${match.id}',
-                                        );
-                                        if (changed == true) _load();
-                                      },
-                                    ),
+                                    child: tile,
                                   );
                                 },
                               ),

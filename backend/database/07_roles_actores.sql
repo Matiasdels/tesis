@@ -53,3 +53,10 @@ BEGIN
     VALUES (N'Cuerpo tecnico');
 END
 GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Roles WHERE Nombre = N'Jugador')
+BEGIN
+    INSERT INTO dbo.Roles (Nombre)
+    VALUES (N'Jugador');
+END
+GO

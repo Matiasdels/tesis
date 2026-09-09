@@ -9,7 +9,8 @@ INSERT INTO Categorias (Nombre, Descripcion) VALUES
 -- Roles
 INSERT INTO Roles (Nombre) VALUES
     (N'Responsable institucional'),
-    (N'Cuerpo tecnico');
+    (N'Cuerpo tecnico'),
+    (N'Jugador');
 
 -- TiposEvento (basado en EventTypes del frontend)
 INSERT INTO TiposEvento (Nombre) VALUES

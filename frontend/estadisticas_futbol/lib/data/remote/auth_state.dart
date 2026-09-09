@@ -76,6 +76,7 @@ class AuthState extends ChangeNotifier {
     required String password,
     required String nombre,
     required String apellido,
+    required String rol,
   }) async {
     await _run(() async {
       _authNotice = null;
@@ -85,6 +86,7 @@ class AuthState extends ChangeNotifier {
         password: password,
         nombre: nombre,
         apellido: apellido,
+        rol: rol,
       );
       await _saveSession(_session!);
       _scheduleRefresh();

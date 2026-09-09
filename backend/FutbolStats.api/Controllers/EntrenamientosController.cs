@@ -1,3 +1,4 @@
+using FutbolStats.Api.Auth;
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -41,6 +42,7 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
 
     // POST /api/Entrenamientos
     [HttpPost]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> CreateEntrenamiento(EntrenamientoRequest request)
     {
         var categoriaExiste = await context.Categorias.AnyAsync(c => c.CategoriaId == request.CategoriaId);
@@ -71,6 +73,7 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
     // PUT /api/Entrenamientos/{id}/asistencia
     // Body: [{ jugadorId: 1, asistio: true }, ...]
     [HttpPut("{id:int}/asistencia")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> SetAsistencia(int id, List<AsistenciaRequest> request)
     {
         var entrenamiento = await context.Entrenamientos
@@ -116,6 +119,7 @@ public class EntrenamientosController(FutbolStatsDbContext context) : Controller
 
     // DELETE /api/Entrenamientos/{id}
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> DeleteEntrenamiento(int id)
     {
         var entrenamiento = await context.Entrenamientos

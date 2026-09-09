@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/local/database_helper.dart';
@@ -96,17 +97,24 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
   }
 
   Widget _buildContent(PartidoModel match) {
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
     final golesOwn = match.golesEquipo ?? 0;
     final golesRival = match.golesRival ?? 0;
 
     final countByType = <String, int>{};
     for (final e in _events) {
-      countByType[e.tipoEventoNombre] = (countByType[e.tipoEventoNombre] ?? 0) + 1;
+      countByType[e.tipoEventoNombre] =
+          (countByType[e.tipoEventoNombre] ?? 0) + 1;
     }
 
-    final goals = _events.where((e) => e.tipoEventoNombre == EventTypes.goal).toList();
-    final yellowCards = _events.where((e) => e.tipoEventoNombre == EventTypes.yellowCard).toList();
-    final redCards = _events.where((e) => e.tipoEventoNombre == EventTypes.redCard).toList();
+    final goals =
+        _events.where((e) => e.tipoEventoNombre == EventTypes.goal).toList();
+    final yellowCards = _events
+        .where((e) => e.tipoEventoNombre == EventTypes.yellowCard)
+        .toList();
+    final redCards =
+        _events.where((e) => e.tipoEventoNombre == EventTypes.redCard).toList();
 
     return CustomScrollView(
       slivers: [
@@ -129,7 +137,8 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
           actions: [
             TextButton.icon(
               onPressed: () => context.go(AppConstants.routeMatches),
-              icon: const Icon(Icons.list_alt_rounded, size: 16, color: AppColors.accent),
+              icon: const Icon(Icons.list_alt_rounded,
+                  size: 16, color: AppColors.accent),
               label: const Text(
                 'Partidos',
                 style: TextStyle(color: AppColors.accent, fontSize: 13),
@@ -141,23 +150,22 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
           padding: const EdgeInsets.all(AppConstants.pagePadding),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              _ScoreBanner(match: match, golesOwn: golesOwn, golesRival: golesRival),
+              _ScoreBanner(
+                  match: match, golesOwn: golesOwn, golesRival: golesRival),
               const SizedBox(height: AppConstants.sectionSpacing),
-
               _InfoCard(match: match),
               const SizedBox(height: AppConstants.sectionSpacing),
-
               if (match.huboPenales || _penalesOffline != null) ...[
                 _PenalesCard(match: match, offline: _penalesOffline),
                 const SizedBox(height: AppConstants.sectionSpacing),
               ],
-
               if (countByType.isNotEmpty) ...[
                 _StatsCard(countByType: countByType),
                 const SizedBox(height: AppConstants.sectionSpacing),
               ],
-
-              if (goals.isNotEmpty || yellowCards.isNotEmpty || redCards.isNotEmpty) ...[
+              if (goals.isNotEmpty ||
+                  yellowCards.isNotEmpty ||
+                  redCards.isNotEmpty) ...[
                 _HighlightsCard(
                   goals: goals,
                   yellowCards: yellowCards,
@@ -165,34 +173,28 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
                 ),
                 const SizedBox(height: AppConstants.sectionSpacing),
               ],
-
               _HeatMapCard(events: _events),
               const SizedBox(height: AppConstants.sectionSpacing),
-
               _IntelligentAnalysisCard(
                 analysis: _analysis,
                 generating: _generatingAnalysis,
-                onGenerate: _generateAnalysis,
+                onGenerate: canWrite ? _generateAnalysis : null,
               ),
               const SizedBox(height: AppConstants.sectionSpacing),
-
               _EventsCard(events: _events),
               const SizedBox(height: AppConstants.sectionSpacing),
-
               _InfoBanner(),
               const SizedBox(height: AppConstants.sectionSpacing),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _exportingPdf
-                      ? null
-                      : () => _exportPdf(match),
+                  onPressed: _exportingPdf ? null : () => _exportPdf(match),
                   icon: _exportingPdf
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.black),
                         )
                       : const Icon(Icons.picture_as_pdf_rounded, size: 20),
                   label: const Text('Exportar PDF'),
@@ -200,9 +202,11 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    textStyle: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.cardRadius),
+                      borderRadius:
+                          BorderRadius.circular(AppConstants.cardRadius),
                     ),
                   ),
                 ),
@@ -281,7 +285,8 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
 class _ScoreBanner extends StatelessWidget {
   final PartidoModel match;
   final int golesOwn, golesRival;
-  const _ScoreBanner({required this.match, required this.golesOwn, required this.golesRival});
+  const _ScoreBanner(
+      {required this.match, required this.golesOwn, required this.golesRival});
 
   @override
   Widget build(BuildContext context) {
@@ -331,8 +336,8 @@ class _ScoreBanner extends StatelessWidget {
               ),
               if (match.huboAlargue)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.info.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -362,7 +367,9 @@ class _TeamBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final abbr = name.length >= 3 ? name.substring(0, 3).toUpperCase() : name.toUpperCase();
+    final abbr = name.length >= 3
+        ? name.substring(0, 3).toUpperCase()
+        : name.toUpperCase();
     return Column(
       children: [
         CircleAvatar(
@@ -370,7 +377,9 @@ class _TeamBadge extends StatelessWidget {
           backgroundColor: AppColors.bgMuted,
           child: Text(abbr,
               style: TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 4),
         Text(name,
@@ -399,9 +408,12 @@ class _InfoCard extends StatelessWidget {
           _Row('Fecha', _fmt(match.fecha)),
           _Row('Tipo', match.tipoCompeticion),
           _Row('Condición', match.esLocal ? 'Local' : 'Visitante'),
-          if (match.categoriaNombre != null) _Row('Categoría', match.categoriaNombre!),
-          if (match.lugar != null && match.lugar!.isNotEmpty) _Row('Lugar', match.lugar!),
-          if (match.minutoActual != null) _Row('Minutos jugados', '${match.minutoActual}\''),
+          if (match.categoriaNombre != null)
+            _Row('Categoría', match.categoriaNombre!),
+          if (match.lugar != null && match.lugar!.isNotEmpty)
+            _Row('Lugar', match.lugar!),
+          if (match.minutoActual != null)
+            _Row('Minutos jugados', '${match.minutoActual}\''),
         ],
       ),
     );
@@ -430,7 +442,9 @@ class _Row extends StatelessWidget {
           Expanded(
             child: Text(value,
                 style: TextStyle(
-                    fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w500)),
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -455,7 +469,8 @@ class _StatsCard extends StatelessWidget {
         children: [
           const SectionHeader(title: 'Estadísticas'),
           const SizedBox(height: 12),
-          ...sorted.map((e) => _StatRow(label: e.key, count: e.value, total: _events(countByType))),
+          ...sorted.map((e) => _StatRow(
+              label: e.key, count: e.value, total: _events(countByType))),
         ],
       ),
     );
@@ -467,7 +482,8 @@ class _StatsCard extends StatelessWidget {
 class _StatRow extends StatelessWidget {
   final String label;
   final int count, total;
-  const _StatRow({required this.label, required this.count, required this.total});
+  const _StatRow(
+      {required this.label, required this.count, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -481,11 +497,14 @@ class _StatRow extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(label,
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary)),
               ),
               Text('$count',
                   style: TextStyle(
-                      fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 3),
@@ -556,7 +575,10 @@ class _HighlightSection extends StatelessWidget {
   final Color color;
   final List<EventoPartidoModel> events;
   const _HighlightSection(
-      {required this.label, required this.icon, required this.color, required this.events});
+      {required this.label,
+      required this.icon,
+      required this.color,
+      required this.events});
 
   @override
   Widget build(BuildContext context) {
@@ -568,7 +590,8 @@ class _HighlightSection extends StatelessWidget {
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 6),
             Text(label,
-                style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    fontSize: 12, color: color, fontWeight: FontWeight.w600)),
           ],
         ),
         const SizedBox(height: 6),
@@ -578,10 +601,13 @@ class _HighlightSection extends StatelessWidget {
                 children: [
                   Text("${e.minuto}'",
                       style: TextStyle(
-                          fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w500)),
                   const SizedBox(width: 8),
                   Text(e.nombreJugador ?? 'Sin jugador',
-                      style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                      style: TextStyle(
+                          fontSize: 13, color: AppColors.textPrimary)),
                 ],
               ),
             )),
@@ -632,7 +658,9 @@ class _EventRow extends StatelessWidget {
             width: 32,
             child: Text("${event.minuto}'",
                 style: TextStyle(
-                    fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w500)),
           ),
           Container(
             width: 6,
@@ -644,7 +672,9 @@ class _EventRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: _esCambio ? _CambioContent(event: event) : _NormalContent(event: event),
+            child: _esCambio
+                ? _CambioContent(event: event)
+                : _NormalContent(event: event),
           ),
         ],
       ),
@@ -696,7 +726,8 @@ class _CambioContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sale = event.nombreJugador ?? 'Jugador desconocido';
-    final entra = event.nombreJugadorRelacionado ?? 'Jugador entrante no disponible';
+    final entra =
+        event.nombreJugadorRelacionado ?? 'Jugador entrante no disponible';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -705,7 +736,8 @@ class _CambioContent extends StatelessWidget {
         const SizedBox(height: 2),
         Row(
           children: [
-            Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.textMuted),
+            Icon(Icons.arrow_forward_rounded,
+                size: 12, color: AppColors.textMuted),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
@@ -895,8 +927,7 @@ class _HeatMapFilters extends StatelessWidget {
               label: Text(filter),
               labelStyle: TextStyle(
                 fontSize: 12,
-                color:
-                    isSelected ? Colors.black : AppColors.textSecondary,
+                color: isSelected ? Colors.black : AppColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
               selectedColor: AppColors.accent,
@@ -948,7 +979,7 @@ class _HeatLegendItem extends StatelessWidget {
 class _IntelligentAnalysisCard extends StatelessWidget {
   final AnalisisPartidoModel? analysis;
   final bool generating;
-  final VoidCallback onGenerate;
+  final VoidCallback? onGenerate;
 
   const _IntelligentAnalysisCard({
     required this.analysis,
@@ -1003,27 +1034,28 @@ class _IntelligentAnalysisCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: generating ? null : onGenerate,
-              icon: generating
-                  ? SizedBox(
-                      width: 17,
-                      height: 17,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.bgDeep,
-                      ),
-                    )
-                  : const Icon(Icons.auto_awesome_rounded, size: 18),
-              label: Text(
-                generating
-                    ? 'Generando análisis...'
-                    : 'Generar análisis inteligente',
+          if (onGenerate != null)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: generating ? null : onGenerate,
+                icon: generating
+                    ? SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.bgDeep,
+                        ),
+                      )
+                    : const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: Text(
+                  generating
+                      ? 'Generando análisis...'
+                      : 'Generar análisis inteligente',
+                ),
               ),
             ),
-          ),
           if (hasMessage) ...[
             const SizedBox(height: 12),
             _AnalysisMessage(message: analysis!.mensaje!),
@@ -1225,7 +1257,9 @@ class _PenalesCard extends StatelessWidget {
         ? match.resultadoPenalesRival
         : offline?['resultadoPenalesRival'] as int?;
 
-    if (equipoScore == null || rivalScore == null) return const SizedBox.shrink();
+    if (equipoScore == null || rivalScore == null) {
+      return const SizedBox.shrink();
+    }
 
     final ganador = equipoScore > rivalScore
         ? 'Kancha'
@@ -1240,10 +1274,12 @@ class _PenalesCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(child: SectionHeader(title: 'Definición por penales')),
+              const Expanded(
+                  child: SectionHeader(title: 'Definición por penales')),
               if (isOffline)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.warningDim,
                     borderRadius: BorderRadius.circular(20),
@@ -1268,7 +1304,8 @@ class _PenalesCard extends StatelessWidget {
               _PenalesTeam(
                   name: match.esLocal ? 'Kancha' : match.rival,
                   score: match.esLocal ? equipoScore : rivalScore,
-                  isWinner: ganador == (match.esLocal ? 'Kancha' : match.rival)),
+                  isWinner:
+                      ganador == (match.esLocal ? 'Kancha' : match.rival)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
@@ -1282,14 +1319,16 @@ class _PenalesCard extends StatelessWidget {
               _PenalesTeam(
                   name: match.esLocal ? match.rival : 'Kancha',
                   score: match.esLocal ? rivalScore : equipoScore,
-                  isWinner: ganador == (match.esLocal ? match.rival : 'Kancha')),
+                  isWinner:
+                      ganador == (match.esLocal ? match.rival : 'Kancha')),
             ],
           ),
           if (ganador != null) ...[
             const SizedBox(height: 12),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
@@ -1362,7 +1401,8 @@ class _InfoBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.infoDim,
         borderRadius: BorderRadius.circular(AppConstants.cardRadius),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.3), width: 0.5),
+        border: Border.all(
+            color: AppColors.info.withValues(alpha: 0.3), width: 0.5),
       ),
       child: const Row(
         children: [
@@ -1371,7 +1411,8 @@ class _InfoBanner extends StatelessWidget {
           Expanded(
             child: Text(
               'Podés volver a ver este resumen en cualquier momento desde Gestión de Partidos.',
-              style: TextStyle(fontSize: 12, color: AppColors.info, height: 1.4),
+              style:
+                  TextStyle(fontSize: 12, color: AppColors.info, height: 1.4),
             ),
           ),
         ],

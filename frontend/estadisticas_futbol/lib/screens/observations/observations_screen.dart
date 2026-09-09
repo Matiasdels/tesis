@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
@@ -162,9 +163,8 @@ class _ObservationsScreenState extends State<ObservationsScreen> {
       if (!mounted) return;
       setState(() {
         _observations = _observations
-            .map((item) => item.observacionId == updated.observacionId
-                ? updated
-                : item)
+            .map((item) =>
+                item.observacionId == updated.observacionId ? updated : item)
             .toList();
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -228,16 +228,21 @@ class _ObservationsScreenState extends State<ObservationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
+
     return PageScaffold(
       title: 'Observaciones',
       subtitle: 'Seguimiento tecnico por jugador',
-      actions: [
-        ElevatedButton.icon(
-          onPressed: _selectedPlayer == null ? null : _openAddSheet,
-          icon: const Icon(Icons.add_comment_outlined, size: 16),
-          label: const Text('Nueva'),
-        ),
-      ],
+      actions: canWrite
+          ? [
+              ElevatedButton.icon(
+                onPressed: _selectedPlayer == null ? null : _openAddSheet,
+                icon: const Icon(Icons.add_comment_outlined, size: 16),
+                label: const Text('Nueva'),
+              ),
+            ]
+          : const [],
       body: _loadingPlayers
           ? const Center(child: CircularProgressIndicator())
           : _error != null && _players.isEmpty
@@ -275,9 +280,9 @@ class _ObservationsScreenState extends State<ObservationsScreen> {
                           onRetry: _selectedPlayer == null
                               ? null
                               : () => _loadObservations(_selectedPlayer!),
-                          onAdd: _openAddSheet,
-                          onEdit: _openEditSheet,
-                          onDelete: _deleteObservation,
+                          onAdd: canWrite ? _openAddSheet : null,
+                          onEdit: canWrite ? _openEditSheet : null,
+                          onDelete: canWrite ? _deleteObservation : null,
                         );
 
                         if (isWide) {
@@ -427,7 +432,9 @@ class _PlayerObservationTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      player.position.isEmpty ? 'Sin posicion' : player.position,
+                      player.position.isEmpty
+                          ? 'Sin posicion'
+                          : player.position,
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 11,
@@ -456,9 +463,9 @@ class _ObservationsPanel extends StatelessWidget {
   final bool loading;
   final String? error;
   final VoidCallback? onRetry;
-  final VoidCallback onAdd;
-  final ValueChanged<PlayerObservacionModel> onEdit;
-  final ValueChanged<PlayerObservacionModel> onDelete;
+  final VoidCallback? onAdd;
+  final ValueChanged<PlayerObservacionModel>? onEdit;
+  final ValueChanged<PlayerObservacionModel>? onDelete;
 
   const _ObservationsPanel({
     required this.player,
@@ -512,15 +519,16 @@ class _ObservationsPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton.filled(
-                onPressed: onAdd,
-                tooltip: 'Nueva observacion',
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.black,
+              if (onAdd != null)
+                IconButton.filled(
+                  onPressed: onAdd,
+                  tooltip: 'Nueva observacion',
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.black,
+                  ),
+                  icon: const Icon(Icons.add_rounded),
                 ),
-                icon: const Icon(Icons.add_rounded),
-              ),
             ],
           ),
         ),
@@ -541,7 +549,8 @@ class _ObservationsPanel extends StatelessWidget {
                           title: 'Sin observaciones',
                           subtitle:
                               'Todavia no hay observaciones para este jugador.',
-                          actionLabel: 'Nueva observacion',
+                          actionLabel:
+                              onAdd == null ? null : 'Nueva observacion',
                           onAction: onAdd,
                         )
                       : RefreshIndicator(
@@ -555,8 +564,12 @@ class _ObservationsPanel extends StatelessWidget {
                                 const SizedBox(height: 10),
                             itemBuilder: (_, index) => _ObservationCard(
                               observation: observations[index],
-                              onEdit: () => onEdit(observations[index]),
-                              onDelete: () => onDelete(observations[index]),
+                              onEdit: onEdit == null
+                                  ? null
+                                  : () => onEdit!(observations[index]),
+                              onDelete: onDelete == null
+                                  ? null
+                                  : () => onDelete!(observations[index]),
                             ),
                           ),
                         ),
@@ -568,8 +581,8 @@ class _ObservationsPanel extends StatelessWidget {
 
 class _ObservationCard extends StatelessWidget {
   final PlayerObservacionModel observation;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _ObservationCard({
     required this.observation,
@@ -610,8 +623,7 @@ class _ObservationCard extends StatelessWidget {
               ],
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
@@ -625,24 +637,27 @@ class _ObservationCard extends StatelessWidget {
                   ),
                 ),
               ),
-              PopupMenuButton<String>(
-                tooltip: 'Opciones',
-                icon: const Icon(Icons.more_vert_rounded),
-                onSelected: (value) {
-                  if (value == 'edit') onEdit();
-                  if (value == 'delete') onDelete();
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Editar'),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Eliminar'),
-                  ),
-                ],
-              ),
+              if (onEdit != null || onDelete != null)
+                PopupMenuButton<String>(
+                  tooltip: 'Opciones',
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit?.call();
+                    if (value == 'delete') onDelete?.call();
+                  },
+                  itemBuilder: (context) => [
+                    if (onEdit != null)
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Editar'),
+                      ),
+                    if (onDelete != null)
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Eliminar'),
+                      ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -716,70 +731,70 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
         padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + bottomInset),
         child: SingleChildScrollView(
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              widget.title,
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.title,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              widget.playerName,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
+              const SizedBox(height: 5),
+              Text(
+                widget.playerName,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final type in _types)
-                  ChoiceChip(
-                    label: Text(type),
-                    selected: _selectedType == type,
-                    onSelected: (_) => setState(() => _selectedType = type),
-                    selectedColor: AppColors.accent.withValues(alpha: 0.2),
-                    labelStyle: TextStyle(
-                      color: _selectedType == type
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final type in _types)
+                    ChoiceChip(
+                      label: Text(type),
+                      selected: _selectedType == type,
+                      onSelected: (_) => setState(() => _selectedType = type),
+                      selectedColor: AppColors.accent.withValues(alpha: 0.2),
+                      labelStyle: TextStyle(
+                        color: _selectedType == type
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      side: BorderSide(
+                        color: _selectedType == type
+                            ? AppColors.accent
+                            : AppColors.borderSubtle,
+                      ),
                     ),
-                    side: BorderSide(
-                      color: _selectedType == type
-                          ? AppColors.accent
-                          : AppColors.borderSubtle,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _controller,
-              maxLines: 5,
-              maxLength: 1000,
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              decoration: const InputDecoration(
-                hintText: 'Escribi la observacion tecnica...',
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _submit,
-              icon: const Icon(Icons.check_rounded),
-              label: Text(widget.actionLabel),
-            ),
-          ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: _controller,
+                maxLines: 5,
+                maxLength: 1000,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                decoration: const InputDecoration(
+                  hintText: 'Escribi la observacion tecnica...',
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _submit,
+                icon: const Icon(Icons.check_rounded),
+                label: Text(widget.actionLabel),
+              ),
+            ],
           ),
         ),
       ),

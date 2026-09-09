@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -205,8 +206,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       final periodState = await DatabaseHelper.instance
           .readJsonMap('match:$_matchId:period_state');
       if (periodState != null) {
-        restoredPeriod =
-            periodState['period'] as String? ?? restoredPeriod;
+        restoredPeriod = periodState['period'] as String? ?? restoredPeriod;
         restoredFirstHalfEnd = periodState['firstHalfEndSeconds'] as int?;
         restoredSecondHalfEnd = periodState['secondHalfEndSeconds'] as int?;
         restoredPrimerTiempoAlargueEnd =
@@ -216,7 +216,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         final savedAtMs = periodState['savedAtMs'] as int?;
         if (savedElapsed != null) {
           var elapsed = savedElapsed;
-          if (wasRunning && savedAtMs != null && MatchPeriod.isActive(restoredPeriod)) {
+          if (wasRunning &&
+              savedAtMs != null &&
+              MatchPeriod.isActive(restoredPeriod)) {
             elapsed +=
                 (DateTime.now().millisecondsSinceEpoch - savedAtMs) ~/ 1000;
           }
@@ -326,11 +328,10 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
           .where((e) => e.tipoEventoNombre == EventTypes.goalRival)
           .length;
       final eventsChanged = !_sameEventList(_events, eventsNewestFirst);
-      final newServerEvents =
-          _newServerEventsCount(_events, eventsNewestFirst);
+      final newServerEvents = _newServerEventsCount(_events, eventsNewestFirst);
       final statusChanged = partido.estado != _partido?.estado;
-      final periodChanged =
-          partido.periodoActual != null && partido.periodoActual != _currentPeriod;
+      final periodChanged = partido.periodoActual != null &&
+          partido.periodoActual != _currentPeriod;
 
       if (!mounted) return;
       if (eventsChanged || statusChanged || periodChanged) {
@@ -344,8 +345,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
           if (statusChanged || periodChanged || !_isRunning) {
             _currentPeriod = partido.periodoActual ?? _currentPeriod;
             _minute = partido.minutoActual ?? _minute;
-            _isRunning = partido.isEnJuego &&
-                MatchPeriod.isActive(_currentPeriod);
+            _isRunning =
+                partido.isEnJuego && MatchPeriod.isActive(_currentPeriod);
             if (_isRunning) {
               _startMatchTimer();
             } else {
@@ -388,7 +389,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
         .map((event) => event.eventoId)
         .toSet();
     return incoming
-        .where((event) => event.eventoId > 0 && !currentIds.contains(event.eventoId))
+        .where((event) =>
+            event.eventoId > 0 && !currentIds.contains(event.eventoId))
         .length;
   }
 
@@ -663,7 +665,9 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     final actions =
         context.read<AppSettingsController>().settings.radialMenuActions;
     final sectors = _sectorDataForActions(actions);
-    return sectors.isEmpty ? _sectorDataForActions(EventTypes.radialPrimary) : sectors;
+    return sectors.isEmpty
+        ? _sectorDataForActions(EventTypes.radialPrimary)
+        : sectors;
   }
 
   void _closeRadial() {
@@ -924,8 +928,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              'Segunda amarilla: ${player.nombreJugador} fue expulsado.'),
+          content:
+              Text('Segunda amarilla: ${player.nombreJugador} fue expulsado.'),
           backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -1102,7 +1106,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       if (evento.eventoId < 0) {
         _showSavedOnDeviceMessage();
       } else {
-        _showInfo('Cambio: sale ${sale.nombreJugador}, entra ${entra.nombreJugador}');
+        _showInfo(
+            'Cambio: sale ${sale.nombreJugador}, entra ${entra.nombreJugador}');
       }
     } on EventApiException catch (e) {
       if (!mounted) return;
@@ -1220,7 +1225,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
       _currentPeriod = MatchPeriod.entretiempo;
     });
     await _savePeriodState();
-    await _patchPeriodTransition(periodoActual: MatchPeriod.entretiempo, huboAlargue: false);
+    await _patchPeriodTransition(
+        periodoActual: MatchPeriod.entretiempo, huboAlargue: false);
     if (mounted) setState(() => _finishing = false);
   }
 
@@ -1232,7 +1238,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     });
     _startMatchTimer();
     await _savePeriodState();
-    await _patchPeriodTransition(periodoActual: MatchPeriod.segundoTiempo, huboAlargue: false);
+    await _patchPeriodTransition(
+        periodoActual: MatchPeriod.segundoTiempo, huboAlargue: false);
   }
 
   Future<void> _finishSecondHalf() async {
@@ -1573,14 +1580,18 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     }
 
     final partido = _partido!;
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
 
-    final finishCallback = switch (_currentPeriod) {
-      MatchPeriod.primerTiempo => _finishFirstHalf,
-      MatchPeriod.segundoTiempo => _finishSecondHalf,
-      MatchPeriod.primerTiempoAlargue => _finishPrimerTiempoAlargue,
-      MatchPeriod.segundoTiempoAlargue => _finishAlargue,
-      _ => null,
-    };
+    final finishCallback = canWrite
+        ? switch (_currentPeriod) {
+            MatchPeriod.primerTiempo => _finishFirstHalf,
+            MatchPeriod.segundoTiempo => _finishSecondHalf,
+            MatchPeriod.primerTiempoAlargue => _finishPrimerTiempoAlargue,
+            MatchPeriod.segundoTiempoAlargue => _finishAlargue,
+            _ => null,
+          }
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.bgDeep,
@@ -1601,7 +1612,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               pendingSyncError: _pendingSyncError,
               onUpdatePending: _updatePendingNow,
               finishing: _finishing,
-              onToggle: _toggleTimer,
+              onToggle: canWrite ? _toggleTimer : null,
               onBack: _saveProgressAndPop,
               onFinishPeriod: finishCallback,
             ),
@@ -1613,56 +1624,83 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               onUndo: _undo,
               onHistory: _openTimeline,
               onMoreEvents: _openMoreEvents,
-              onCambio: _showCambioDialog,
+              onCambio: canWrite ? _showCambioDialog : null,
+              canRegisterEvents: canWrite,
               hasCambiosDisponibles:
                   _rosterState.suplentesDisponibles.isNotEmpty &&
-                  _currentPeriod != MatchPeriod.finalizado,
+                      _currentPeriod != MatchPeriod.finalizado,
             ),
 
             // ③ Pitch or break/decision panel
             Expanded(
               child: switch (_currentPeriod) {
-                MatchPeriod.entretiempo => _EntretiempoPanel(
-                    homeScore: _homeScore,
-                    awayScore: _awayScore,
-                    firstHalfEndSeconds: _firstHalfEndSeconds ?? _minute,
-                    onStartSecondHalf: _startSecondHalf,
-                  ),
-                MatchPeriod.descansoAlargue => _DescansoAlarguePanel(
-                    homeScore: _homeScore,
-                    awayScore: _awayScore,
-                    onStartSegundoTiempoAlargue: _startSegundoTiempoAlargue,
-                  ),
-                MatchPeriod.segundoTiempoFinalizado =>
-                  _SegundoTiempoFinalizadoPanel(
-                    homeScore: _homeScore,
-                    awayScore: _awayScore,
-                    definicionEmpate: _definicionEmpate,
-                    finishing: _finishing,
-                    onStartAlargue: _startAlargue,
-                    onGoToPenales: _goToPenales,
-                    onConfirmFinish: _confirmFinishMatch,
-                  ),
-                MatchPeriod.alargueFinalizado => _AlargueFinalizadoPanel(
-                    homeScore: _homeScore,
-                    awayScore: _awayScore,
-                    definicionEmpate: _definicionEmpate,
-                    finishing: _finishing,
-                    onGoToPenales: _goToPenales,
-                    onConfirmFinish: _confirmFinishMatch,
-                  ),
+                MatchPeriod.entretiempo => canWrite
+                    ? _EntretiempoPanel(
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                        firstHalfEndSeconds: _firstHalfEndSeconds ?? _minute,
+                        onStartSecondHalf: _startSecondHalf,
+                      )
+                    : _ReadOnlyMatchStatePanel(
+                        label: 'ENTRETIEMPO',
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                      ),
+                MatchPeriod.descansoAlargue => canWrite
+                    ? _DescansoAlarguePanel(
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                        onStartSegundoTiempoAlargue: _startSegundoTiempoAlargue,
+                      )
+                    : _ReadOnlyMatchStatePanel(
+                        label: 'DESCANSO ALARGUE',
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                      ),
+                MatchPeriod.segundoTiempoFinalizado => canWrite
+                    ? _SegundoTiempoFinalizadoPanel(
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                        definicionEmpate: _definicionEmpate,
+                        finishing: _finishing,
+                        onStartAlargue: _startAlargue,
+                        onGoToPenales: _goToPenales,
+                        onConfirmFinish: _confirmFinishMatch,
+                      )
+                    : _ReadOnlyMatchStatePanel(
+                        label: 'FIN SEGUNDO TIEMPO',
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                      ),
+                MatchPeriod.alargueFinalizado => canWrite
+                    ? _AlargueFinalizadoPanel(
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                        definicionEmpate: _definicionEmpate,
+                        finishing: _finishing,
+                        onGoToPenales: _goToPenales,
+                        onConfirmFinish: _confirmFinishMatch,
+                      )
+                    : _ReadOnlyMatchStatePanel(
+                        label: 'FIN ALARGUE',
+                        homeScore: _homeScore,
+                        awayScore: _awayScore,
+                      ),
                 _ => Stack(
                     clipBehavior: Clip.none,
                     children: [
                       LayoutBuilder(
                         key: _pitchKey,
                         builder: (ctx, constraints) => GestureDetector(
-                          onTapDown: (d) =>
-                              _handlePitchTapDown(d, constraints),
-                          onPanUpdate:
-                              _showRadial ? _handleRadialDragUpdate : null,
-                          onPanEnd:
-                              _showRadial ? _handleRadialDragEnd : null,
+                          onTapDown: canWrite
+                              ? (d) => _handlePitchTapDown(d, constraints)
+                              : null,
+                          onPanUpdate: canWrite && _showRadial
+                              ? _handleRadialDragUpdate
+                              : null,
+                          onPanEnd: canWrite && _showRadial
+                              ? _handleRadialDragEnd
+                              : null,
                           child: _PitchCanvas(
                             events: _events,
                             pendingTap: _tapNorm,
@@ -1671,7 +1709,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                           ),
                         ),
                       ),
-                      if (_showRadial && _tapLocal != null)
+                      if (canWrite && _showRadial && _tapLocal != null)
                         _RadialOverlay(
                           center: _tapLocal!,
                           sectors: _activeRadialSectors(),
@@ -1682,7 +1720,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                           onMoreTap: _openMoreEvents,
                           onDismiss: _closeRadial,
                         ),
-                      if (!_showRadial && !_showPlayerPicker)
+                      if (canWrite && !_showRadial && !_showPlayerPicker)
                         const _TapHint(),
                       _TimelinePanel(
                         events: _events,
@@ -1700,6 +1738,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
               duration: AppConstants.animNormal,
               curve: Curves.easeOutCubic,
               child: _showPlayerPicker &&
+                      canWrite &&
                       _pendingEvent != null &&
                       !MatchPeriod.isBreak(_currentPeriod)
                   ? _PlayerPicker(
@@ -1748,7 +1787,8 @@ class _TopBar extends StatelessWidget {
   final bool syncingPending;
   final bool pendingSyncError;
   final bool finishing;
-  final VoidCallback onToggle, onBack;
+  final VoidCallback? onToggle;
+  final VoidCallback onBack;
   final VoidCallback onUpdatePending;
   // null = currently in a break/decision period (no finish button)
   final Future<void> Function()? onFinishPeriod;
@@ -1848,7 +1888,7 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
             )
-          else
+          else if (onFinishPeriod != null || finishing)
             SizedBox(
               width: double.infinity,
               height: 34,
@@ -1862,8 +1902,7 @@ class _TopBar extends StatelessWidget {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.black))
                     : const Icon(Icons.flag_rounded, size: 16),
-                label:
-                    Text(finishing ? 'Finalizando...' : finishLabel),
+                label: Text(finishing ? 'Finalizando...' : finishLabel),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: buttonColor,
                   foregroundColor: Colors.black,
@@ -2196,6 +2235,7 @@ class _QuickBar extends StatelessWidget {
   final Future<void> Function() onUndo;
   final VoidCallback? onCambio;
   final bool hasCambiosDisponibles;
+  final bool canRegisterEvents;
 
   const _QuickBar({
     required this.lastEvent,
@@ -2205,6 +2245,7 @@ class _QuickBar extends StatelessWidget {
     required this.onMoreEvents,
     this.onCambio,
     this.hasCambiosDisponibles = false,
+    this.canRegisterEvents = true,
   });
 
   @override
@@ -2216,7 +2257,7 @@ class _QuickBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            if (lastEvent != null && undoSeconds > 0) ...[
+            if (canRegisterEvents && lastEvent != null && undoSeconds > 0) ...[
               _QChip(
                 icon: Icons.check_circle_outline_rounded,
                 label: lastEvent!.tipoEventoNombre,
@@ -2232,7 +2273,9 @@ class _QuickBar extends StatelessWidget {
               Container(width: 0.5, height: 24, color: AppColors.borderDefault),
               const SizedBox(width: 6),
             ],
-            if (hasCambiosDisponibles && onCambio != null) ...[
+            if (canRegisterEvents &&
+                hasCambiosDisponibles &&
+                onCambio != null) ...[
               _QChip(
                 icon: Icons.swap_horiz_rounded,
                 label: 'Realizar cambio',
@@ -2245,11 +2288,13 @@ class _QuickBar extends StatelessWidget {
                 icon: Icons.history_rounded,
                 label: 'Historial',
                 onTap: onHistory),
-            const SizedBox(width: 6),
-            _QChip(
-                icon: Icons.add_circle_outline_rounded,
-                label: 'Más eventos',
-                onTap: onMoreEvents),
+            if (canRegisterEvents) ...[
+              const SizedBox(width: 6),
+              _QChip(
+                  icon: Icons.add_circle_outline_rounded,
+                  label: 'Más eventos',
+                  onTap: onMoreEvents),
+            ],
           ],
         ),
       ),
@@ -2597,22 +2642,38 @@ class _SectorData {
 }
 
 final _allSectorData = [
-  const _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded, AppColors.warning),
-  const _SectorData('Al arco', EventTypes.shotOnTarget, Icons.gps_fixed_rounded, Color(0xFFFF9800)),
-  const _SectorData('Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
-  const _SectorData('Gol rival', EventTypes.goalRival, Icons.sports_soccer_rounded, AppColors.danger),
-  const _SectorData('Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
-  const _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded, AppColors.warning),
-  const _SectorData('Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
-  const _SectorData('Perdida', EventTypes.loss, Icons.remove_circle_outline_rounded, AppColors.purple),
-  const _SectorData('Intercep.', EventTypes.interception, Icons.compare_arrows_rounded, AppColors.info),
-  _SectorData('Centro', EventTypes.cross, Icons.open_in_full_rounded, AppColors.textSecondary),
-  const _SectorData('Asist.', EventTypes.assist, Icons.handshake_rounded, Color(0xFF67E8F9)),
-  const _SectorData('Atajada', EventTypes.save, Icons.back_hand_rounded, AppColors.purple),
-  const _SectorData('Corner', EventTypes.corner, Icons.flag_rounded, AppColors.warning),
-  _SectorData('Offside', EventTypes.offside, Icons.outlined_flag_rounded, AppColors.textSecondary),
-  const _SectorData('Penal +', EventTypes.penaltyFor, Icons.add_circle_outline_rounded, AppColors.accent),
-  const _SectorData('Penal -', EventTypes.penaltyAgainst, Icons.remove_circle_outline_rounded, AppColors.danger),
+  const _SectorData('Remate', EventTypes.shot, Icons.sports_soccer_rounded,
+      AppColors.warning),
+  const _SectorData('Al arco', EventTypes.shotOnTarget, Icons.gps_fixed_rounded,
+      Color(0xFFFF9800)),
+  const _SectorData(
+      'Gol', EventTypes.goal, Icons.emoji_events_rounded, Color(0xFFFFEB3B)),
+  const _SectorData('Gol rival', EventTypes.goalRival,
+      Icons.sports_soccer_rounded, AppColors.danger),
+  const _SectorData(
+      'Falta', EventTypes.foul, Icons.warning_amber_rounded, AppColors.danger),
+  const _SectorData('Tarjeta', EventTypes.yellowCard, Icons.square_rounded,
+      AppColors.warning),
+  const _SectorData(
+      'Recup.', EventTypes.recovery, Icons.autorenew_rounded, AppColors.info),
+  const _SectorData('Perdida', EventTypes.loss,
+      Icons.remove_circle_outline_rounded, AppColors.purple),
+  const _SectorData('Intercep.', EventTypes.interception,
+      Icons.compare_arrows_rounded, AppColors.info),
+  _SectorData('Centro', EventTypes.cross, Icons.open_in_full_rounded,
+      AppColors.textSecondary),
+  const _SectorData(
+      'Asist.', EventTypes.assist, Icons.handshake_rounded, Color(0xFF67E8F9)),
+  const _SectorData(
+      'Atajada', EventTypes.save, Icons.back_hand_rounded, AppColors.purple),
+  const _SectorData(
+      'Corner', EventTypes.corner, Icons.flag_rounded, AppColors.warning),
+  _SectorData('Offside', EventTypes.offside, Icons.outlined_flag_rounded,
+      AppColors.textSecondary),
+  const _SectorData('Penal +', EventTypes.penaltyFor,
+      Icons.add_circle_outline_rounded, AppColors.accent),
+  const _SectorData('Penal -', EventTypes.penaltyAgainst,
+      Icons.remove_circle_outline_rounded, AppColors.danger),
 ];
 
 List<_SectorData> _sectorDataForActions(List<String> actions) {
@@ -3059,8 +3120,7 @@ class _MiniEventRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis),
                 if (registeredBy != null)
                   Text('Por $registeredBy',
-                      style:
-                          TextStyle(fontSize: 8, color: AppColors.textMuted),
+                      style: TextStyle(fontSize: 8, color: AppColors.textMuted),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
               ],
@@ -3264,8 +3324,7 @@ class _PlayerCell extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 surname,
-                style: TextStyle(
-                    fontSize: 9, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -3472,6 +3531,71 @@ class _MoreEventsSheet extends StatelessWidget {
 //  ENTRETIEMPO PANEL
 // =============================================================================
 
+class _ReadOnlyMatchStatePanel extends StatelessWidget {
+  final String label;
+  final int homeScore;
+  final int awayScore;
+
+  const _ReadOnlyMatchStatePanel({
+    required this.label,
+    required this.homeScore,
+    required this.awayScore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.info.withValues(alpha: 0.4),
+                  width: 0.5,
+                ),
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  color: AppColors.info,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Text(
+              '$homeScore : $awayScore',
+              style: TextStyle(
+                fontSize: 56,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: 6,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Modo lectura. El cuerpo tecnico gestiona el avance del partido.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EntretiempoPanel extends StatelessWidget {
   final int homeScore, awayScore, firstHalfEndSeconds;
   final Future<void> Function() onStartSecondHalf;
@@ -3496,8 +3620,7 @@ class _EntretiempoPanel extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
               decoration: BoxDecoration(
                 color: AppColors.warning.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
@@ -3528,8 +3651,7 @@ class _EntretiempoPanel extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               'Tiempo primer tiempo: $timeStr',
-              style:
-                  TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 36),
             SizedBox(
@@ -3752,8 +3874,7 @@ class _SegundoTiempoFinalizadoPanel extends StatelessWidget {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.black))
                     : const Icon(Icons.sports_score_rounded),
-                label: Text(
-                    finishing ? 'Finalizando...' : 'Finalizar partido'),
+                label: Text(finishing ? 'Finalizando...' : 'Finalizar partido'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.danger,
                   foregroundColor: Colors.black,
@@ -3868,8 +3989,7 @@ class _AlargueFinalizadoPanel extends StatelessWidget {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.black))
                     : const Icon(Icons.sports_score_rounded),
-                label: Text(
-                    finishing ? 'Finalizando...' : 'Finalizar partido'),
+                label: Text(finishing ? 'Finalizando...' : 'Finalizar partido'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.danger,
                   foregroundColor: Colors.black,
@@ -4041,8 +4161,7 @@ class _FullTimeline extends StatelessWidget {
     );
   }
 
-  Widget _buildEventRow(
-      EventoPartidoModel ev, Color color, bool isLast) {
+  Widget _buildEventRow(EventoPartidoModel ev, Color color, bool isLast) {
     final registeredBy = _registeredBy(ev);
 
     return IntrinsicHeight(
@@ -4088,8 +4207,7 @@ class _FullTimeline extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.bgMuted,
                 borderRadius: BorderRadius.circular(10),
-                border:
-                    Border.all(color: AppColors.borderSubtle, width: 0.5),
+                border: Border.all(color: AppColors.borderSubtle, width: 0.5),
               ),
               child: Row(
                 children: [
@@ -4106,14 +4224,12 @@ class _FullTimeline extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(ev.nombreJugador ?? 'Sin jugador',
                             style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary)),
+                                fontSize: 12, color: AppColors.textSecondary)),
                         if (registeredBy != null) ...[
                           const SizedBox(height: 2),
                           Text('Registrado por $registeredBy',
                               style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textMuted)),
+                                  fontSize: 11, color: AppColors.textMuted)),
                         ],
                       ],
                     ),
@@ -4127,8 +4243,8 @@ class _FullTimeline extends StatelessWidget {
                       Container(
                         width: 6,
                         height: 6,
-                        decoration: BoxDecoration(
-                            color: color, shape: BoxShape.circle),
+                        decoration:
+                            BoxDecoration(color: color, shape: BoxShape.circle),
                       ),
                     ],
                   ),
@@ -4184,7 +4300,10 @@ class _CambioDialogState extends State<_CambioDialog> {
       backgroundColor: AppColors.bgSurface,
       title: Text(
         'Realizar cambio',
-        style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+        style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w600),
       ),
       content: SizedBox(
         width: 320,
@@ -4192,7 +4311,8 @@ class _CambioDialogState extends State<_CambioDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Sale del campo', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            Text('Sale del campo',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 6),
             _PlayerDropdown(
               hint: 'Seleccionar jugador',
@@ -4201,7 +4321,8 @@ class _CambioDialogState extends State<_CambioDialog> {
               onChanged: (p) => setState(() => _sale = p),
             ),
             const SizedBox(height: 14),
-            Text('Entra al campo', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            Text('Entra al campo',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 6),
             _PlayerDropdown(
               hint: 'Seleccionar suplente',
@@ -4212,20 +4333,24 @@ class _CambioDialogState extends State<_CambioDialog> {
             if (_canConfirm) ...[
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                  border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.swap_horiz_rounded, color: AppColors.accent, size: 16),
+                    const Icon(Icons.swap_horiz_rounded,
+                        color: AppColors.accent, size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Min. ${widget.minuto}: ${_sale!.nombreJugador} → ${_entra!.nombreJugador}',
-                        style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        style: TextStyle(
+                            color: AppColors.textPrimary, fontSize: 13),
                       ),
                     ),
                   ],
@@ -4238,7 +4363,8 @@ class _CambioDialogState extends State<_CambioDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(null),
-          child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          child: Text('Cancelar',
+              style: TextStyle(color: AppColors.textSecondary)),
         ),
         FilledButton(
           onPressed: _canConfirm
@@ -4280,11 +4406,15 @@ class _PlayerDropdown extends StatelessWidget {
           underline: const SizedBox.shrink(),
           dropdownColor: AppColors.bgSurface,
           style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
-          hint: Text(hint, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          items: players.map((p) => DropdownMenuItem(
-            value: p,
-            child: Text(p.nombreJugador, overflow: TextOverflow.ellipsis),
-          )).toList(),
+          hint: Text(hint,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          items: players
+              .map((p) => DropdownMenuItem(
+                    value: p,
+                    child:
+                        Text(p.nombreJugador, overflow: TextOverflow.ellipsis),
+                  ))
+              .toList(),
           onChanged: onChanged,
         ),
       ),

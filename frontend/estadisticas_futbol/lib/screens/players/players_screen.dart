@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../core/auth/role_permissions.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/remote/auth_state.dart';
@@ -93,10 +94,8 @@ class _PlayersScreenState extends State<PlayersScreen>
   }
 
   List<PlayerModel> get _filteredActive => _activePlayers.where((p) {
-        final matchQuery =
-            p.name.toLowerCase().contains(_query.toLowerCase());
-        final matchStatus =
-            _filterStatus == 'all' || p.status == _filterStatus;
+        final matchQuery = p.name.toLowerCase().contains(_query.toLowerCase());
+        final matchStatus = _filterStatus == 'all' || p.status == _filterStatus;
         final matchPos = _filterPosition == 'all' ||
             (PlayerPositions.groups[_filterPosition]?.contains(p.position) ??
                 false);
@@ -112,22 +111,27 @@ class _PlayersScreenState extends State<PlayersScreen>
 
   @override
   Widget build(BuildContext context) {
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
+
     return PageScaffold(
       title: 'Jugadores',
       subtitle: _loadingActive
           ? ''
           : '${_activePlayers.length} activos · ${_inactivePlayers.length} inactivos',
-      actions: [
-        ElevatedButton.icon(
-          onPressed: () async {
-            final created =
-                await context.push<bool>(AppConstants.routePlayerCreate);
-            if (created == true) _loadActive();
-          },
-          icon: const Icon(Icons.person_add_outlined, size: 16),
-          label: const Text('Añadir'),
-        ),
-      ],
+      actions: canWrite
+          ? [
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final created =
+                      await context.push<bool>(AppConstants.routePlayerCreate);
+                  if (created == true) _loadActive();
+                },
+                icon: const Icon(Icons.person_add_outlined, size: 16),
+                label: const Text('Añadir'),
+              ),
+            ]
+          : const [],
       body: Column(
         children: [
           Container(
@@ -413,8 +417,8 @@ class _FilterBar extends StatelessWidget {
                 const SizedBox(width: 10),
                 _Chip(
                     'Todas', filterPosition == 'all', () => onPosition('all')),
-                ...PlayerPositions.groups.keys.map((g) =>
-                    _Chip(g, filterPosition == g, () => onPosition(g))),
+                ...PlayerPositions.groups.keys.map(
+                    (g) => _Chip(g, filterPosition == g, () => onPosition(g))),
               ],
             ),
           ),
@@ -470,12 +474,9 @@ class _PlayerCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
-          final changed =
-              await context.push<bool>('/players/${player.id}');
+          final changed = await context.push<bool>('/players/${player.id}');
           if (changed == true && context.mounted) {
-            context
-                .findAncestorStateOfType<_PlayersScreenState>()
-                ?._load();
+            context.findAncestorStateOfType<_PlayersScreenState>()?._load();
           }
         },
         child: Container(
@@ -510,8 +511,7 @@ class _PlayerCard extends StatelessWidget {
                             ),
                             child: Text('#${player.jerseyNumber}',
                                 style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.textMuted)),
+                                    fontSize: 10, color: AppColors.textMuted)),
                           ),
                         ],
                       ],
@@ -519,8 +519,7 @@ class _PlayerCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(player.position,
                         style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary)),
+                            fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -537,8 +536,7 @@ class _PlayerCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right,
-                  size: 18, color: AppColors.textMuted),
+              Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
             ],
           ),
         ),
