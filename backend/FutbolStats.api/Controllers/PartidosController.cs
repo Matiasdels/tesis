@@ -1,3 +1,4 @@
+using FutbolStats.Api.Auth;
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using FutbolStats.Api.Services;
@@ -50,6 +51,7 @@ public class PartidosController(
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> CreatePartido(PartidoRequest request)
     {
         var validation = await ValidateRequest(request);
@@ -76,6 +78,7 @@ public class PartidosController(
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> UpdatePartido(int id, PartidoRequest request)
     {
         var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id);
@@ -100,6 +103,7 @@ public class PartidosController(
     }
 
     [HttpPatch("{id:int}/estado")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> PatchEstado(int id, EstadoRequest request)
     {
         var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id);
@@ -128,6 +132,7 @@ public class PartidosController(
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> DeletePartido(int id)
     {
         var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id && p.Activo);
@@ -139,6 +144,7 @@ public class PartidosController(
     }
 
     [HttpPost("{id:int}/analisis-inteligente")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> GenerarAnalisisInteligente(int id, CancellationToken cancellationToken)
     {
         var analisis = await analisisPartidoService.GenerarAsync(id, cancellationToken);
@@ -163,6 +169,7 @@ public class PartidosController(
     }
 
     [HttpPut("{id:int}/alineacion")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> SetAlineacion(int id, AlineacionRequest request)
     {
         var partido = await context.Partidos
@@ -271,6 +278,7 @@ public class PartidosController(
     }
 
     [HttpPost("{id:int}/penales")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> GuardarPenales(int id, PenalesRequest request)
     {
         var partido = await context.Partidos.FirstOrDefaultAsync(p => p.PartidoId == id && p.Activo);

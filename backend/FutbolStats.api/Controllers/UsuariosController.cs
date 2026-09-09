@@ -1,3 +1,4 @@
+using FutbolStats.Api.Auth;
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using FutbolStats.Api.Services;
@@ -9,7 +10,7 @@ namespace FutbolStats.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Responsable institucional,Admin")]
+[Authorize(Roles = AppRoles.GestionUsuarios)]
 public class UsuariosController(
     FutbolStatsDbContext context,
     PasswordHasher passwordHasher) : ControllerBase
@@ -165,6 +166,7 @@ public class UsuariosController(
         {
             "Cuerpo tecnico" => "Cuerpo tecnico",
             "Responsable institucional" => "Responsable institucional",
+            "Jugador" => "Jugador",
             "Entrenador" => "Cuerpo tecnico",
             "Asistente" => "Cuerpo tecnico",
             "Analista" => "Cuerpo tecnico",

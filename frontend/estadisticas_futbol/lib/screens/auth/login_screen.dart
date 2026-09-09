@@ -18,6 +18,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _publicRegisterRoles = ['Cuerpo tecnico', 'Jugador'];
+
   final _formKey = GlobalKey<FormState>();
   final _usuarioController = TextEditingController();
   final _emailController = TextEditingController();
@@ -26,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _apellidoController = TextEditingController();
   bool _registerMode = false;
   bool _obscurePassword = true;
+  String _selectedRegisterRole = _publicRegisterRoles.first;
   String? _error;
 
   @override
@@ -73,8 +76,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         passwordController: _passwordController,
                         nombreController: _nombreController,
                         apellidoController: _apellidoController,
+                        selectedRegisterRole: _selectedRegisterRole,
                         obscurePassword: _obscurePassword,
                         error: visibleError,
+                        onRegisterRoleChanged: (role) {
+                          if (role == null) return;
+                          setState(() => _selectedRegisterRole = role);
+                        },
                         onTogglePassword: () => setState(() {
                           _obscurePassword = !_obscurePassword;
                         }),
@@ -133,6 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text,
           nombre: _nombreController.text.trim(),
           apellido: _apellidoController.text.trim(),
+          rol: _selectedRegisterRole,
         );
       } else {
         await auth.login(
@@ -290,8 +299,10 @@ class _LoginPanel extends StatelessWidget {
   final TextEditingController passwordController;
   final TextEditingController nombreController;
   final TextEditingController apellidoController;
+  final String selectedRegisterRole;
   final bool obscurePassword;
   final String? error;
+  final ValueChanged<String?> onRegisterRoleChanged;
   final VoidCallback onTogglePassword;
   final VoidCallback onSubmit;
   final VoidCallback onToggleMode;
@@ -308,8 +319,10 @@ class _LoginPanel extends StatelessWidget {
     required this.passwordController,
     required this.nombreController,
     required this.apellidoController,
+    required this.selectedRegisterRole,
     required this.obscurePassword,
     required this.error,
+    required this.onRegisterRoleChanged,
     required this.onTogglePassword,
     required this.onSubmit,
     required this.onToggleMode,
@@ -406,6 +419,25 @@ class _LoginPanel extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedRegisterRole,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de cuenta',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Cuerpo tecnico',
+                      child: Text('Cuerpo tecnico'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Jugador',
+                      child: Text('Jugador'),
+                    ),
+                  ],
+                  onChanged: busy ? null : onRegisterRoleChanged,
                 ),
               ],
               const SizedBox(height: 12),

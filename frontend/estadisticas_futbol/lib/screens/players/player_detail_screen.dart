@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
@@ -153,6 +154,9 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
   }
 
   Widget _buildContent(PlayerModel player) {
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
+
     return NestedScrollView(
       headerSliverBuilder: (_, __) => [
         SliverAppBar(
@@ -163,29 +167,31 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(_changed),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Editar jugador',
-              onPressed: () async {
-                final updated =
-                    await context.push<bool>('/players/${player.id}/edit');
-                if (updated == true) {
-                  _changed = true;
-                  _load();
-                }
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                player.active
-                    ? Icons.person_remove_outlined
-                    : Icons.person_add_alt_1_outlined,
-              ),
-              tooltip: player.active ? 'Dar de baja' : 'Reactivar',
-              onPressed: _toggleActive,
-            ),
-          ],
+          actions: canWrite
+              ? [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Editar jugador',
+                    onPressed: () async {
+                      final updated = await context
+                          .push<bool>('/players/${player.id}/edit');
+                      if (updated == true) {
+                        _changed = true;
+                        _load();
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      player.active
+                          ? Icons.person_remove_outlined
+                          : Icons.person_add_alt_1_outlined,
+                    ),
+                    tooltip: player.active ? 'Dar de baja' : 'Reactivar',
+                    onPressed: _toggleActive,
+                  ),
+                ]
+              : const [],
           flexibleSpace: FlexibleSpaceBar(
             background: _PlayerHeader(player: player),
           ),
@@ -212,7 +218,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen>
           _RealDataTab(player: player),
           _CargaFisicaTab(playerId: player.id),
           _MatchesTab(playerId: player.id),
-          _ObservationsTab(playerId: player.id),
+          _ObservationsTab(playerId: player.id, canWrite: canWrite),
         ],
       ),
     );
@@ -496,13 +502,26 @@ class _CargaFisicaTabState extends State<_CargaFisicaTab>
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final token = context.read<AuthState>().session!.accessToken;
       final data = await _api.getActividadJugador(widget.playerId, token);
-      if (mounted) setState(() { _data = data; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _data = data;
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -579,7 +598,8 @@ class _ResumenCarga extends StatelessWidget {
               Expanded(
                 child: _ResumenStat(
                   label: 'Entrenamientos',
-                  value: '${data.entrenamientosRealizados}/${data.entrenamientosConvocado}',
+                  value:
+                      '${data.entrenamientosRealizados}/${data.entrenamientosConvocado}',
                   icon: Icons.fitness_center_rounded,
                   color: AppColors.info,
                 ),
@@ -592,7 +612,8 @@ class _ResumenCarga extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.timer_rounded, size: 15, color: AppColors.textSecondary),
+              Icon(Icons.timer_rounded,
+                  size: 15, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               Text(
                 '${data.minutosDisputados} minutos disputados',
@@ -631,12 +652,11 @@ class _ResumenStat extends StatelessWidget {
         Icon(icon, size: 18, color: c),
         const SizedBox(height: 4),
         Text(value,
-            style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w700, color: c)),
+            style:
+                TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c)),
         const SizedBox(height: 2),
         Text(label,
-            style:
-                TextStyle(fontSize: 10, color: AppColors.textMuted),
+            style: TextStyle(fontSize: 10, color: AppColors.textMuted),
             textAlign: TextAlign.center),
       ],
     );
@@ -669,31 +689,31 @@ class _ActividadRow extends StatelessWidget {
   bool get _esPartido => item.tipo == 'Partido';
 
   Color get _color => switch (item.detalle) {
-        'Titular'               => AppColors.accent,
+        'Titular' => AppColors.accent,
         'Ingresó desde el banco' => AppColors.warning,
-        'Asistió'               => AppColors.info,
-        _                       => AppColors.textMuted,
+        'Asistió' => AppColors.info,
+        _ => AppColors.textMuted,
       };
 
   IconData get _icon => switch (item.detalle) {
-        'Titular'               => Icons.star_rounded,
+        'Titular' => Icons.star_rounded,
         'Ingresó desde el banco' => Icons.swap_horiz_rounded,
-        'Asistió'               => Icons.fitness_center_rounded,
-        _                       => Icons.remove_circle_outline_rounded,
+        'Asistió' => Icons.fitness_center_rounded,
+        _ => Icons.remove_circle_outline_rounded,
       };
 
   @override
   Widget build(BuildContext context) {
     final fecha =
         '${item.fecha.day.toString().padLeft(2, '0')}/${item.fecha.month.toString().padLeft(2, '0')}/${item.fecha.year}';
-    final resultado = (_esPartido &&
-            item.golesEquipo != null &&
-            item.golesRival != null)
-        ? '  ${item.golesEquipo}–${item.golesRival}'
-        : '';
-    final minText = (_esPartido && item.minutosJugados != null && item.minutosJugados! > 0)
-        ? "${item.minutosJugados}'"
-        : null;
+    final resultado =
+        (_esPartido && item.golesEquipo != null && item.golesRival != null)
+            ? '  ${item.golesEquipo}–${item.golesRival}'
+            : '';
+    final minText =
+        (_esPartido && item.minutosJugados != null && item.minutosJugados! > 0)
+            ? "${item.minutosJugados}'"
+            : null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -709,8 +729,7 @@ class _ActividadRow extends StatelessWidget {
                   _esPartido
                       ? 'vs ${item.rival ?? "—"}$resultado'
                       : 'Entrenamiento',
-                  style: TextStyle(
-                      fontSize: 13, color: AppColors.textPrimary),
+                  style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
                 ),
                 Text(
                   item.detalle,
@@ -956,8 +975,12 @@ class _RolBadge extends StatelessWidget {
 
 class _ObservationsTab extends StatefulWidget {
   final int playerId;
+  final bool canWrite;
 
-  const _ObservationsTab({required this.playerId});
+  const _ObservationsTab({
+    required this.playerId,
+    required this.canWrite,
+  });
 
   @override
   State<_ObservationsTab> createState() => _ObservationsTabState();
@@ -1140,8 +1163,8 @@ class _ObservationsTabState extends State<_ObservationsTab>
         icon: Icons.chat_bubble_outline,
         title: 'Sin observaciones',
         subtitle: 'Todavia no hay observaciones para este jugador.',
-        actionLabel: 'Nueva observacion',
-        onAction: _openAddSheet,
+        actionLabel: widget.canWrite ? 'Nueva observacion' : null,
+        onAction: widget.canWrite ? _openAddSheet : null,
       );
     }
 
@@ -1158,21 +1181,25 @@ class _ObservationsTabState extends State<_ObservationsTab>
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, i) => _ObservationCard(
             observation: _observations[i],
-            onEdit: () => _openEditSheet(_observations[i]),
-            onDelete: () => _deleteObservation(_observations[i]),
+            onEdit:
+                widget.canWrite ? () => _openEditSheet(_observations[i]) : null,
+            onDelete: widget.canWrite
+                ? () => _deleteObservation(_observations[i])
+                : null,
           ),
         ),
-        Positioned(
-          right: AppConstants.pagePadding,
-          bottom: AppConstants.pagePadding,
-          child: FloatingActionButton.small(
-            onPressed: _openAddSheet,
-            backgroundColor: AppColors.accent,
-            foregroundColor: Colors.black,
-            tooltip: 'Nueva observacion',
-            child: const Icon(Icons.add),
+        if (widget.canWrite)
+          Positioned(
+            right: AppConstants.pagePadding,
+            bottom: AppConstants.pagePadding,
+            child: FloatingActionButton.small(
+              onPressed: _openAddSheet,
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.black,
+              tooltip: 'Nueva observacion',
+              child: const Icon(Icons.add),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1291,12 +1318,10 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
               autocorrect: false,
               enableSuggestions: false,
               textCapitalization: TextCapitalization.sentences,
-              style: TextStyle(
-                  color: AppColors.textPrimary, fontSize: 14),
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Escribi tu observacion aqui...',
-                hintStyle:
-                    TextStyle(color: AppColors.textMuted, fontSize: 14),
+                hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
                 filled: true,
                 fillColor: AppColors.bgMuted,
                 border: OutlineInputBorder(
@@ -1318,8 +1343,7 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(AppConstants.cardRadius),
+                  borderRadius: BorderRadius.circular(AppConstants.cardRadius),
                 ),
               ),
               child: _saving
@@ -1341,8 +1365,8 @@ class _AddObservationSheetState extends State<_AddObservationSheet> {
 
 class _ObservationCard extends StatelessWidget {
   final PlayerObservacionModel observation;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _ObservationCard({
     required this.observation,
@@ -1379,8 +1403,7 @@ class _ObservationCard extends StatelessWidget {
               ],
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
@@ -1395,24 +1418,27 @@ class _ObservationCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              PopupMenuButton<String>(
-                tooltip: 'Opciones',
-                icon: const Icon(Icons.more_vert_rounded),
-                onSelected: (value) {
-                  if (value == 'edit') onEdit();
-                  if (value == 'delete') onDelete();
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Editar'),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Eliminar'),
-                  ),
-                ],
-              ),
+              if (onEdit != null || onDelete != null)
+                PopupMenuButton<String>(
+                  tooltip: 'Opciones',
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit?.call();
+                    if (value == 'delete') onDelete?.call();
+                  },
+                  itemBuilder: (context) => [
+                    if (onEdit != null)
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Editar'),
+                      ),
+                    if (onDelete != null)
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Eliminar'),
+                      ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 8),

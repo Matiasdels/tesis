@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/auth/role_permissions.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_controller.dart';
@@ -258,10 +259,10 @@ void _showSettingsPanel(BuildContext context) {
                             },
                           ),
                           Divider(height: 1, color: AppColors.borderSubtle),
-                        Consumer<AppSettingsController>(
-                          builder: (context, settingsController, _) {
-                            final settings = settingsController.settings;
-                            return _SettingsSwitchTile(
+                          Consumer<AppSettingsController>(
+                            builder: (context, settingsController, _) {
+                              final settings = settingsController.settings;
+                              return _SettingsSwitchTile(
                                 icon: Icons.waving_hand_outlined,
                                 title: 'Mostrar saludo del panel',
                                 subtitle: settings.showDashboardGreeting
@@ -278,126 +279,126 @@ void _showSettingsPanel(BuildContext context) {
                               );
                             },
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    _SettingsSection(
-                      title: 'Alineacion',
-                      children: [
-                        Consumer<AppSettingsController>(
-                          builder: (context, settingsController, _) {
-                            final settings = settingsController.settings;
-                            return _SettingsActionTile(
-                              icon: Icons.account_tree_outlined,
-                              title: 'Formacion predeterminada',
-                              subtitle: settings.defaultFormation,
-                              onTap: () => _selectDefaultFormation(
-                                context,
-                                settingsController,
-                              ),
-                            );
-                          },
-                        ),
-                        Divider(height: 1, color: AppColors.borderSubtle),
-                        Consumer<AppSettingsController>(
-                          builder: (context, settingsController, _) {
-                            final settings = settingsController.settings;
-                            return _SettingsSwitchTile(
-                              icon: Icons.history_rounded,
-                              title: 'Recordar ultima formacion',
-                              subtitle: settings.rememberLastFormation
-                                  ? 'Usa la ultima formacion guardada'
-                                  : 'Mantiene la formacion predeterminada',
-                              value: settings.rememberLastFormation,
-                              onChanged: (value) {
-                                settingsController.save(
-                                  settings.copyWith(
-                                    rememberLastFormation: value,
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    _SettingsSection(
-                      title: 'Partido en vivo',
-                      children: [
-                        Consumer<AppSettingsController>(
-                          builder: (context, settingsController, _) {
-                            final settings = settingsController.settings;
-                            final count = settings.radialMenuActions.length;
-                            return _SettingsActionTile(
-                              icon: Icons.adjust_rounded,
-                              title: 'Menu radial',
-                              subtitle: '$count acciones rapidas visibles',
-                              onTap: () => _selectRadialMenuActions(
-                                context,
-                                settingsController,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    _SettingsSection(
-                      title: 'Cuenta y datos',
-                      children: [
-                        if (canManageUsers) ...[
-                          _SettingsActionTile(
-                            icon: Icons.manage_accounts_outlined,
-                            title: 'Usuarios y roles',
-                            subtitle: 'Crear y administrar usuarios',
-                            onTap: () {
-                              Navigator.of(sheetContext).pop();
-                              context.go(AppConstants.routeUsers);
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _SettingsSection(
+                        title: 'Alineacion',
+                        children: [
+                          Consumer<AppSettingsController>(
+                            builder: (context, settingsController, _) {
+                              final settings = settingsController.settings;
+                              return _SettingsActionTile(
+                                icon: Icons.account_tree_outlined,
+                                title: 'Formacion predeterminada',
+                                subtitle: settings.defaultFormation,
+                                onTap: () => _selectDefaultFormation(
+                                  context,
+                                  settingsController,
+                                ),
+                              );
                             },
                           ),
                           Divider(height: 1, color: AppColors.borderSubtle),
-                        ],
-                        _SettingsActionTile(
-                          icon: Icons.logout_rounded,
-                          title: 'Cerrar sesion',
-                          subtitle: 'Salir de la cuenta actual',
-                          iconColor: AppColors.danger,
-                          iconBackground: AppColors.dangerDim,
-                          onTap: () async {
-                            Navigator.of(sheetContext).pop();
-                            await _logout(context);
-                          },
-                        ),
-                        Divider(height: 1, color: AppColors.borderSubtle),
-                        Consumer2<AppSettingsController, ThemeController>(
-                          builder: (
-                            context,
-                            settingsController,
-                            themeController,
-                            _,
-                          ) {
-                            return _SettingsActionTile(
-                              icon: Icons.restart_alt_rounded,
-                              title: 'Restablecer configuraciones',
-                              subtitle: 'Vuelve a los valores originales',
-                              onTap: () async {
-                                await settingsController.resetToDefaults();
-                                await themeController.resetToDefaults();
-                                if (!sheetContext.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Configuraciones restablecidas',
+                          Consumer<AppSettingsController>(
+                            builder: (context, settingsController, _) {
+                              final settings = settingsController.settings;
+                              return _SettingsSwitchTile(
+                                icon: Icons.history_rounded,
+                                title: 'Recordar ultima formacion',
+                                subtitle: settings.rememberLastFormation
+                                    ? 'Usa la ultima formacion guardada'
+                                    : 'Mantiene la formacion predeterminada',
+                                value: settings.rememberLastFormation,
+                                onChanged: (value) {
+                                  settingsController.save(
+                                    settings.copyWith(
+                                      rememberLastFormation: value,
                                     ),
-                                  ),
-                                );
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _SettingsSection(
+                        title: 'Partido en vivo',
+                        children: [
+                          Consumer<AppSettingsController>(
+                            builder: (context, settingsController, _) {
+                              final settings = settingsController.settings;
+                              final count = settings.radialMenuActions.length;
+                              return _SettingsActionTile(
+                                icon: Icons.adjust_rounded,
+                                title: 'Menu radial',
+                                subtitle: '$count acciones rapidas visibles',
+                                onTap: () => _selectRadialMenuActions(
+                                  context,
+                                  settingsController,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _SettingsSection(
+                        title: 'Cuenta y datos',
+                        children: [
+                          if (canManageUsers) ...[
+                            _SettingsActionTile(
+                              icon: Icons.manage_accounts_outlined,
+                              title: 'Usuarios y roles',
+                              subtitle: 'Crear y administrar usuarios',
+                              onTap: () {
+                                Navigator.of(sheetContext).pop();
+                                context.go(AppConstants.routeUsers);
                               },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                            ),
+                            Divider(height: 1, color: AppColors.borderSubtle),
+                          ],
+                          _SettingsActionTile(
+                            icon: Icons.logout_rounded,
+                            title: 'Cerrar sesion',
+                            subtitle: 'Salir de la cuenta actual',
+                            iconColor: AppColors.danger,
+                            iconBackground: AppColors.dangerDim,
+                            onTap: () async {
+                              Navigator.of(sheetContext).pop();
+                              await _logout(context);
+                            },
+                          ),
+                          Divider(height: 1, color: AppColors.borderSubtle),
+                          Consumer2<AppSettingsController, ThemeController>(
+                            builder: (
+                              context,
+                              settingsController,
+                              themeController,
+                              _,
+                            ) {
+                              return _SettingsActionTile(
+                                icon: Icons.restart_alt_rounded,
+                                title: 'Restablecer configuraciones',
+                                subtitle: 'Vuelve a los valores originales',
+                                onTap: () async {
+                                  await settingsController.resetToDefaults();
+                                  await themeController.resetToDefaults();
+                                  if (!sheetContext.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Configuraciones restablecidas',
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -411,8 +412,7 @@ void _showSettingsPanel(BuildContext context) {
 }
 
 bool _canManageUsers(String? role) {
-  final normalized = role?.trim().toLowerCase();
-  return normalized == 'responsable institucional' || normalized == 'admin';
+  return RolePermissions.canManageUsers(role);
 }
 
 Future<void> _selectDefaultFormation(
@@ -536,8 +536,8 @@ Future<void> _selectRadialMenuActions(
                       itemBuilder: (context, index) {
                         final action = EventTypes.registrable[index];
                         final isSelected = draft.contains(action);
-                        final canAdd =
-                            isSelected || draft.length < AppConstants.radialSegments;
+                        final canAdd = isSelected ||
+                            draft.length < AppConstants.radialSegments;
                         final canRemove = !isSelected || draft.length > 1;
 
                         return CheckboxListTile(
@@ -587,7 +587,8 @@ Future<void> _selectRadialMenuActions(
                         TextButton(
                           onPressed: () {
                             setSheetState(() {
-                              draft = List<String>.from(EventTypes.radialPrimary);
+                              draft =
+                                  List<String>.from(EventTypes.radialPrimary);
                             });
                           },
                           child: const Text('Restablecer'),
@@ -1053,9 +1054,9 @@ void _showProfileSheet(BuildContext context) {
                 ),
               ),
               const SizedBox(height: 18),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.bgSurface,
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.bgSurface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.borderSubtle, width: 0.5),
                 ),

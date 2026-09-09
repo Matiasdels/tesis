@@ -15,7 +15,11 @@ public class AuthController(
     PasswordHasher passwordHasher,
     TokenService tokenService) : ControllerBase
 {
-    private const string PublicRegistrationRole = "Cuerpo tecnico";
+    private static readonly string[] PublicRegistrationRoles =
+    [
+        "Cuerpo tecnico",
+        "Jugador"
+    ];
 
     [HttpPost("registro")]
     [AllowAnonymous]
@@ -39,11 +43,20 @@ public class AuthController(
             return Conflict("Ya existe un usuario con ese nombre de usuario o email.");
         }
 
+        var requestedRole = string.IsNullOrWhiteSpace(request.Rol)
+            ? PublicRegistrationRoles[0]
+            : request.Rol.Trim();
+
+        if (!PublicRegistrationRoles.Contains(requestedRole, StringComparer.OrdinalIgnoreCase))
+        {
+            return BadRequest("El rol seleccionado no esta disponible para registro publico.");
+        }
+
         var rol = await context.Roles
-            .FirstOrDefaultAsync(r => r.Nombre == PublicRegistrationRole);
+            .FirstOrDefaultAsync(r => r.Nombre == requestedRole);
         if (rol is null)
         {
-            return Problem("No hay un rol predeterminado configurado para nuevos usuarios.");
+            return Problem("No hay un rol configurado para nuevos usuarios.");
         }
 
         var usuario = new Usuario
@@ -216,7 +229,8 @@ public record RegisterRequest(
     string Email,
     string Password,
     string Nombre,
-    string Apellido);
+    string Apellido,
+    string? Rol = null);
 
 public record LoginRequest(string UsuarioOEmail, string Password);
 
