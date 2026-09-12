@@ -11,6 +11,7 @@ frontend/**/android/.kotlin/
 # .NET
 backend/**/bin/
 backend/**/obj/
+backend/**/appsettings.Development.json
 
 # IDE
 .vscode/
