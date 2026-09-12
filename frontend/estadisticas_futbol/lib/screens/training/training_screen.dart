@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
@@ -238,6 +239,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite =
+        RolePermissions.canWriteSportData(context.watch<AuthState>().user?.rol);
     final totalAttendance = _sessions.fold<int>(
       0,
       (sum, session) => sum + session.attended,
@@ -246,13 +249,16 @@ class _TrainingScreenState extends State<TrainingScreen> {
     return PageScaffold(
       title: 'Entrenamientos',
       subtitle: 'Planificacion y seguimiento del plantel',
-      actions: [
-        ElevatedButton.icon(
-          onPressed: _categories.isEmpty && !_loading ? null : _createTraining,
-          icon: const Icon(Icons.add_rounded, size: 16),
-          label: const Text('Nuevo'),
-        ),
-      ],
+      actions: canWrite
+          ? [
+              ElevatedButton.icon(
+                onPressed:
+                    _categories.isEmpty && !_loading ? null : _createTraining,
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Nuevo'),
+              ),
+            ]
+          : const [],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -277,10 +283,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
                         EmptyState(
                           icon: Icons.fitness_center_rounded,
                           title: 'Sin entrenamientos registrados',
-                          subtitle:
-                              'Crea el primer entrenamiento para comenzar el seguimiento.',
-                          actionLabel: 'Nuevo entrenamiento',
-                          onAction: _createTraining,
+                          subtitle: canWrite
+                              ? 'Crea el primer entrenamiento para comenzar el seguimiento.'
+                              : 'Todavia no hay entrenamientos registrados.',
+                          actionLabel: canWrite ? 'Nuevo entrenamiento' : null,
+                          onAction: canWrite ? _createTraining : null,
                         )
                       else
                         ..._sessions.map(
@@ -289,9 +296,12 @@ class _TrainingScreenState extends State<TrainingScreen> {
                             child: _TrainingCard(
                               session: session,
                               players: _playersForSession(session),
-                              onAttendance: () =>
-                                  _openAttendanceSheet(session),
-                              onDelete: () => _deleteTraining(session),
+                              onAttendance: canWrite
+                                  ? () => _openAttendanceSheet(session)
+                                  : null,
+                              onDelete: canWrite
+                                  ? () => _deleteTraining(session)
+                                  : null,
                             ),
                           ),
                         ),
@@ -400,8 +410,8 @@ class _SummaryCard extends StatelessWidget {
 class _TrainingCard extends StatelessWidget {
   final TrainingSessionModel session;
   final List<PlayerModel> players;
-  final VoidCallback onAttendance;
-  final VoidCallback onDelete;
+  final VoidCallback? onAttendance;
+  final VoidCallback? onDelete;
 
   const _TrainingCard({
     required this.session,
@@ -414,9 +424,8 @@ class _TrainingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final date =
         '${session.date.day.toString().padLeft(2, '0')}/${session.date.month.toString().padLeft(2, '0')}/${session.date.year}';
-    final duration = session.durationMin == null
-        ? null
-        : '${session.durationMin} min';
+    final duration =
+        session.durationMin == null ? null : '${session.durationMin} min';
     final playerById = <int, PlayerModel>{};
     for (final player in players) {
       playerById[player.id] = player;
@@ -488,12 +497,13 @@ class _TrainingCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: 'Eliminar entrenamiento',
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: AppColors.danger,
-                onPressed: onDelete,
-              ),
+              if (onDelete != null)
+                IconButton(
+                  tooltip: 'Eliminar entrenamiento',
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: AppColors.danger,
+                  onPressed: onDelete,
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -511,11 +521,12 @@ class _TrainingCard extends StatelessWidget {
                 color: AppColors.warning,
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: onAttendance,
-                icon: const Icon(Icons.fact_check_rounded, size: 16),
-                label: const Text('Asistencia'),
-              ),
+              if (onAttendance != null)
+                TextButton.icon(
+                  onPressed: onAttendance,
+                  icon: const Icon(Icons.fact_check_rounded, size: 16),
+                  label: const Text('Asistencia'),
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -729,7 +740,9 @@ class _AttendanceSheetState extends State<_AttendanceSheet> {
                         ),
                       ),
                       subtitle: Text(
-                        player.position.isEmpty ? 'Sin posicion' : player.position,
+                        player.position.isEmpty
+                            ? 'Sin posicion'
+                            : player.position,
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12,

@@ -174,8 +174,6 @@ public class AnalisisPartidoService(
         string model,
         CancellationToken cancellationToken)
     {
-        httpClient.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.TimeoutSeconds));
-
         var requestBody = new
         {
             systemInstruction = new
@@ -274,6 +272,26 @@ public class AnalisisPartidoService(
         }
 
         var cleanText = CleanLooseText(outputText);
+        var unwrappedJson = TryUnwrapJsonString(cleanText);
+        if (!string.IsNullOrWhiteSpace(unwrappedJson))
+        {
+            foreach (var candidate in BuildJsonCandidates(unwrappedJson))
+            {
+                try
+                {
+                    var payload = JsonSerializer.Deserialize<AiAnalysisPayload>(candidate, JsonOptions);
+                    if (payload is not null && payload.HasContent)
+                    {
+                        return NormalizeNestedJsonPayload(payload);
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Se intenta con el siguiente candidato limpio.
+                }
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(cleanText))
         {
             return new AiAnalysisPayload
@@ -283,6 +301,25 @@ public class AnalisisPartidoService(
         }
 
         throw new InvalidOperationException("No se pudo interpretar la respuesta de Gemini.");
+    }
+
+    private static string? TryUnwrapJsonString(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            !value.TrimStart().StartsWith('"'))
+        {
+            return null;
+        }
+
+        try
+        {
+            var unwrapped = JsonSerializer.Deserialize<string>(value, JsonOptions);
+            return LooksLikeJsonObject(unwrapped) ? unwrapped : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static IEnumerable<string> BuildJsonCandidates(string outputText)

@@ -78,6 +78,7 @@ public class CatalogosController(FutbolStatsDbContext context) : ControllerBase
         {
             "Cuerpo tecnico" => "Cuerpo tecnico",
             "Responsable institucional" => "Responsable institucional",
+            "Jugador" => "Jugador",
             "Entrenador" => "Cuerpo tecnico",
             "Admin" => "Responsable institucional",
             "Asistente" => null,

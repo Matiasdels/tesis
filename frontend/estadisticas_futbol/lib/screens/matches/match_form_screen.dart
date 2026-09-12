@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
@@ -115,6 +116,12 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
   }
 
   Future<void> _submit() async {
+    if (!RolePermissions.canWriteSportData(
+        context.read<AuthState>().session?.user.rol)) {
+      context.go(AppConstants.routeDashboard);
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_fecha == null) {
@@ -179,6 +186,23 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite = RolePermissions.canWriteSportData(
+      context.watch<AuthState>().session?.user.rol,
+    );
+
+    if (!canWrite) {
+      return const PageScaffold(
+        title: 'Partidos',
+        showBack: true,
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Solo lectura',
+          subtitle:
+              'Tu usuario puede consultar partidos, pero no crear ni editar datos.',
+        ),
+      );
+    }
+
     return PageScaffold(
       title: widget.isEditing ? 'Editar partido' : 'Nuevo partido',
       showBack: true,
@@ -222,11 +246,11 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: _tipoCompeticion,
-                      decoration:
-                          const InputDecoration(labelText: 'Tipo de competición'),
+                      decoration: const InputDecoration(
+                          labelText: 'Tipo de competición'),
                       items: TiposCompeticion.all
-                          .map((t) =>
-                              DropdownMenuItem(value: t, child: Text(t)))
+                          .map(
+                              (t) => DropdownMenuItem(value: t, child: Text(t)))
                           .toList(),
                       onChanged: _saving
                           ? null
@@ -250,14 +274,12 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                           .toList(),
                       onChanged: _saving
                           ? null
-                          : (v) =>
-                              setState(() => _definicionEmpate = v!),
+                          : (v) => setState(() => _definicionEmpate = v!),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       initialValue: _categoriaId,
-                      decoration:
-                          const InputDecoration(labelText: 'Categoría'),
+                      decoration: const InputDecoration(labelText: 'Categoría'),
                       items: _categories
                           .map((c) => DropdownMenuItem(
                               value: c.id, child: Text(c.name)))
@@ -272,8 +294,7 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                     if (widget.isEditing) ...[
                       DropdownButtonFormField<String>(
                         initialValue: _estado,
-                        decoration:
-                            const InputDecoration(labelText: 'Estado'),
+                        decoration: const InputDecoration(labelText: 'Estado'),
                         items: EstadosPartido.all
                             .map((e) =>
                                 DropdownMenuItem(value: e, child: Text(e)))
@@ -303,7 +324,9 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            _esLocal ? 'Partido de local' : 'Partido de visitante',
+                            _esLocal
+                                ? 'Partido de local'
+                                : 'Partido de visitante',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
@@ -312,8 +335,9 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                         ),
                         Switch(
                           value: _esLocal,
-                          onChanged:
-                              _saving ? null : (v) => setState(() => _esLocal = v),
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _esLocal = v),
                           activeThumbColor: AppColors.accent,
                         ),
                       ],
@@ -335,8 +359,9 @@ class _MatchFormScreenState extends State<MatchFormScreen> {
                               ),
                             )
                           : const Icon(Icons.save_outlined),
-                      label: Text(
-                          widget.isEditing ? 'Guardar cambios' : 'Crear partido'),
+                      label: Text(widget.isEditing
+                          ? 'Guardar cambios'
+                          : 'Crear partido'),
                     ),
                   ],
                 ),

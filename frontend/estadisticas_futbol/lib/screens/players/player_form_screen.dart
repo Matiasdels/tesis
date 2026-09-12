@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/auth/role_permissions.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/remote/auth_state.dart';
@@ -137,6 +138,12 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
   }
 
   Future<void> _submit() async {
+    if (!RolePermissions.canWriteSportData(
+        context.read<AuthState>().session?.user.rol)) {
+      context.go(AppConstants.routeDashboard);
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_categoryId == null) {
@@ -195,8 +202,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
       partidosSuspendido: _status == 'suspended'
           ? int.tryParse(_suspendedMatchesController.text.trim())
           : null,
-      fechaEstimadaRegreso:
-          _status == 'injured' ? _fechaEstimadaRegreso : null,
+      fechaEstimadaRegreso: _status == 'injured' ? _fechaEstimadaRegreso : null,
     );
 
     final token = context.read<AuthState>().session!.accessToken;
@@ -269,6 +275,23 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite = RolePermissions.canWriteSportData(
+      context.watch<AuthState>().session?.user.rol,
+    );
+
+    if (!canWrite) {
+      return const PageScaffold(
+        title: 'Jugadores',
+        showBack: true,
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Solo lectura',
+          subtitle:
+              'Tu usuario puede consultar jugadores, pero no crear ni editar datos.',
+        ),
+      );
+    }
+
     return PageScaffold(
       title: widget.isEditing ? 'Editar jugador' : 'Nuevo jugador',
       showBack: true,
@@ -336,7 +359,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                       controller: _numberController,
                       enabled: !_saving,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Número de camiseta'),
+                      decoration: const InputDecoration(
+                          labelText: 'Número de camiseta'),
                       validator: _validateNumero,
                     ),
                     const SizedBox(height: 12),
@@ -345,7 +369,8 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                       enabled: !_saving,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Altura (cm)'),
+                      decoration:
+                          const InputDecoration(labelText: 'Altura (cm)'),
                       validator: _validateAltura,
                     ),
                     const SizedBox(height: 12),
@@ -360,11 +385,10 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: _nationality,
-                      decoration:
-                          const InputDecoration(labelText: 'País'),
+                      decoration: const InputDecoration(labelText: 'País'),
                       items: Nacionalidades.all
-                          .map((n) =>
-                              DropdownMenuItem(value: n, child: Text(n)))
+                          .map(
+                              (n) => DropdownMenuItem(value: n, child: Text(n)))
                           .toList(),
                       onChanged: _saving
                           ? null
@@ -438,8 +462,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
                             _fechaEstimadaRegreso == null
                                 ? 'Sin definir'
                                 : _formatDate(_fechaEstimadaRegreso!),
-                            style:
-                                TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(color: AppColors.textPrimary),
                           ),
                         ),
                       ),

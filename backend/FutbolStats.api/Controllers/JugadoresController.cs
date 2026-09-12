@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using FutbolStats.Api.Auth;
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using FutbolStats.Api.Services;
@@ -52,6 +53,7 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> CreateJugador(JugadorRequest request)
     {
         var validation = await ValidateRequest(request);
@@ -95,6 +97,7 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> UpdateJugador(int id, JugadorRequest request)
     {
         var jugador = await context.Jugadores.FirstOrDefaultAsync(j => j.JugadorId == id);
@@ -284,6 +287,7 @@ public class JugadoresController(FutbolStatsDbContext context) : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> DeactivateJugador(int id)
     {
         var jugador = await context.Jugadores.FirstOrDefaultAsync(j => j.JugadorId == id);

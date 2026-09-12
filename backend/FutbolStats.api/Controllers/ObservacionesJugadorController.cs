@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FutbolStats.Api.Auth;
 using FutbolStats.Api.Data;
 using FutbolStats.Api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -34,6 +35,7 @@ public class ObservacionesJugadorController(FutbolStatsDbContext context) : Cont
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> CreateObservacion(int jugadorId, ObservacionRequest request)
     {
         var existe = await context.Jugadores
@@ -73,6 +75,7 @@ public class ObservacionesJugadorController(FutbolStatsDbContext context) : Cont
     }
 
     [HttpPut("{observacionId:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> UpdateObservacion(
         int jugadorId,
         int observacionId,
@@ -101,6 +104,7 @@ public class ObservacionesJugadorController(FutbolStatsDbContext context) : Cont
     }
 
     [HttpDelete("{observacionId:int}")]
+    [Authorize(Roles = AppRoles.EscrituraDeportiva)]
     public async Task<IActionResult> DeleteObservacion(int jugadorId, int observacionId)
     {
         var observacion = await context.Observaciones

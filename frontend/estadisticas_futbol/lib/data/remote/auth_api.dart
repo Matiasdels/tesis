@@ -25,6 +25,7 @@ class AuthApi {
     required String password,
     required String nombre,
     required String apellido,
+    required String rol,
   }) async {
     final response = await _post('/api/Auth/registro', {
       'nombreUsuario': nombreUsuario,
@@ -32,6 +33,7 @@ class AuthApi {
       'password': password,
       'nombre': nombre,
       'apellido': apellido,
+      'rol': rol,
     });
 
     return AuthSession.fromJson(response);

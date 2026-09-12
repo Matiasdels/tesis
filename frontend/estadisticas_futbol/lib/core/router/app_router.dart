@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:estadisticas_futbol/core/constants/app_constants.dart';
+import 'package:estadisticas_futbol/core/auth/role_permissions.dart';
 import 'package:estadisticas_futbol/screens/dashboard/dashboard_screen.dart';
 import 'package:estadisticas_futbol/screens/players/players_screen.dart';
 import 'package:estadisticas_futbol/screens/players/player_detail_screen.dart';
@@ -47,6 +48,18 @@ GoRouter createRouter(AuthState authState) => GoRouter(
           return AppConstants.routeDashboard;
         }
 
+        final path = state.uri.path;
+        final role = authState.user?.rol;
+        if (path == AppConstants.routeUsers &&
+            !RolePermissions.canManageUsers(role)) {
+          return AppConstants.routeDashboard;
+        }
+
+        if (_isSportWriteRoute(path) &&
+            !RolePermissions.canWriteSportData(role)) {
+          return AppConstants.routeDashboard;
+        }
+
         return null;
       },
       routes: [
@@ -90,7 +103,9 @@ GoRouter createRouter(AuthState authState) => GoRouter(
                         ? s.extra as PlayerMatchModel
                         : null;
                     return _slide<bool>(
-                        s, MatchDetailScreen(matchId: id, playerContext: playerCtx));
+                        s,
+                        MatchDetailScreen(
+                            matchId: id, playerContext: playerCtx));
                   },
                   routes: [
                     GoRoute(
@@ -177,6 +192,16 @@ GoRouter createRouter(AuthState authState) => GoRouter(
         ),
       ],
     );
+
+bool _isSportWriteRoute(String path) {
+  if (path == AppConstants.routeMatchCreate ||
+      path == AppConstants.routePlayerCreate) {
+    return true;
+  }
+
+  return RegExp(r'^/matches/\d+/(edit|lineup|penales)$').hasMatch(path) ||
+      RegExp(r'^/players/\d+/edit$').hasMatch(path);
+}
 
 CustomTransitionPage<void> _fade(GoRouterState state, Widget child) =>
     CustomTransitionPage(
