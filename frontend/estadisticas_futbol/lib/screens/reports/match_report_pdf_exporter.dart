@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -251,17 +252,26 @@ class MatchReportPdfExporter {
     List<EventoPartidoModel> events,
   ) async {
     if (events.isEmpty) return null;
-    const w = 750;
-    const h = 1005; // 1:1.34 ratio, matches app's height = width * 1.34
-    final recorder = ui.PictureRecorder();
-    MatchPitchPainter(
-      events: events,
-      showEventDots: false,
-      showHeatMap: true,
-    ).paint(ui.Canvas(recorder), ui.Size(w.toDouble(), h.toDouble()));
-    final img = await recorder.endRecording().toImage(w, h);
-    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-    return bytes?.buffer.asUint8List();
+    const w = 200;
+    const h = 268;
+    ui.Picture? picture;
+    ui.Image? img;
+    try {
+      final recorder = ui.PictureRecorder();
+      MatchPitchPainter(
+        events: events,
+        showEventDots: false,
+        showHeatMap: true,
+      ).paint(ui.Canvas(recorder), const ui.Size(w * 1.0, h * 1.0));
+      picture = recorder.endRecording();
+      img = await picture.toImage(w, h);
+      final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+      // Los bytes son CPU memory — sobreviven al dispose de la imagen
+      return bytes?.buffer.asUint8List();
+    } finally {
+      picture?.dispose();
+      img?.dispose();
+    }
   }
 
   // ── Spatial distribution insights ────────────────────────────────────────────
@@ -427,41 +437,64 @@ class MatchReportPdfExporter {
     required PartidoModel match,
     required List<EventoPartidoModel> events,
   }) async {
-    final doc = pw.Document();
-    final stats = _MatchStats(match: match, events: events);
-    final sortedEvents = List<EventoPartidoModel>.from(events)
-      ..sort((a, b) => a.minuto.compareTo(b.minuto));
-
-    // ── Separate events by category for spatial analysis ────────────────────
+    // ── Separate events by category ──────────────────────────────────────────
     const offensiveTypes = {
-      EventTypes.goal,
-      EventTypes.assist,
-      EventTypes.shot,
-      EventTypes.shotOnTarget,
-      EventTypes.passKey,
-      EventTypes.cross,
-      EventTypes.corner,
-      EventTypes.penaltyFor,
-      EventTypes.offside,
+      EventTypes.goal, EventTypes.assist, EventTypes.shot,
+      EventTypes.shotOnTarget, EventTypes.passKey, EventTypes.cross,
+      EventTypes.corner, EventTypes.penaltyFor, EventTypes.offside,
     };
     const defensiveTypes = {
-      EventTypes.recovery,
-      EventTypes.interception,
-      EventTypes.save,
-      EventTypes.loss,
-      EventTypes.foul,
-      EventTypes.penaltyAgainst,
+      EventTypes.recovery, EventTypes.interception, EventTypes.save,
+      EventTypes.loss, EventTypes.foul, EventTypes.penaltyAgainst,
     };
     final offensiveEvents =
         events.where((e) => offensiveTypes.contains(e.tipoEventoNombre)).toList();
     final defensiveEvents =
         events.where((e) => defensiveTypes.contains(e.tipoEventoNombre)).toList();
 
-    // Render heat maps before building PDF (off-screen via PictureRecorder)
-    final generalImg = await _renderPitchHeatMap(events);
-    final offensiveImg = await _renderPitchHeatMap(offensiveEvents);
-    final defensiveImg = await _renderPitchHeatMap(defensiveEvents);
+    // ── Render heat maps on main isolate (GPU required) ──────────────────────
+    Uint8List? generalImg;
+    Uint8List? offensiveImg;
+    Uint8List? defensiveImg;
+    try {
+      generalImg = await _renderPitchHeatMap(events);
+      offensiveImg = await _renderPitchHeatMap(offensiveEvents);
+      defensiveImg = await _renderPitchHeatMap(defensiveEvents);
+    } catch (_) {}
 
+    // ── Build PDF in background isolate (fresh heap, no Flutter UI state) ────
+    final pdfBytes = await Isolate.run(() => _buildPdfBytes(
+      match: match,
+      events: events,
+      offensiveEvents: offensiveEvents,
+      defensiveEvents: defensiveEvents,
+      generalImg: generalImg,
+      offensiveImg: offensiveImg,
+      defensiveImg: defensiveImg,
+    ));
+
+    await Printing.sharePdf(
+      bytes: pdfBytes,
+      filename:
+          'partido_vs_${_sanitizeFileName(match.rival)}_${_formatDateFile(match.fecha)}.pdf',
+    );
+  }
+
+  static Future<Uint8List> _buildPdfBytes({
+    required PartidoModel match,
+    required List<EventoPartidoModel> events,
+    required List<EventoPartidoModel> offensiveEvents,
+    required List<EventoPartidoModel> defensiveEvents,
+    Uint8List? generalImg,
+    Uint8List? offensiveImg,
+    Uint8List? defensiveImg,
+  }) async {
+    final doc = pw.Document(compress: false);
+    final stats = _MatchStats(match: match, events: events);
+    final sortedEvents = List<EventoPartidoModel>.from(events)
+      ..sort((a, b) => a.minuto.compareTo(b.minuto));
+
+    // ── Bloque 1: resumen y estadísticas principales ─────────────────────────
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -469,7 +502,6 @@ class MatchReportPdfExporter {
         header: (ctx) =>
             ctx.pageNumber > 1 ? _miniHeader(match) : pw.SizedBox(),
         build: (ctx) => [
-          // ─ Página 1 ─
           _buildHeader(match, stats),
           pw.SizedBox(height: 14),
           _buildResumenGeneral(stats),
@@ -490,7 +522,17 @@ class MatchReportPdfExporter {
             _buildDestacados(stats),
             pw.SizedBox(height: 14),
           ],
-          // ─ Página 2+ ─
+        ],
+      ),
+    );
+
+    // ── Bloque 2: eventos por tipo + comparativas ────────────────────────────
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+        header: (ctx) => _miniHeader(match),
+        build: (ctx) => [
           _buildEventosPorTipo(stats),
           pw.SizedBox(height: 14),
           _buildComparativaOfensivaTiempos(stats),
@@ -499,56 +541,97 @@ class MatchReportPdfExporter {
             _buildComparativaDefensivaTiempos(stats),
             pw.SizedBox(height: 14),
           ],
-          if (stats.hasPlayerData) ...[
+        ],
+      ),
+    );
+
+    // ── Bloque 3: participación individual ───────────────────────────────────
+    if (stats.hasPlayerData) {
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+          header: (ctx) => _miniHeader(match),
+          build: (ctx) => [
             _buildParticipacionOfensiva(stats),
             pw.SizedBox(height: 14),
             _buildParticipacionDefensiva(stats),
             pw.SizedBox(height: 14),
             _buildDisciplinaIndividual(stats),
-            pw.SizedBox(height: 14),
           ],
-          _buildTimeline(sortedEvents),
-          if (stats.insights.isNotEmpty) ...[
-            pw.SizedBox(height: 14),
-            _buildInsights(stats),
-          ],
-          if (match.huboPenales) ...[
-            pw.SizedBox(height: 14),
-            _buildDefinicionPenales(match),
-          ],
-        ],
-      ),
-    );
+        ),
+      );
+    }
 
-    // ── Página de análisis espacial (A4 landscape, 3 mapas en columnas) ──────
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
-        header: (ctx) => _miniHeader(match),
-        build: (ctx) => [
-          _buildAnalisisEspacial(
-            generalImg: generalImg,
-            offensiveImg: offensiveImg,
-            defensiveImg: defensiveImg,
-            allEvents: events,
-            offensiveEvents: offensiveEvents,
-            defensiveEvents: defensiveEvents,
+    // ── Bloque 4: timeline en páginas de 30 eventos (pw.Page, sin auto-paginación) ──
+    const timelineChunkSize = 30;
+    for (var ti = 0; ti < sortedEvents.length; ti += timelineChunkSize) {
+      final chunk = sortedEvents.sublist(
+        ti,
+        (ti + timelineChunkSize).clamp(0, sortedEvents.length),
+      );
+      final isFirst = ti == 0;
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _miniHeader(match),
+              pw.SizedBox(height: 8),
+              _buildTimeline(chunk, showTitle: isFirst),
+            ],
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
 
-    await Printing.sharePdf(
-      bytes: await doc.save(),
-      filename:
-          'partido_vs_${_sanitizeFileName(match.rival)}_${_formatDateFile(match.fecha)}.pdf',
-    );
+    // ── Bloque 4b: insights y penales ────────────────────────────────────────
+    if (stats.insights.isNotEmpty || match.huboPenales) {
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+          header: (ctx) => _miniHeader(match),
+          build: (ctx) => [
+            if (stats.insights.isNotEmpty) _buildInsights(stats),
+            if (match.huboPenales) ...[
+              pw.SizedBox(height: 14),
+              _buildDefinicionPenales(match),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // ── Página de análisis espacial ──────────────────────────────────────────
+    if (generalImg != null || offensiveImg != null || defensiveImg != null) {
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+          header: (ctx) => _miniHeader(match),
+          build: (ctx) => [
+            _buildAnalisisEspacial(
+              generalImg: generalImg,
+              offensiveImg: offensiveImg,
+              defensiveImg: defensiveImg,
+              allEvents: events,
+              offensiveEvents: offensiveEvents,
+              defensiveEvents: defensiveEvents,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return await doc.save();
   }
 
   // ── Mini header (páginas 2+) ─────────────────────────────────────────────
   static pw.Widget _miniHeader(PartidoModel match) {
-    const teamName = 'Kancha';
+    const teamName = 'Colón';
     final label = match.esLocal
         ? '$teamName vs ${match.rival}'
         : '${match.rival} vs $teamName';
@@ -569,7 +652,7 @@ class MatchReportPdfExporter {
 
   // ── 1. Encabezado ────────────────────────────────────────────────────────
   static pw.Widget _buildHeader(PartidoModel match, _MatchStats stats) {
-    const teamName = 'Kancha';
+    const teamName = 'Colón';
     final golesOwn = match.golesEquipo ?? 0;
     final golesRiv = match.golesRival ?? 0;
     final localTeam = match.esLocal ? teamName : match.rival;
@@ -592,7 +675,7 @@ class MatchReportPdfExporter {
                       color: _green,
                       fontWeight: pw.FontWeight.bold,
                       letterSpacing: 1.0)),
-              pw.Text('Kancha',
+              pw.Text('Colón',
                   style: const pw.TextStyle(fontSize: 8, color: _muted)),
             ],
           ),
@@ -1448,7 +1531,7 @@ class MatchReportPdfExporter {
     MatchPeriod.segundoTiempoAlargue: 'Alargue — 2T',
   };
 
-  static pw.Widget _buildTimeline(List<EventoPartidoModel> sortedEvents) {
+  static pw.Widget _buildTimeline(List<EventoPartidoModel> sortedEvents, {bool showTitle = true}) {
     if (sortedEvents.isEmpty) return pw.SizedBox();
 
     // Group by explicit periodo field
@@ -1530,8 +1613,10 @@ class MatchReportPdfExporter {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Timeline del partido'),
-        pw.SizedBox(height: 6),
+        if (showTitle) ...[
+          _sectionTitle('Timeline del partido'),
+          pw.SizedBox(height: 6),
+        ],
         pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
           columnWidths: {
@@ -1659,7 +1744,7 @@ class MatchReportPdfExporter {
 
   // ── 15. Definición por penales ───────────────────────────────────────────
   static pw.Widget _buildDefinicionPenales(PartidoModel match) {
-    const teamName = 'Kancha';
+    const teamName = 'Colón';
     final eq = match.resultadoPenalesEquipo ?? 0;
     final rv = match.resultadoPenalesRival ?? 0;
     final ganador = eq > rv

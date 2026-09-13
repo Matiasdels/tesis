@@ -12,6 +12,7 @@ frontend/**/android/.kotlin/
 backend/**/bin/
 backend/**/obj/
 backend/**/appsettings.Development.json
+backend/**/appsettings.Production.json
 
 # IDE
 .vscode/

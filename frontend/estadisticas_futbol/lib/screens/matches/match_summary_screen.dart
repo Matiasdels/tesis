@@ -223,10 +223,11 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
     setState(() => _exportingPdf = true);
     try {
       await MatchReportPdfExporter.export(match: match, events: _events);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('PDF export error: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo generar el PDF.')),
+          SnackBar(content: Text('No se pudo generar el PDF: $e')),
         );
       }
     } finally {
@@ -290,7 +291,7 @@ class _ScoreBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const ownName = 'Kancha';
+    const ownName = 'Colón';
     final rivalName = match.rival;
 
     return AppCard(
@@ -1262,7 +1263,7 @@ class _PenalesCard extends StatelessWidget {
     }
 
     final ganador = equipoScore > rivalScore
-        ? 'Kancha'
+        ? 'Colón'
         : equipoScore < rivalScore
             ? match.rival
             : null;
@@ -1302,10 +1303,10 @@ class _PenalesCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _PenalesTeam(
-                  name: match.esLocal ? 'Kancha' : match.rival,
+                  name: match.esLocal ? 'Colón' : match.rival,
                   score: match.esLocal ? equipoScore : rivalScore,
                   isWinner:
-                      ganador == (match.esLocal ? 'Kancha' : match.rival)),
+                      ganador == (match.esLocal ? 'Colón' : match.rival)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
@@ -1317,10 +1318,10 @@ class _PenalesCard extends StatelessWidget {
                 ),
               ),
               _PenalesTeam(
-                  name: match.esLocal ? match.rival : 'Kancha',
+                  name: match.esLocal ? match.rival : 'Colón',
                   score: match.esLocal ? rivalScore : equipoScore,
                   isWinner:
-                      ganador == (match.esLocal ? match.rival : 'Kancha')),
+                      ganador == (match.esLocal ? match.rival : 'Colón')),
             ],
           ),
           if (ganador != null) ...[
