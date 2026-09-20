@@ -1596,6 +1596,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
     return Scaffold(
       backgroundColor: AppColors.bgDeep,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             // ① Scoreboard + timer
@@ -1753,6 +1754,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                     )
                   : const SizedBox.shrink(),
             ),
+            SizedBox(height: MediaQuery.of(context).viewPadding.bottom),
           ],
         ),
       ),
