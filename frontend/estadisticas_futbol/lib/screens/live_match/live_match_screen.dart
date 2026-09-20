@@ -1720,8 +1720,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                           onMoreTap: _openMoreEvents,
                           onDismiss: _closeRadial,
                         ),
-                      if (canWrite && !_showRadial && !_showPlayerPicker)
-                        const _TapHint(),
+
                       _TimelinePanel(
                         events: _events,
                         isExpanded: _timelineExpanded,
@@ -2938,39 +2937,6 @@ class _RadialRingPainter extends CustomPainter {
 //  TAP HINT
 // =============================================================================
 
-class _TapHint extends StatelessWidget {
-  const _TapHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      bottom: 14,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.borderDefault, width: 0.5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.touch_app_rounded,
-                  size: 13, color: AppColors.textMuted),
-              const SizedBox(width: 6),
-              Text('Toca la cancha para registrar un evento',
-                  style:
-                      TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // =============================================================================
 //  COLLAPSIBLE TIMELINE PANEL
