@@ -1919,8 +1919,8 @@ class _TopBar extends StatelessWidget {
   }
 
   List<Widget> _buildScoreRow() {
-    final homeTeam = partido.esLocal ? 'Kancha' : partido.rival;
-    final awayTeam = partido.esLocal ? partido.rival : 'Kancha';
+    final homeTeam = partido.esLocal ? 'Colón' : partido.rival;
+    final awayTeam = partido.esLocal ? partido.rival : 'Colón';
     final homeAbbr =
         homeTeam.substring(0, math.min(3, homeTeam.length)).toUpperCase();
     final awayAbbr =
