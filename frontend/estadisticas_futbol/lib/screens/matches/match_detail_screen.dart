@@ -318,8 +318,15 @@ class _LineupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titulares = lineup.where((a) => a.esTitular).toList();
-    final suplentes = lineup.where((a) => !a.esTitular).toList();
+    int _posOrder(AlineacionEntradaModel a) {
+      final i = PlayerPositions.all.indexOf(a.posicionAsignada ?? '');
+      return i < 0 ? 999 : i;
+    }
+
+    final titulares = lineup.where((a) => a.esTitular).toList()
+      ..sort((a, b) => _posOrder(a).compareTo(_posOrder(b)));
+    final suplentes = lineup.where((a) => !a.esTitular).toList()
+      ..sort((a, b) => _posOrder(a).compareTo(_posOrder(b)));
 
     return AppCard(
       child: Column(
