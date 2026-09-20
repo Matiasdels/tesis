@@ -1743,7 +1743,15 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
                   ? _PlayerPicker(
                       eventType: _pendingEvent!,
                       minute: MatchTime.calcularMinuto(_minute),
-                      lineup: _rosterState.jugadoresEnCancha,
+                      lineup: [..._rosterState.jugadoresEnCancha]..sort((a, b) {
+                          final pa = a.posicionAsignada ?? '';
+                          final pb = b.posicionAsignada ?? '';
+                          final ia = PlayerPositions.all.indexOf(pa);
+                          final ib = PlayerPositions.all.indexOf(pb);
+                          final ra = ia < 0 ? 999 : ia;
+                          final rb = ib < 0 ? 999 : ib;
+                          return ra.compareTo(rb);
+                        }),
                       saving: _savingEvent,
                       pickingGoalScorer: _pickingGoalScorer,
                       assisterName: _assistPlayer?.nombreJugador,
