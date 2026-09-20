@@ -1136,7 +1136,7 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
 
   void _beginUndo() {
     _undoTimer?.cancel();
-    setState(() => _undoSeconds = 5);
+    setState(() => _undoSeconds = 15);
     _undoTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {
         t.cancel();
