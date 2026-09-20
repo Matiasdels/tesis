@@ -15,5 +15,9 @@ public static class EventTypeNames
     public const string Falta           = "Falta";
     public const string TarjetaAmarilla = "Tarjeta amarilla";
     public const string TarjetaRoja     = "Tarjeta roja";
-    public const string Cambio          = "Cambio";
+    public const string Cambio                = "Cambio";
+    public const string Despeje               = "Despeje";
+    public const string TiroLibre             = "Tiro libre";
+    public const string OcasionClaraFallada   = "Ocasión clara fallada";
+    public const string PaseOfensivoFallado   = "Pase ofensivo fallado";
 }

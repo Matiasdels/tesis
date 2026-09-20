@@ -67,6 +67,10 @@ abstract class EventTypes {
   static const String passKey = 'Pase clave';
   static const String penaltyFor = 'Penal a favor';
   static const String penaltyAgainst = 'Penal en contra';
+  static const String clearance = 'Despeje';
+  static const String freeKick = 'Tiro libre';
+  static const String missedChance = 'Ocasión clara fallada';
+  static const String failedOffensivePass = 'Pase ofensivo fallado';
 
   // Legacy — solo para mostrar partidos anteriores, no se pueden registrar nuevos
   static const String passOk = 'Pase correcto';
@@ -94,6 +98,10 @@ abstract class EventTypes {
     passKey,
     penaltyFor,
     penaltyAgainst,
+    clearance,
+    freeKick,
+    missedChance,
+    failedOffensivePass,
     // legacy
     passOk,
     passBad,
@@ -121,6 +129,10 @@ abstract class EventTypes {
     passKey,
     penaltyFor,
     penaltyAgainst,
+    clearance,
+    freeKick,
+    missedChance,
+    failedOffensivePass,
   ];
 
   // Radial menu — 8 eventos principales
