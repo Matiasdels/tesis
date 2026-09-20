@@ -1603,8 +1603,8 @@ class _LiveMatchScreenState extends State<LiveMatchScreen>
             _TopBar(
               partido: partido,
               minute: _minute,
-              homeScore: _homeScore,
-              awayScore: _awayScore,
+              homeScore: partido.esLocal ? _homeScore : _awayScore,
+              awayScore: partido.esLocal ? _awayScore : _homeScore,
               isRunning: _isRunning,
               currentPeriod: _currentPeriod,
               hasServerConnection: _hasServerConnection,
