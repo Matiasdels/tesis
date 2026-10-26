@@ -7,7 +7,7 @@ chicas (`feature/...`, `fix/...`, `chore/...`) que se integran a `develop`.
 - [x] Restaurar `02_seed_data.sql` (el working copy lo pisó con la migración 10)
 - [x] CI en GitHub Actions: `dotnet build` + `dotnet test` y `flutter analyze` + `flutter test` en cada push/PR
 - [x] Corregir el aviso de `flutter analyze` (`_posOrder` en `match_detail_screen.dart`)
-- [ ] Sincronizar `main` con `develop` (hoy `main` quedó en el commit inicial) y definir cómo se etiquetan versiones
+- [x] Sincronizar `main` con `develop`; versiones con tags `vX.Y.Z` (`v1.0.0` = versión de la tesis)
 - [x] Borrar `.gitignore.rtf` del repo (es un duplicado en formato RTF de `.gitignore`)
 
 ## Fase 1 — Seguridad de acceso
