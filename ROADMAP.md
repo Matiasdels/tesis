@@ -4,11 +4,11 @@ Objetivo: tener una versión que se pueda ofrecer a clubes reales. Cada fase se 
 chicas (`feature/...`, `fix/...`, `chore/...`) que se integran a `develop`.
 
 ## Fase 0 — Higiene (base para trabajar tranquilo)
-- [ ] Restaurar `02_seed_data.sql` (el working copy lo pisó con la migración 10)
-- [ ] CI en GitHub Actions: `dotnet build` + `dotnet test` y `flutter analyze` + `flutter test` en cada push/PR
-- [ ] Corregir el aviso de `flutter analyze` (`_posOrder` en `match_detail_screen.dart`)
+- [x] Restaurar `02_seed_data.sql` (el working copy lo pisó con la migración 10)
+- [x] CI en GitHub Actions: `dotnet build` + `dotnet test` y `flutter analyze` + `flutter test` en cada push/PR
+- [x] Corregir el aviso de `flutter analyze` (`_posOrder` en `match_detail_screen.dart`)
 - [ ] Sincronizar `main` con `develop` (hoy `main` quedó en el commit inicial) y definir cómo se etiquetan versiones
-- [ ] Borrar `.gitignore.rtf` del repo (es un duplicado en formato RTF de `.gitignore`)
+- [x] Borrar `.gitignore.rtf` del repo (es un duplicado en formato RTF de `.gitignore`)
 
 ## Fase 1 — Seguridad de acceso
 - [ ] Cerrar el registro público: alta por invitación o solo por el Responsable institucional
